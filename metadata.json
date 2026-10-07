@@ -1,0 +1,6 @@
+{
+  "name": "claveHogar — Plataforma Inmobiliaria Inteligente",
+  "description": "Plataforma inmobiliaria web y móvil con buscador inteligente con IA para buscar, comparar, publicar y gestionar propiedades en alquiler y venta, visitas, consultas y operaciones.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

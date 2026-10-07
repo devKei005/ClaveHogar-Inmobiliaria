@@ -1,0 +1,212 @@
+{
+  "entities": {
+    "AppUser": {
+      "title": "AppUser",
+      "description": "Platform user profile and role permissions (Cliente, Propietario, Agente, Administrador).",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "maxLength": 128 },
+        "displayName": { "type": "string", "maxLength": 120 },
+        "email": { "type": "string", "format": "email", "maxLength": 160 },
+        "phone": { "type": "string", "maxLength": 40 },
+        "address": { "type": "string", "maxLength": 200 },
+        "dni": { "type": "string", "maxLength": 30 },
+        "role": { "type": "string", "enum": ["cliente", "propietario", "agente", "administrador"] },
+        "isAlsoOwner": { "type": "boolean" },
+        "active": { "type": "boolean" },
+        "agencyName": { "type": "string", "maxLength": 120 },
+        "bio": { "type": "string", "maxLength": 500 }
+      },
+      "required": ["uid", "displayName", "email", "role", "active"]
+    },
+    "Property": {
+      "title": "Property",
+      "description": "Real estate listing for rent or sale stored in Firestore.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "title": { "type": "string", "minLength": 2, "maxLength": 180 },
+        "description": { "type": "string", "maxLength": 4000 },
+        "location": { "type": "string", "maxLength": 160 },
+        "address": { "type": "string", "maxLength": 160 },
+        "operationType": { "type": "string", "enum": ["alquiler", "venta"] },
+        "propertyType": { "type": "string", "maxLength": 60 },
+        "price": { "type": "number" },
+        "currency": { "type": "string", "enum": ["USD", "ARS"] },
+        "surface": { "type": "number" },
+        "rooms": { "type": "number" },
+        "bedrooms": { "type": "number" },
+        "bathrooms": { "type": "number" },
+        "features": { "type": "array" },
+        "images": { "type": "array" },
+        "availability": { "type": "string", "enum": ["disponible", "reservada", "alquilada", "vendida"] },
+        "publicationStatus": { "type": "string", "enum": ["pendiente", "aprobada", "rechazada"] },
+        "ownerId": { "type": "string", "maxLength": 128 },
+        "ownerName": { "type": "string", "maxLength": 120 },
+        "agentId": { "type": "string", "maxLength": 128 },
+        "agentName": { "type": "string", "maxLength": 120 },
+        "createdAtIso": { "type": "string" }
+      },
+      "required": ["id", "title", "description", "location", "operationType", "price", "images"]
+    },
+    "Favorite": {
+      "title": "Favorite",
+      "description": "Saved favorite property for a user.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "maxLength": 128 },
+        "propertyId": { "type": "string", "maxLength": 128 },
+        "createdAtIso": { "type": "string" }
+      },
+      "required": ["userId", "propertyId"]
+    },
+    "Visit": {
+      "title": "Visit",
+      "description": "Scheduled property visit request.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "propertyId": { "type": "string", "maxLength": 128 },
+        "propertyTitle": { "type": "string", "maxLength": 180 },
+        "clientId": { "type": "string", "maxLength": 128 },
+        "clientName": { "type": "string", "maxLength": 120 },
+        "ownerId": { "type": "string", "maxLength": 128 },
+        "agentId": { "type": "string", "maxLength": 128 },
+        "date": { "type": "string" },
+        "timeSlot": { "type": "string" },
+        "status": { "type": "string", "enum": ["pendiente", "confirmada", "reprogramada", "rechazada", "cancelada", "realizada"] },
+        "notes": { "type": "string", "maxLength": 500 },
+        "createdAtIso": { "type": "string" }
+      },
+      "required": ["propertyId", "clientId", "status"]
+    },
+    "Inquiry": {
+      "title": "Inquiry",
+      "description": "Chat conversation and inquiry thread between client, owner, and agent.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "propertyId": { "type": "string", "maxLength": 128 },
+        "propertyTitle": { "type": "string", "maxLength": 180 },
+        "clientId": { "type": "string", "maxLength": 128 },
+        "clientName": { "type": "string", "maxLength": 120 },
+        "ownerId": { "type": "string", "maxLength": 128 },
+        "agentId": { "type": "string", "maxLength": 128 },
+        "question": { "type": "string", "maxLength": 1000 },
+        "reply": { "type": "string", "maxLength": 1000 },
+        "messages": { "type": "array" },
+        "status": { "type": "string", "enum": ["pendiente", "respondida"] },
+        "createdAtIso": { "type": "string" }
+      },
+      "required": ["propertyId", "clientId", "messages"]
+    },
+    "Operation": {
+      "title": "Operation",
+      "description": "Rental or purchase request and contract registration.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "propertyId": { "type": "string", "maxLength": 128 },
+        "propertyTitle": { "type": "string", "maxLength": 180 },
+        "operationType": { "type": "string", "enum": ["alquiler", "venta"] },
+        "offeredAmount": { "type": "number" },
+        "currency": { "type": "string", "enum": ["USD", "ARS"] },
+        "clientId": { "type": "string", "maxLength": 128 },
+        "clientName": { "type": "string", "maxLength": 120 },
+        "ownerId": { "type": "string", "maxLength": 128 },
+        "agentId": { "type": "string", "maxLength": 128 },
+        "status": { "type": "string", "enum": ["solicitada", "en_revision", "aprobada", "rechazada", "concretada"] },
+        "message": { "type": "string", "maxLength": 800 },
+        "contractCode": { "type": "string" },
+        "contractTerms": { "type": "string" },
+        "contractStartDate": { "type": "string" },
+        "contractEndDate": { "type": "string" },
+        "createdAtIso": { "type": "string" }
+      },
+      "required": ["propertyId", "clientId", "status"]
+    },
+    "Claim": {
+      "title": "Claim",
+      "description": "User claim or support ticket.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "reporterId": { "type": "string", "maxLength": 128 },
+        "reporterName": { "type": "string", "maxLength": 120 },
+        "targetType": { "type": "string", "enum": ["publicacion", "usuario", "visita", "operacion"] },
+        "targetReference": { "type": "string", "maxLength": 140 },
+        "subject": { "type": "string", "maxLength": 200 },
+        "description": { "type": "string", "maxLength": 1000 },
+        "status": { "type": "string", "enum": ["abierto", "en_revision", "resuelto", "desestimado"] },
+        "adminResolution": { "type": "string", "maxLength": 800 },
+        "createdAtIso": { "type": "string" }
+      },
+      "required": ["reporterId", "subject"]
+    },
+    "Category": {
+      "title": "Category",
+      "description": "Property type or amenity configuration.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "name": { "type": "string", "maxLength": 100 },
+        "kind": { "type": "string", "enum": ["tipo_inmueble", "caracteristica"] },
+        "active": { "type": "boolean" }
+      },
+      "required": ["name", "kind"]
+    },
+    "Notification": {
+      "title": "Notification",
+      "description": "User notification record.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "title": { "type": "string", "maxLength": 160 },
+        "message": { "type": "string", "maxLength": 500 },
+        "type": { "type": "string", "enum": ["success", "info", "warning"] },
+        "read": { "type": "boolean" },
+        "createdAtIso": { "type": "string" }
+      },
+      "required": ["userId", "title"]
+    }
+  },
+  "firestore": {
+    "/app_users/{userId}": {
+      "schema": { "$ref": "#/entities/AppUser" },
+      "description": "Persistent user accounts and roles."
+    },
+    "/properties/{propertyId}": {
+      "schema": { "$ref": "#/entities/Property" },
+      "description": "Real estate properties for rent and sale."
+    },
+    "/favorites/{favoriteId}": {
+      "schema": { "$ref": "#/entities/Favorite" },
+      "description": "Client favorite property links."
+    },
+    "/visits/{visitId}": {
+      "schema": { "$ref": "#/entities/Visit" },
+      "description": "Property visit bookings."
+    },
+    "/inquiries/{inquiryId}": {
+      "schema": { "$ref": "#/entities/Inquiry" },
+      "description": "Chat conversations on properties."
+    },
+    "/operations/{operationId}": {
+      "schema": { "$ref": "#/entities/Operation" },
+      "description": "Rental and sale applications and contracts."
+    },
+    "/claims/{claimId}": {
+      "schema": { "$ref": "#/entities/Claim" },
+      "description": "Platform claims and disputes."
+    },
+    "/categories/{categoryId}": {
+      "schema": { "$ref": "#/entities/Category" },
+      "description": "Property types and features catalog."
+    },
+    "/notifications/{notificationId}": {
+      "schema": { "$ref": "#/entities/Notification" },
+      "description": "User alerts and notifications."
+    }
+  }
+}

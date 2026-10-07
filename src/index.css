@@ -1,0 +1,50 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --font-display: 'Cormorant Garamond', Georgia, serif;
+    --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
+
+    /* Paleta Editorial ClaveHogar: Arquitectura & Hogar */
+    --color-olive: #39483A;
+    --color-sage: #A8B5A0;
+    --color-cream: #F5F1E8;
+    --color-sand: #D8C7AA;
+    --color-terracotta: #B86F52;
+    --color-offwhite: #FCFBF7;
+    --color-ink: #1F241F;
+  }
+
+  body {
+    font-family: var(--font-sans);
+    background-color: #FCFBF7;
+    color: #1F241F;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  h1, h2, h3, .font-serif-display {
+    font-family: var(--font-display);
+    text-wrap: balance;
+  }
+
+  .font-tabular {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+@keyframes fadeInGentle {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-slide {
+  animation: fadeInGentle 0.35s ease-out forwards;
+}

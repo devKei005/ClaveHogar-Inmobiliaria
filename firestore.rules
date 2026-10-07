@@ -1,0 +1,115 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+    function incoming() {
+      return request.resource.data;
+    }
+    function existing() {
+      return resource.data;
+    }
+
+    // Connection health check endpoint
+    match /test/{docId} {
+      allow get: if isValidId(docId);
+      allow list, create, update, delete: if false;
+    }
+
+    // Users collection (persistent auth & role profiles)
+    match /app_users/{userId} {
+      allow get, list: if true;
+      allow create, update: if isValidId(userId)
+        && incoming().uid is string && incoming().uid.size() <= 128
+        && incoming().displayName is string && incoming().displayName.size() <= 120
+        && incoming().email is string && incoming().email.size() <= 160
+        && incoming().role in ['cliente', 'propietario', 'agente', 'administrador'];
+      allow delete: if isValidId(userId);
+    }
+
+    // Properties collection (CRUD persistent in Firestore)
+    match /properties/{propertyId} {
+      allow get, list: if true;
+      allow create, update: if isValidId(propertyId)
+        && incoming().title is string && incoming().title.size() >= 2 && incoming().title.size() <= 180
+        && incoming().description is string && incoming().description.size() <= 4000
+        && incoming().location is string && incoming().location.size() <= 160
+        && incoming().operationType in ['alquiler', 'venta']
+        && incoming().price is number && incoming().price >= 0
+        && incoming().images is list && incoming().images.size() <= 10;
+      allow delete: if isValidId(propertyId);
+    }
+
+    // Favorites collection
+    match /favorites/{favoriteId} {
+      allow get, list: if true;
+      allow create, update: if isValidId(favoriteId)
+        && incoming().userId is string && incoming().userId.size() <= 128
+        && incoming().propertyId is string && incoming().propertyId.size() <= 128;
+      allow delete: if isValidId(favoriteId);
+    }
+
+    // Visits collection
+    match /visits/{visitId} {
+      allow get, list: if true;
+      allow create, update: if isValidId(visitId)
+        && incoming().propertyId is string && incoming().propertyId.size() <= 128
+        && incoming().clientId is string && incoming().clientId.size() <= 128
+        && incoming().status in ['pendiente', 'confirmada', 'reprogramada', 'rechazada', 'cancelada', 'realizada'];
+      allow delete: if isValidId(visitId);
+    }
+
+    // Inquiries / Chat conversations collection
+    match /inquiries/{inquiryId} {
+      allow get, list: if true;
+      allow create, update: if isValidId(inquiryId)
+        && incoming().propertyId is string && incoming().propertyId.size() <= 128
+        && incoming().clientId is string && incoming().clientId.size() <= 128
+        && incoming().messages is list && incoming().messages.size() <= 200;
+      allow delete: if isValidId(inquiryId);
+    }
+
+    // Operations & Contracts collection
+    match /operations/{operationId} {
+      allow get, list: if true;
+      allow create, update: if isValidId(operationId)
+        && incoming().propertyId is string && incoming().propertyId.size() <= 128
+        && incoming().clientId is string && incoming().clientId.size() <= 128
+        && incoming().status in ['solicitada', 'en_revision', 'aprobada', 'rechazada', 'concretada'];
+      allow delete: if isValidId(operationId);
+    }
+
+    // Claims / Reclamos collection
+    match /claims/{claimId} {
+      allow get, list: if true;
+      allow create, update: if isValidId(claimId)
+        && incoming().reporterId is string && incoming().reporterId.size() <= 128
+        && incoming().subject is string && incoming().subject.size() <= 200;
+      allow delete: if isValidId(claimId);
+    }
+
+    // Categories & Features collection
+    match /categories/{categoryId} {
+      allow get, list: if true;
+      allow create, update: if isValidId(categoryId)
+        && incoming().name is string && incoming().name.size() <= 100
+        && incoming().kind in ['tipo_inmueble', 'caracteristica'];
+      allow delete: if isValidId(categoryId);
+    }
+
+    // Notifications collection
+    match /notifications/{notificationId} {
+      allow get, list: if true;
+      allow create, update: if isValidId(notificationId)
+        && incoming().userId is string && incoming().userId.size() <= 128
+        && incoming().title is string && incoming().title.size() <= 160;
+      allow delete: if isValidId(notificationId);
+    }
+  }
+}
