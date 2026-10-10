@@ -108,7 +108,7 @@ export default function App() {
 
   // Auth & User state
   const [users, setUsers] = useState<UserProfile[]>(INITIAL_USERS);
-  const [currentUser, setCurrentUser] = useState<UserProfile | null>(INITIAL_USERS[0]);
+  const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [authModalMode, setAuthModalMode] = useState<AuthModalMode>('login');
   const [showNotifDropdown, setShowNotifDropdown] = useState(false);
