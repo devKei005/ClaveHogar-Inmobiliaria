@@ -1,3 +1,5 @@
+import { deprecate } from "util";
+
 export type UserRole = 'cliente' | 'propietario' | 'agente' | 'administrador';
 
 export type OperationTypeChoice = 'alquiler' | 'venta';
@@ -47,7 +49,7 @@ export interface UserProfile {
   uid: string;
   displayName: string;
   email: string;
-  password?: string;
+  // password?: string; 
   phone: string;
   address: string;
   dni: string;

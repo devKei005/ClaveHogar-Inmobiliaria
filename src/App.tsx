@@ -16,6 +16,10 @@ import {
 import {
   onAuthStateChanged,
   signInWithPopup,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  updateProfile,
+  sendPasswordResetEmail,
   signOut,
 } from 'firebase/auth';
 import {
@@ -115,11 +119,8 @@ export default function App() {
 
   // Core Entities state (synced with Firestore)
   const [properties, setProperties] = useState<PropertyItem[]>(INITIAL_PROPERTIES);
-  const [favoriteIds, setFavoriteIds] = useState<string[]>(['prop_casa_quilmes_pileta']);
-  const [comparedIds, setComparedIds] = useState<string[]>([
-    'prop_casa_quilmes_pileta',
-    'prop_chalet_quilmes_parque',
-  ]);
+  const [favoriteIds, setFavoriteIds] = useState<string[]>([]);
+ const [comparedIds, setComparedIds] = useState<string[]>([]);   //'prop_casa_quilmes_pileta','prop_chalet_quilmes_parque',
   const [visits, setVisits] = useState<VisitItem[]>(INITIAL_VISITS);
   const [inquiries, setInquiries] = useState<InquiryItem[]>(INITIAL_INQUIRIES);
   const [operations, setOperations] = useState<OperationItem[]>(INITIAL_OPERATIONS);
@@ -150,7 +151,7 @@ export default function App() {
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
 
   // AI Smart Search
-  const [aiQuery, setAiQuery] = useState(AI_PROMPT_SUGGESTIONS[0]);
+  const [aiQuery, setAiQuery] = useState('');
   const [aiLoading, setAiLoading] = useState(false);
   const [aiResult, setAiResult] = useState<AISmartSearchResponse | null>(null);
 
@@ -383,7 +384,10 @@ export default function App() {
   // Sync Firebase Google Auth if used
   useEffect(() => {
     const unsubAuth = onAuthStateChanged(auth, async (user) => {
-      if (!user) return;
+      if (!user) {
+   setCurrentUser(null);
+    return;
+}
       const uid = sanitizeId(user.uid);
       const isBootstrapAdmin = user.email === 'programacionkeichi@gmail.com';
       const defaultRole: UserRole = isBootstrapAdmin ? 'administrador' : 'cliente';
@@ -491,11 +495,9 @@ export default function App() {
   );
 
   const myNotifications = useMemo(() => {
-    if (!currentUser) return [];
-    return notifications.filter(
-      (n) => n.userId === currentUser.uid || n.userId === 'usr_cliente_demo'
-    );
-  }, [notifications, currentUser]);
+  if (!currentUser) return [];
+  return notifications.filter((n) => n.userId === currentUser.uid);
+}, [notifications, currentUser]);
 
   const unreadCount = myNotifications.filter((n) => !n.read).length;
 
@@ -517,47 +519,61 @@ export default function App() {
   };
 
   const handleLoginSubmit = async (email: string, password: string): Promise<boolean> => {
-    const found = users.find(
-      (u) => u.email.toLowerCase() === email.toLowerCase() && (!u.password || u.password === password)
-    );
-    if (!found) {
-      notify('error', 'Credenciales incorrectas', 'Verificá tu correo electrónico y contraseña o registrate.');
+  try {
+    const cred = await signInWithEmailAndPassword(auth, email, password);
+    const profile =
+      users.find((u) => u.uid === cred.user.uid) ||
+      users.find((u) => u.email.toLowerCase() === email.toLowerCase());
+
+    if (!profile) {
+      notify('error', 'Perfil no encontrado', 'Tu cuenta existe pero falta el perfil en la base de datos.');
       return false;
     }
-    if (!found.active) {
-      notify('error', 'Cuenta suspendida', 'Tu cuenta se encuentra desactivada por el administrador.');
+    if (!profile.active) {
+      notify('error', 'Cuenta suspendida', 'Tu cuenta está desactivada por el administrador.');
+      await signOut(auth);
       return false;
     }
-    setCurrentUser(found);
-    setActiveSubView(getDefaultSubViewForRole(found.role));
-    notify('success', `¡Bienvenido/a, ${found.displayName}!`, `Ingresaste con tu cuenta de ${found.role}.`);
+
+    setCurrentUser(profile);
+    setActiveSubView(getDefaultSubViewForRole(profile.role));
+    notify('success', `¡Bienvenido/a, ${profile.displayName}!`, `Ingresaste con tu cuenta de ${profile.role}.`);
     return true;
-  };
+  } catch (err: any) {
+    const msg =
+      err?.code === 'auth/wrong-password' || err?.code === 'auth/invalid-credential'
+        ? 'Correo o contraseña incorrectos.'
+        : err?.code === 'auth/user-not-found'
+        ? 'No existe una cuenta con ese correo.'
+        : err?.code === 'auth/too-many-requests'
+        ? 'Demasiados intentos. Probá más tarde.'
+        : 'No se pudo iniciar sesión.';
+    notify('error', 'Error al iniciar sesión', msg);
+    return false;
+  }
+};
 
   const handleRegisterSubmit = async (data: {
-    displayName: string;
-    email: string;
-    password: string;
-    phone: string;
-    address: string;
-    dni: string;
-  }): Promise<boolean> => {
-    if (!data.displayName || !data.email || !data.password || !data.phone || !data.dni) {
-      notify('error', 'Error: faltan completar campos', 'Completá todos los campos obligatorios del registro.');
-      return false;
-    }
-    const exists = users.some((u) => u.email.toLowerCase() === data.email.toLowerCase());
-    if (exists) {
-      notify('error', 'El correo ya está registrado', 'Intentá iniciar sesión con ese correo electrónico.');
-      return false;
-    }
+  displayName: string;
+  email: string;
+  password: string;
+  phone: string;
+  address: string;
+  dni: string;
+}): Promise<boolean> => {
+  if (!data.displayName || !data.email || !data.password || !data.phone || !data.dni) {
+    notify('error', 'Error: faltan completar campos', 'Completá todos los campos obligatorios del registro.');
+    return false;
+  }
 
-    const uid = sanitizeId(`usr_${Date.now()}`);
+  try {
+    const cred = await createUserWithEmailAndPassword(auth, data.email, data.password);
+    await updateProfile(cred.user, { displayName: data.displayName });
+
     const newUser: UserProfile = {
-      uid,
+      uid: cred.user.uid,            // ⬅️ UID REAL de Firebase Auth
       displayName: data.displayName,
       email: data.email,
-      password: data.password,
       phone: data.phone,
       address: data.address,
       dni: data.dni,
@@ -566,32 +582,47 @@ export default function App() {
       active: true,
       agencyName: '',
       bio: 'Cliente registrado en ClaveHogar.',
+      // ⬅️ NO guardes password acá
     };
 
-    try {
-      await setDoc(doc(db, 'app_users', uid), newUser);
-      setUsers((prev) => [newUser, ...prev]);
-      setCurrentUser(newUser);
-      setActiveSubView('cliente_favoritos');
-      notify(
-        'success',
-        'Cuenta creada correctamente',
-        'Te registraste como Cliente. Podés buscar inmuebles o habilitar tu perfil de Propietario.'
-      );
-      return true;
-    } catch (err) {
-      notify('error', 'Error al guardar los datos', 'No se pudo registrar el usuario en Firestore.');
-      handleFirestoreError(err, OperationType.CREATE, `app_users/${uid}`);
-    }
-  };
+    await setDoc(doc(db, 'app_users', cred.user.uid), newUser);
+    setUsers((prev) => [newUser, ...prev.filter((u) => u.uid !== newUser.uid)]);
+    setCurrentUser(newUser);
+    setActiveSubView('cliente_favoritos');
+    notify('success', 'Cuenta creada correctamente', 'Te registraste como Cliente.');
+    return true;
+ } catch (err: any) {
+  const code = err?.code || 'desconocido';
+  const msg  = err?.message || String(err);
+  console.error('❌ ERROR REGISTRO FIREBASE:', code, msg);
 
-  const handlePasswordReset = async (email: string) => {
-    notify(
-      'info',
-      'Enlace de recuperación enviado',
-      `Se enviaron las instrucciones de restablecimiento a ${email}.`
-    );
-  };
+  // Mapeo de errores comunes a mensajes humanos
+  const humanMsg =
+    code === 'auth/operation-not-allowed'
+      ? 'El registro con email/contraseña no está habilitado en Firebase. Andá a Authentication → Sign-in method y activá Email/Password.'
+      : code === 'auth/email-already-in-use'
+      ? 'Ese correo ya está registrado. Probá iniciar sesión.'
+      : code === 'auth/weak-password'
+      ? 'La contraseña debe tener al menos 6 caracteres.'
+      : code === 'auth/invalid-email'
+      ? 'El correo no tiene un formato válido.'
+      : code === 'permission-denied' || code === 'firestore/permission-denied'
+      ? 'Firestore rechazó guardar el perfil. Revisá las reglas de seguridad.'
+      : `No se pudo crear la cuenta. (${code})`;
+
+  notify('error', 'Error al registrarte', humanMsg);
+  return false;
+}
+};
+
+ const handlePasswordReset = async (email: string) => {
+  try {
+    await sendPasswordResetEmail(auth, email);
+    notify('info', 'Enlace enviado', `Revisá la casilla de ${email}.`);
+  } catch {
+    notify('error', 'No se pudo enviar el enlace', 'Verificá el correo ingresado.');
+  }
+};
 
   const handleQuickRoleLogin = (role: UserRole) => {
     const target = users.find((u) => u.role === role) || INITIAL_USERS.find((u) => u.role === role) || INITIAL_USERS[0];
@@ -718,8 +749,8 @@ export default function App() {
       id: propId,
       ownerId: existingProp?.ownerId || currentUser.uid,
       ownerName: existingProp?.ownerName || currentUser.displayName,
-      agentId: data.agentId || existingProp?.agentId || 'usr_agente_demo',
-      agentName: data.agentName || existingProp?.agentName || 'Valentina Alvear',
+      agentId: data.agentId || existingProp?.agentId || '',
+      agentName: data.agentName || existingProp?.agentName || '',
       publicationStatus: existingProp?.publicationStatus || 'aprobada',
       createdAtIso: existingProp?.createdAtIso || new Date().toISOString(),
     };
@@ -842,7 +873,7 @@ export default function App() {
       clientId: currentUser.uid,
       clientName: currentUser.displayName,
       ownerId: property.ownerId,
-      agentId: property.agentId || 'usr_agente_demo',
+      agentId: property.agentId || ' ',
       date,
       timeSlot,
       status: 'pendiente',
@@ -985,8 +1016,8 @@ export default function App() {
         clientName: currentUser.displayName,
         ownerId: property.ownerId,
         ownerName: property.ownerName,
-        agentId: property.agentId || 'usr_agente_demo',
-        agentName: property.agentName || 'Valentina Alvear',
+        agentId: property.agentId || ' ',
+        agentName: property.agentName || ' ',
         question: newMsg.text,
         reply: '',
         messages: [newMsg],
@@ -1028,7 +1059,7 @@ export default function App() {
       clientId: currentUser.uid,
       clientName: currentUser.displayName,
       ownerId: property.ownerId,
-      agentId: property.agentId || 'usr_agente_demo',
+      agentId: property.agentId || ' ',
       status: 'solicitada',
       message,
       createdAtIso: new Date().toISOString(),
@@ -1339,6 +1370,75 @@ export default function App() {
       }
     }
   };
+// ============================================================================
+// FILTRADO POR ROL — cada usuario ve SOLO lo que le corresponde
+// ============================================================================
+
+// Propiedades según rol
+const scopedProperties = useMemo(() => {
+  if (!currentUser) return [];
+  if (currentUser.role === 'administrador') return properties;
+  if (currentUser.role === 'agente') {
+    return properties.filter((p) => p.agentId === currentUser.uid);
+  }
+  // cliente y propietario ven solo las que publicaron
+  return properties.filter((p) => p.ownerId === currentUser.uid);
+}, [properties, currentUser]);
+
+// Visitas
+const scopedVisits = useMemo(() => {
+  if (!currentUser) return [];
+  if (currentUser.role === 'administrador') return visits;
+  if (currentUser.role === 'cliente') {
+    return visits.filter((v) => v.clientId === currentUser.uid);
+  }
+  if (currentUser.role === 'propietario') {
+    return visits.filter((v) => v.ownerId === currentUser.uid);
+  }
+  if (currentUser.role === 'agente') {
+    return visits.filter((v) => v.agentId === currentUser.uid);
+  }
+  return [];
+}, [visits, currentUser]);
+
+// Consultas / chat
+const scopedInquiries = useMemo(() => {
+  if (!currentUser) return [];
+  if (currentUser.role === 'administrador') return inquiries;
+  if (currentUser.role === 'cliente') {
+    return inquiries.filter((i) => i.clientId === currentUser.uid);
+  }
+  if (currentUser.role === 'propietario') {
+    return inquiries.filter((i) => i.ownerId === currentUser.uid);
+  }
+  if (currentUser.role === 'agente') {
+    return inquiries.filter((i) => i.agentId === currentUser.uid);
+  }
+  return [];
+}, [inquiries, currentUser]);
+
+// Operaciones / contratos
+const scopedOperations = useMemo(() => {
+  if (!currentUser) return [];
+  if (currentUser.role === 'administrador') return operations;
+  if (currentUser.role === 'cliente') {
+    return operations.filter((o) => o.clientId === currentUser.uid);
+  }
+  if (currentUser.role === 'propietario') {
+    return operations.filter((o) => o.ownerId === currentUser.uid);
+  }
+  if (currentUser.role === 'agente') {
+    return operations.filter((o) => o.agentId === currentUser.uid);
+  }
+  return [];
+}, [operations, currentUser]);
+
+// Reclamos
+const scopedClaims = useMemo(() => {
+  if (!currentUser) return [];
+  if (currentUser.role === 'administrador') return claims;
+  return claims.filter((c) => c.reporterId === currentUser.uid);
+}, [claims, currentUser]);
 
   return (
     <div className="min-h-screen flex flex-col bg-[#FCFBF7] text-[#1F241F]">
@@ -2412,12 +2512,12 @@ export default function App() {
             activeSubView={activeSubView}
             onChangeSubView={setActiveSubView}
             users={users}
-            properties={properties}
+            properties={scopedProperties}     
             favoriteIds={favoriteIds}
-            visits={visits}
-            inquiries={inquiries}
-            operations={operations}
-            claims={claims}
+            visits={scopedVisits}             
+            inquiries={scopedInquiries}      
+            operations={scopedOperations}      
+            claims={scopedClaims}         
             categories={categories}
             onEnableOwnerRole={handleEnableOwnerRole}
             onOpenNewProperty={() => {

@@ -221,10 +221,10 @@ export const AuthProfileModal: React.FC<AuthProfileModalProps> = ({
 
               <div className="relative flex py-1 items-center">
                 <div className="flex-grow border-t border-[#D8C7AA]"></div>
-                <span className="flex-shrink mx-3 text-xs text-[#39483A]/60">o continuá con</span>
+                <span className="flex-shrink mx-3 text-xs text-[#39483A]/60">O acceso rápido:</span>
                 <div className="flex-grow border-t border-[#D8C7AA]"></div>
               </div>
-
+{/* 
               <button
                 type="button"
                 onClick={async () => {
@@ -234,12 +234,12 @@ export const AuthProfileModal: React.FC<AuthProfileModalProps> = ({
                 className="w-full py-2.5 px-4 text-xs font-semibold text-[#39483A] bg-white border border-[#D8C7AA] hover:bg-[#F5F1E8] rounded-sm transition-colors"
               >
                 Continuar con Google Auth
-              </button>
+              </button> */}
 
               {/* Quick Demo Credentials helper */}
               <div className="p-4 bg-[#F5F1E8] border border-[#D8C7AA] rounded-sm space-y-2.5">
                 <div className="text-[11px] font-semibold text-[#39483A]">
-                  Acceso rápido a cuentas verificadas (según quien ingresa ve su propio menú):
+                  Acceso rápido a cuentas verificadas (según su rol):
                 </div>
                 <div className="grid grid-cols-2 gap-2">
                   <button
@@ -302,7 +302,7 @@ export const AuthProfileModal: React.FC<AuthProfileModalProps> = ({
           {mode === 'register' && (
             <div className="space-y-4">
               <div className="p-3 bg-[#F5F1E8] border border-[#D8C7AA] rounded-sm text-xs text-[#39483A]">
-                Tu cuenta se creará con perfil de <strong>Cliente</strong> por defecto. Luego podrás habilitar también funciones de <strong>Propietario</strong> si deseás publicar un inmueble.
+                Tu cuenta se creará con perfil de <strong>Cliente</strong>.Luego podrás habilitar también funciones de <strong>Propietario</strong> si deseás publicar un inmueble.
               </div>
 
               <form onSubmit={handleRegister} className="space-y-3.5">
