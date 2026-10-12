@@ -7,6 +7,16 @@ import {
   Send,
   ArrowLeft,
   ChevronRight,
+  UserCheck,
+  ShieldCheck,
+  Check,
+  X,
+  User,
+  Clock,
+  AlertCircle,
+  Camera,
+  CheckCircle2,
+  XCircle,
 } from 'lucide-react';
 import {
   UserProfile,
@@ -53,20 +63,35 @@ interface RoleWorkspaceViewProps {
   activeSubView: WorkspaceSubView;
   onChangeSubView: (sub: WorkspaceSubView) => void;
   users: UserProfile[];
-  properties: PropertyItem[];
+  allProperties: PropertyItem[];
   favoriteIds: string[];
-  visits: VisitItem[];
-  inquiries: InquiryItem[];
-  operations: OperationItem[];
+  allVisits: VisitItem[];
+  allInquiries: InquiryItem[];
+  allOperations: OperationItem[];
   claims: ClaimItem[];
   categories: CategoryConfigItem[];
   onEnableOwnerRole: () => Promise<void>;
+  onOpenProfileModal?: () => void;
   onOpenNewProperty: () => void;
   onOpenEditProperty: (property: PropertyItem) => void;
   onSelectProperty: (property: PropertyItem) => void;
   onDeleteProperty: (propertyId: string) => Promise<void>;
   onUpdateAvailability: (propertyId: string, availability: AvailabilityStatus) => Promise<void>;
-  onAssignAgent: (propertyId: string, agentId: string, agentName: string) => Promise<void>;
+  onOwnerRequestAgent: (
+    propertyId: string,
+    mode: 'directa' | 'elegir_agente' | 'asignacion_admin',
+    chosenAgent?: UserProfile
+  ) => Promise<void>;
+  onAgentRespondAssignment: (
+    propertyId: string,
+    accept: boolean,
+    reason?: string
+  ) => Promise<void>;
+  onAdminConfirmAgentAssignment: (
+    propertyId: string,
+    agentId: string,
+    agentName: string
+  ) => Promise<void>;
   onModerateProperty: (
     propertyId: string,
     status: PublicationStatus,
@@ -107,25 +132,100 @@ interface RoleWorkspaceViewProps {
   onToggleCategory: (categoryId: string, active: boolean) => Promise<void>;
 }
 
+export function isAgentConfirmedOnProperty(prop: PropertyItem, agentUid?: string): boolean {
+  const hasAgent = Boolean(prop.agentId && prop.agentId.trim().length > 0);
+  if (!hasAgent) return false;
+  const statusOk = !prop.agentAssignmentStatus || prop.agentAssignmentStatus === 'asignado';
+  if (!statusOk) return false;
+  if (agentUid) return prop.agentId === agentUid;
+  return true;
+}
+
+/**
+ * Colores semánticos de alto contraste para diferenciar claramente los estados
+ * (Rechazado, En revisión / Pendiente, Aprobado / Confirmado, Cancelado, etc.)
+ * respecto del color crema/oliva normal de la página.
+ */
+function getPublicationStatusBadgeClass(status: PublicationStatus): string {
+  switch (status) {
+    case 'aprobada':
+      return 'bg-emerald-100 text-emerald-900 border-emerald-400';
+    case 'pendiente':
+      return 'bg-amber-100 text-amber-900 border-amber-400';
+    case 'rechazada':
+      return 'bg-red-100 text-red-800 border-red-400';
+    default:
+      return 'bg-amber-100 text-amber-900 border-amber-400';
+  }
+}
+
+function getVisitStatusBadgeClass(status: VisitStatus): string {
+  switch (status) {
+    case 'confirmada':
+    case 'realizada':
+      return 'bg-emerald-100 text-emerald-900 border-emerald-400';
+    case 'pendiente':
+    case 'reprogramada':
+      return 'bg-amber-100 text-amber-900 border-amber-400';
+    case 'rechazada':
+    case 'cancelada':
+      return 'bg-red-100 text-red-800 border-red-400';
+    default:
+      return 'bg-amber-100 text-amber-900 border-amber-400';
+  }
+}
+
+function getDealStatusBadgeClass(status: DealStatus): string {
+  switch (status) {
+    case 'aprobada':
+    case 'concretada':
+      return 'bg-emerald-100 text-emerald-900 border-emerald-400';
+    case 'solicitada':
+    case 'en_revision':
+      return 'bg-amber-100 text-amber-900 border-amber-400';
+    case 'rechazada':
+      return 'bg-red-100 text-red-800 border-red-400';
+    default:
+      return 'bg-amber-100 text-amber-900 border-amber-400';
+  }
+}
+
+function getClaimStatusBadgeClass(status: ClaimStatus): string {
+  switch (status) {
+    case 'resuelto':
+      return 'bg-emerald-100 text-emerald-900 border-emerald-400';
+    case 'abierto':
+    case 'en_revision':
+      return 'bg-amber-100 text-amber-900 border-amber-400';
+    case 'desestimado':
+      return 'bg-red-100 text-red-800 border-red-400';
+    default:
+      return 'bg-amber-100 text-amber-900 border-amber-400';
+  }
+}
+
 export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
   currentUser,
   activeSubView,
   onChangeSubView,
   users,
-  properties,
+  allProperties,
   favoriteIds,
-  visits,
-  inquiries,
-  operations,
+  allVisits,
+  allInquiries,
+  allOperations,
   claims,
   categories,
   onEnableOwnerRole,
+  onOpenProfileModal,
   onOpenNewProperty,
   onOpenEditProperty,
   onSelectProperty,
   onDeleteProperty,
   onUpdateAvailability,
-  onAssignAgent,
+  onOwnerRequestAgent,
+  onAgentRespondAssignment,
+  onAdminConfirmAgentAssignment,
   onModerateProperty,
   onToggleFavorite,
   onUpdateVisit,
@@ -137,7 +237,6 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
   onAddCategory,
   onToggleCategory,
 }) => {
-  // Selected chat conversation ID (null = show list of people/conversations; string = show full chat screen)
   const [selectedChatId, setSelectedChatId] = useState<string | null>(null);
   const [replyDrafts, setReplyDrafts] = useState<Record<string, string>>({});
   const [rescheduleDates, setRescheduleDates] = useState<Record<string, string>>({});
@@ -146,6 +245,19 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
   const [contractDrafts, setContractDrafts] = useState<
     Record<string, { code: string; terms: string; start: string; end: string }>
   >({});
+
+  // Filtro en Panel de Administrador: separar las solicitudes sin acción de las ya respondidas
+  const [adminModerationFilter, setAdminModerationFilter] = useState<'pendientes' | 'respondidas'>(
+    'pendientes'
+  );
+  const [adminClaimFilter, setAdminClaimFilter] = useState<'pendientes' | 'respondidos'>(
+    'pendientes'
+  );
+
+  // Agent selector modal/drawer per property for Owner
+  const [agentSelectorPropId, setAgentSelectorPropId] = useState<string | null>(null);
+  const [agentRejectReasonDrafts, setAgentRejectReasonDrafts] = useState<Record<string, string>>({});
+  const [adminSelectedAgentByProp, setAdminSelectedAgentByProp] = useState<Record<string, string>>({});
 
   const [claimTargetType, setClaimTargetType] = useState<ClaimTargetType>('publicacion');
   const [claimRef, setClaimRef] = useState('');
@@ -157,14 +269,77 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
   const [newCatKind, setNewCatKind] = useState<'tipo_inmueble' | 'caracteristica'>('caracteristica');
 
   const agentsList = users.filter((u) => u.role === 'agente' && u.active);
-  const favoriteProperties = properties.filter((p) => favoriteIds.includes(p.id));
-  const pendingProperties = properties.filter((p) => p.publicationStatus === 'pendiente');
-
-  const myOwnedProperties = properties.filter(
-    (p) => p.ownerId === currentUser.uid || currentUser.uid === 'usr_propietario_demo'
+  const favoriteProperties = allProperties.filter((p) => favoriteIds.includes(p.id));
+  const pendingProperties = allProperties.filter((p) => p.publicationStatus === 'pendiente');
+  const pendingAgentRequestProperties = allProperties.filter(
+    (p) =>
+      p.agentAssignmentStatus === 'pendiente_admin' ||
+      p.agentAssignmentStatus === 'pendiente_agente'
   );
-  const myAssignedProperties = properties.filter(
-    (p) => p.agentId === currentUser.uid || currentUser.uid === 'usr_agente_demo'
+
+  // Solicitudes donde el Administrador todavía NO tomó acción (publicación pendiente o solicitud de agente pendiente)
+  const adminPendingActionProperties = allProperties.filter(
+    (p) =>
+      p.publicationStatus === 'pendiente' ||
+      p.agentAssignmentStatus === 'pendiente_admin' ||
+      p.agentAssignmentStatus === 'pendiente_agente'
+  );
+
+  // Solicitudes donde el Administrador YA respondió (aprobadas o rechazadas, y sin solicitud de agente pendiente)
+  const adminRespondedProperties = allProperties.filter(
+    (p) =>
+      (p.publicationStatus === 'aprobada' || p.publicationStatus === 'rechazada') &&
+      p.agentAssignmentStatus !== 'pendiente_admin' &&
+      p.agentAssignmentStatus !== 'pendiente_agente'
+  );
+
+  // Reclamos separados por pendientes vs ya respondidos para el Admin
+  const adminPendingClaims = claims.filter(
+    (c) => c.status === 'abierto' || c.status === 'en_revision'
+  );
+  const adminRespondedClaims = claims.filter(
+    (c) => c.status === 'resuelto' || c.status === 'desestimado'
+  );
+
+  // Strictly scoped lists per role and subview:
+  // 1. Propietario: ONLY properties where ownerId === currentUser.uid
+  const myOwnedProperties = allProperties.filter((p) => p.ownerId === currentUser.uid);
+
+  // 2. Agente: ONLY properties where agentId === currentUser.uid AND assignment is confirmed ('asignado')
+  const myAssignedProperties = allProperties.filter((p) =>
+    isAgentConfirmedOnProperty(p, currentUser.uid)
+  );
+
+  // Solicitudes donde un propietario eligió a este agente y están pendientes de aceptación
+  const myPendingAgentInvitations = allProperties.filter(
+    (p) =>
+      p.requestedAgentId === currentUser.uid &&
+      p.agentAssignmentStatus === 'pendiente_agente'
+  );
+
+  // Visitas, Consultas y Operaciones estrictamente separadas según la pestaña activa
+  const clientVisits = allVisits.filter((v) => v.clientId === currentUser.uid);
+  const ownerVisits = allVisits.filter((v) => v.ownerId === currentUser.uid);
+  const agentVisits = allVisits.filter(
+    (v) =>
+      v.agentId === currentUser.uid &&
+      myAssignedProperties.some((p) => p.id === v.propertyId)
+  );
+
+  const clientInquiries = allInquiries.filter((i) => i.clientId === currentUser.uid);
+  const ownerInquiries = allInquiries.filter((i) => i.ownerId === currentUser.uid);
+  const agentInquiries = allInquiries.filter(
+    (i) =>
+      i.agentId === currentUser.uid &&
+      myAssignedProperties.some((p) => p.id === i.propertyId)
+  );
+
+  const clientOperations = allOperations.filter((o) => o.clientId === currentUser.uid);
+  const ownerOperations = allOperations.filter((o) => o.ownerId === currentUser.uid);
+  const agentOperations = allOperations.filter(
+    (o) =>
+      o.agentId === currentUser.uid &&
+      myAssignedProperties.some((p) => p.id === o.propertyId)
   );
 
   const canActAsClient = currentUser.role === 'cliente' || currentUser.role === 'propietario';
@@ -193,7 +368,7 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
     setNewCatName('');
   };
 
-  const totalSalesVolume = operations
+  const totalSalesVolume = allOperations
     .filter((o) => o.status === 'concretada' || o.status === 'aprobada')
     .reduce((acc, o) => acc + o.offeredAmount, 0);
 
@@ -211,7 +386,7 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
 
   if (canActAsOwner) {
     roleNavItems.push(
-      { id: 'propietario_inmuebles', label: 'Mis Propiedades Publicadas', group: 'Propietario' },
+      { id: 'propietario_inmuebles', label: 'Mis propiedades', group: 'Propietario' },
       { id: 'propietario_visitas', label: 'Visitas Recibidas', group: 'Propietario' },
       { id: 'propietario_operaciones', label: 'Ofertas y Contratos', group: 'Propietario' },
       { id: 'propietario_consultas', label: 'Chat con Interesados', group: 'Propietario' }
@@ -220,7 +395,13 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
 
   if (currentUser.role === 'agente') {
     roleNavItems.push(
-      { id: 'agente_cartera', label: 'Propiedades Asignadas' },
+      {
+        id: 'agente_cartera',
+        label:
+          myPendingAgentInvitations.length > 0
+            ? `Propiedades Asignadas (${myPendingAgentInvitations.length} solic.)`
+            : 'Propiedades Asignadas',
+      },
       { id: 'agente_visitas', label: 'Agenda de Visitas' },
       { id: 'agente_consultas', label: 'Chat con Clientes' },
       { id: 'agente_operaciones', label: 'Operaciones y Contratos' }
@@ -228,38 +409,42 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
   }
 
   if (currentUser.role === 'administrador') {
+    const pendingModCount = adminPendingActionProperties.length;
     roleNavItems.push(
       { id: 'admin_dashboard', label: 'Reportes y Métricas' },
-      { id: 'admin_publicaciones', label: `Aprobación de Publicaciones (${pendingProperties.length})` },
+      {
+        id: 'admin_publicaciones',
+        label: `Solicitudes y Moderación (${pendingModCount} pend.)`,
+      },
       { id: 'admin_usuarios', label: 'Usuarios y Roles' },
       { id: 'admin_categorias', label: 'Categorías y Características' },
-      { id: 'admin_reclamos', label: 'Gestión de Reclamos' }
+      {
+        id: 'admin_reclamos',
+        label: `Gestión de Reclamos (${adminPendingClaims.length} pend.)`,
+      }
     );
   } else {
     roleNavItems.push({ id: 'reclamos_usuario', label: 'Mis Reclamos / Soporte' });
   }
 
-  /**
-   * Renders the new Clean Inbox -> Full Screen Chat View:
-   * - When `selectedChatId` is null: displays a clean list of people/conversations.
-   * - When a person/conversation is clicked: opens the dedicated Full Chat Screen for that conversation.
-   */
   const renderChatSection = (threads: InquiryItem[], isManagerView: boolean) => {
     const activeInquiry = selectedChatId
       ? threads.find((t) => t.id === selectedChatId) || null
       : null;
 
-    // 1. FULL SCREEN INDIVIDUAL CHAT VIEW
     if (activeInquiry) {
-      const prop = properties.find((p) => p.id === activeInquiry.propertyId);
+      const prop = allProperties.find((p) => p.id === activeInquiry.propertyId);
       const counterpartName = isManagerView
         ? activeInquiry.clientName
-        : activeInquiry.agentName ||
+        : (prop && isAgentConfirmedOnProperty(prop) ? prop.agentName : '') ||
           activeInquiry.ownerName ||
-          prop?.agentName ||
           prop?.ownerName ||
           'Responsable Inmobiliario';
-      const counterpartRoleLabel = isManagerView ? 'Cliente interesado' : 'Propietario / Agente';
+      const counterpartRoleLabel = isManagerView
+        ? 'Cliente interesado'
+        : prop && isAgentConfirmedOnProperty(prop)
+        ? 'Agente asignado / Propietario'
+        : 'Propietario (Gestión directa)';
 
       const messagesList =
         activeInquiry.messages && activeInquiry.messages.length > 0
@@ -292,7 +477,6 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
 
       return (
         <div className="bg-[#FCFBF7] border border-[#D8C7AA] rounded-sm overflow-hidden flex flex-col min-h-[560px]">
-          {/* Full Chat Top Header */}
           <div className="px-6 py-4 bg-[#39483A] text-[#FCFBF7] flex flex-wrap items-center justify-between gap-4">
             <div className="flex items-center gap-4">
               <button
@@ -324,7 +508,6 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
             )}
           </div>
 
-          {/* Messages Body */}
           <div className="flex-1 p-6 space-y-4 overflow-y-auto bg-[#F5F1E8]/50 max-h-[460px]">
             {messagesList.map((msg) => {
               const isMine = msg.senderId === currentUser.uid;
@@ -357,7 +540,6 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
             })}
           </div>
 
-          {/* Bottom Message Input Bar */}
           <form
             onSubmit={async (e) => {
               e.preventDefault();
@@ -399,7 +581,6 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
       );
     }
 
-    // 2. CLEAN LIST OF PEOPLE / CONVERSATIONS
     return (
       <div className="bg-[#FCFBF7] border border-[#D8C7AA] rounded-sm p-6 space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#D8C7AA] pb-4">
@@ -428,15 +609,23 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
         ) : (
           <div className="divide-y divide-[#D8C7AA] border border-[#D8C7AA] rounded-sm bg-white">
             {threads.map((inq) => {
-              const prop = properties.find((p) => p.id === inq.propertyId);
+              const prop = allProperties.find((p) => p.id === inq.propertyId);
+              const confirmedAgent = prop && isAgentConfirmedOnProperty(prop) ? prop.agentName : '';
               const personName = isManagerView
                 ? inq.clientName
-                : inq.agentName ||
+                : confirmedAgent ||
                   inq.ownerName ||
-                  prop?.agentName ||
                   prop?.ownerName ||
                   'Responsable';
-              const personRole = isManagerView ? 'Cliente' : 'Propietario / Agente';
+              const personUid = isManagerView
+                ? inq.clientId
+                : (confirmedAgent ? prop?.agentId : inq.ownerId) || '';
+              const personProfile = users.find((u) => u.uid === personUid);
+              const personRole = isManagerView
+                ? 'Cliente'
+                : confirmedAgent
+                ? 'Agente Asignado'
+                : 'Propietario';
               const messagesCount =
                 inq.messages && inq.messages.length > 0
                   ? inq.messages.length
@@ -461,8 +650,16 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
                   className="w-full p-5 text-left hover:bg-[#F5F1E8] transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-4 group"
                 >
                   <div className="flex items-start gap-4 min-w-0">
-                    <div className="w-11 h-11 rounded-sm bg-[#39483A] text-[#FCFBF7] flex items-center justify-center font-serif-display font-semibold text-lg shrink-0">
-                      {personName.charAt(0).toUpperCase()}
+                    <div className="w-11 h-11 rounded-full overflow-hidden bg-[#39483A] text-[#FCFBF7] flex items-center justify-center font-serif-display font-semibold text-lg shrink-0">
+                      {personProfile?.photoUrl ? (
+                        <img
+                          src={personProfile.photoUrl}
+                          alt={personName}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        personName.charAt(0).toUpperCase()
+                      )}
                     </div>
                     <div className="space-y-1 min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
@@ -471,6 +668,15 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
                         </span>
                         <span className="text-[11px] uppercase tracking-wider px-2 py-0.5 bg-[#F5F1E8] border border-[#D8C7AA] text-[#39483A] rounded-sm">
                           {personRole}
+                        </span>
+                        <span
+                          className={`text-[10px] uppercase tracking-wider font-semibold px-2 py-0.5 rounded-sm border ${
+                            inq.status === 'respondida'
+                              ? 'bg-emerald-100 text-emerald-900 border-emerald-400'
+                              : 'bg-amber-100 text-amber-900 border-amber-400'
+                          }`}
+                        >
+                          {inq.status === 'respondida' ? 'Respondida' : 'En revisión / Pendiente'}
                         </span>
                         <span className="text-xs text-[#B86F52] font-medium truncate">
                           · {inq.propertyTitle}
@@ -507,45 +713,79 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
 
   return (
     <section className="max-w-7xl mx-auto px-6 py-10 space-y-8">
-      {/* Role Header Banner */}
+      {/* Role Header Banner ("Mi Espacio") with Live Profile Photo */}
       <div className="bg-[#39483A] rounded-sm p-6 sm:p-8 text-[#FCFBF7] flex flex-col lg:flex-row lg:items-center justify-between gap-6">
-        <div className="space-y-1.5">
-          <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#D8C7AA]">
-            Espacio de Gestión ·{' '}
-            {currentUser.role === 'cliente' && currentUser.isAlsoOwner
-              ? 'Cliente y Propietario'
-              : currentUser.role.toUpperCase()}
+        <div className="flex items-start sm:items-center gap-5">
+          <button
+            type="button"
+            onClick={onOpenProfileModal}
+            title="Hacé clic para cambiar tu foto o editar tu perfil"
+            className="group relative w-16 h-16 rounded-full overflow-hidden bg-[#F5F1E8] text-[#39483A] border-2 border-[#D8C7AA] flex items-center justify-center shrink-0 cursor-pointer"
+          >
+            {currentUser.photoUrl ? (
+              <img
+                src={currentUser.photoUrl}
+                alt={currentUser.displayName}
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <User className="w-8 h-8 text-[#39483A]" />
+            )}
+            <span className="absolute inset-0 bg-black/45 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+              <Camera className="w-5 h-5 text-white" />
+            </span>
+          </button>
+
+          <div className="space-y-1.5">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#D8C7AA]">
+                Mi Espacio ·{' '}
+                {currentUser.role === 'cliente' && currentUser.isAlsoOwner
+                  ? 'Cliente y Propietario'
+                  : currentUser.role.toUpperCase()}
+              </span>
+              {onOpenProfileModal && (
+                <button
+                  type="button"
+                  onClick={onOpenProfileModal}
+                  className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold bg-white/15 hover:bg-white/25 text-[#FCFBF7] rounded-sm transition-colors cursor-pointer"
+                >
+                  <Camera className="w-3 h-3" />
+                  Editar foto / perfil
+                </button>
+              )}
+            </div>
+            <h1 className="text-2xl sm:text-3xl font-serif-display font-semibold">
+              {currentUser.displayName}
+            </h1>
+            <p className="text-xs sm:text-sm text-[#F5F1E8]/85 max-w-2xl leading-relaxed">
+              {currentUser.role === 'cliente' &&
+                !currentUser.isAlsoOwner &&
+                'Gestioná tus inmuebles favoritos, tus visitas programadas, tus solicitudes de alquiler o compra y tus conversaciones.'}
+              {canActAsOwner &&
+                'Administrá tanto tus búsquedas y reservas como Cliente, como la publicación y gestión de tus inmuebles desde "Mis propiedades" (de forma independiente o con agente inmobiliario).'}
+              {currentUser.role === 'agente' &&
+                'Gestioná exclusivamente las propiedades a tu cargo, aceptá o rechazá solicitudes de asignación, coordiná visitas y respondé consultas.'}
+              {currentUser.role === 'administrador' &&
+                'Supervisión general de ClaveHogar: aprobá publicaciones pendientes, asigná o confirmá agentes inmobiliarios, administrá usuarios y roles, categorías y reclamos.'}
+            </p>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-serif-display font-semibold">
-            {currentUser.displayName}
-          </h1>
-          <p className="text-xs sm:text-sm text-[#F5F1E8]/85 max-w-2xl leading-relaxed">
-            {currentUser.role === 'cliente' &&
-              !currentUser.isAlsoOwner &&
-              'Gestioná tus inmuebles favoritos, tus visitas programadas, tus solicitudes de alquiler o compra y tus conversaciones.'}
-            {canActAsOwner &&
-              'Administrá tanto tus búsquedas y reservas como Cliente, como la publicación y gestión de tus propios inmuebles como Propietario.'}
-            {currentUser.role === 'agente' &&
-              'Gestioná las propiedades que te fueron asignadas, coordiná agendas de visitas, respondé consultas de clientes y registrá contratos.'}
-            {currentUser.role === 'administrador' &&
-              'Supervisión general de ClaveHogar: aprobá o rechazá publicaciones, administrá usuarios y roles, categorías, reclamos y métricas.'}
-          </p>
         </div>
 
         {currentUser.role === 'cliente' && !currentUser.isAlsoOwner && (
           <div className="bg-[#FCFBF7]/10 border border-[#D8C7AA]/30 rounded-sm p-4 max-w-xs space-y-2.5 shrink-0">
             <div className="text-xs font-semibold text-[#D8C7AA]">
-              ¿Querés publicar una propiedad?
+              ¿Querés vender o alquilar tu casa?
             </div>
             <p className="text-[11px] text-[#FCFBF7]/85 leading-relaxed">
-              Habilitá también tu perfil de <strong>Propietario</strong> sin perder ninguna de tus funciones de Cliente.
+              Convertite en <strong>Propietario</strong> desde tu misma cuenta sin perder tus funciones de Cliente.
             </p>
             <button
               type="button"
               onClick={onEnableOwnerRole}
               className="w-full py-2 px-3 text-xs font-semibold text-[#FCFBF7] bg-[#B86F52] hover:bg-[#a35e42] rounded-sm transition-colors"
             >
-              Habilitar Modo Propietario
+              Convertirme en Propietario
             </button>
           </div>
         )}
@@ -557,7 +797,7 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
             className="flex items-center gap-2 px-5 py-3 text-xs uppercase tracking-widest font-semibold text-[#FCFBF7] bg-[#B86F52] hover:bg-[#a35e42] rounded-sm transition-colors whitespace-nowrap self-start lg:self-center"
           >
             <Plus className="w-4 h-4" />
-            Publicar Propiedad
+            Publicar en Mis propiedades
           </button>
         )}
       </div>
@@ -647,7 +887,7 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
                     <button
                       type="button"
                       onClick={() => onToggleFavorite(prop.id)}
-                      className="py-2 px-3 text-xs font-semibold text-[#B86F52] bg-white border border-[#D8C7AA] rounded-sm hover:bg-[#F5F1E8]"
+                      className="py-2 px-3 text-xs font-semibold text-red-700 bg-red-50 border border-red-300 rounded-sm hover:bg-red-100"
                     >
                       Quitar
                     </button>
@@ -664,52 +904,64 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
           <h2 className="text-2xl font-serif-display font-semibold text-[#39483A]">
             Mis Solicitudes de Visita
           </h2>
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse text-sm">
-              <thead>
-                <tr className="border-b border-[#D8C7AA] text-xs uppercase tracking-wider text-[#39483A]/70">
-                  <th className="py-3 pr-4">Propiedad</th>
-                  <th className="py-3 px-4">Fecha y Horario</th>
-                  <th className="py-3 px-4">Estado</th>
-                  <th className="py-3 px-4">Notas</th>
-                  <th className="py-3 pl-4 text-right">Acción</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[#D8C7AA]/60">
-                {visits.map((v) => (
-                  <tr key={v.id}>
-                    <td className="py-3.5 pr-4 font-semibold text-[#1F241F]">{v.propertyTitle}</td>
-                    <td className="py-3.5 px-4 font-tabular text-xs text-[#39483A]">
-                      {v.date} · {v.timeSlot}
-                    </td>
-                    <td className="py-3.5 px-4 text-xs capitalize font-semibold text-[#B86F52]">
-                      {v.status}
-                    </td>
-                    <td className="py-3.5 px-4 text-xs text-[#39483A]/75">{v.notes || '—'}</td>
-                    <td className="py-3.5 pl-4 text-right">
-                      {v.status !== 'cancelada' && v.status !== 'realizada' && (
-                        <button
-                          type="button"
-                          onClick={() =>
-                            onUpdateVisit(
-                              v.id,
-                              'cancelada',
-                              v.date,
-                              v.timeSlot,
-                              'Cancelada por el cliente'
-                            )
-                          }
-                          className="px-3 py-1.5 text-xs font-semibold text-[#B86F52] border border-[#B86F52]/40 rounded-sm hover:bg-[#F5F1E8]"
-                        >
-                          Cancelar Visita
-                        </button>
-                      )}
-                    </td>
+          {clientVisits.length === 0 ? (
+            <p className="text-sm text-[#39483A]/70 py-8 text-center">
+              No tenés visitas solicitadas por el momento.
+            </p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse text-sm">
+                <thead>
+                  <tr className="border-b border-[#D8C7AA] text-xs uppercase tracking-wider text-[#39483A]/70">
+                    <th className="py-3 pr-4">Propiedad</th>
+                    <th className="py-3 px-4">Fecha y Horario</th>
+                    <th className="py-3 px-4">Estado</th>
+                    <th className="py-3 px-4">Notas</th>
+                    <th className="py-3 pl-4 text-right">Acción</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody className="divide-y divide-[#D8C7AA]/60">
+                  {clientVisits.map((v) => (
+                    <tr key={v.id}>
+                      <td className="py-3.5 pr-4 font-semibold text-[#1F241F]">{v.propertyTitle}</td>
+                      <td className="py-3.5 px-4 font-tabular text-xs text-[#39483A]">
+                        {v.date} · {v.timeSlot}
+                      </td>
+                      <td className="py-3.5 px-4">
+                        <span
+                          className={`inline-block text-[11px] uppercase tracking-wider font-bold px-2.5 py-1 rounded-sm border ${getVisitStatusBadgeClass(
+                            v.status
+                          )}`}
+                        >
+                          {v.status}
+                        </span>
+                      </td>
+                      <td className="py-3.5 px-4 text-xs text-[#39483A]/75">{v.notes || '—'}</td>
+                      <td className="py-3.5 pl-4 text-right">
+                        {v.status !== 'cancelada' && v.status !== 'realizada' && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              onUpdateVisit(
+                                v.id,
+                                'cancelada',
+                                v.date,
+                                v.timeSlot,
+                                'Cancelada por el cliente'
+                              )
+                            }
+                            className="px-3 py-1.5 text-xs font-semibold text-red-700 bg-red-50 border border-red-300 rounded-sm hover:bg-red-100"
+                          >
+                            Cancelar Visita
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       )}
 
@@ -718,64 +970,75 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
           <h2 className="text-2xl font-serif-display font-semibold text-[#39483A]">
             Mis Solicitudes de Alquiler / Compra y Contratos
           </h2>
-          <div className="space-y-3">
-            {operations.map((op) => (
-              <div
-                key={op.id}
-                className="p-5 bg-[#F5F1E8] border border-[#D8C7AA] rounded-sm space-y-2.5"
-              >
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div>
-                    <span className="text-[11px] font-semibold text-[#B86F52] uppercase tracking-wider">
-                      Solicitud de {op.operationType}
-                    </span>
-                    <h3 className="text-lg font-serif-display font-semibold text-[#1F241F]">
-                      {op.propertyTitle}
-                    </h3>
-                  </div>
-                  <div className="text-right">
-                    <span className="text-base font-semibold font-tabular text-[#39483A]">
-                      {op.currency} {op.offeredAmount.toLocaleString()}
-                    </span>
-                    <span className="block text-xs text-[#B86F52] font-semibold capitalize">
-                      Estado: {op.status.replace('_', ' ')}
-                    </span>
-                  </div>
-                </div>
-                <p className="text-xs text-[#39483A]/85">{op.message}</p>
-                {op.contractCode && (
-                  <div className="p-3.5 bg-[#FCFBF7] border border-[#D8C7AA] rounded-sm text-xs space-y-1">
-                    <div className="font-semibold text-[#39483A] font-tabular">
-                      Contrato Registrado: {op.contractCode} ({op.contractStartDate} a{' '}
-                      {op.contractEndDate})
+          {clientOperations.length === 0 ? (
+            <p className="text-sm text-[#39483A]/70 py-8 text-center">
+              No tenés solicitudes de alquiler o compra registradas.
+            </p>
+          ) : (
+            <div className="space-y-3">
+              {clientOperations.map((op) => (
+                <div
+                  key={op.id}
+                  className="p-5 bg-[#F5F1E8] border border-[#D8C7AA] rounded-sm space-y-2.5"
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <span className="text-[11px] font-semibold text-[#B86F52] uppercase tracking-wider">
+                        Solicitud de {op.operationType}
+                      </span>
+                      <h3 className="text-lg font-serif-display font-semibold text-[#1F241F]">
+                        {op.propertyTitle}
+                      </h3>
                     </div>
-                    <p className="text-[#1F241F]/80">{op.contractTerms}</p>
+                    <div className="text-right space-y-1">
+                      <span className="text-base font-semibold font-tabular text-[#39483A] block">
+                        {op.currency} {op.offeredAmount.toLocaleString()}
+                      </span>
+                      <span
+                        className={`inline-block text-[11px] uppercase tracking-wider font-bold px-2.5 py-0.5 rounded-sm border ${getDealStatusBadgeClass(
+                          op.status
+                        )}`}
+                      >
+                        Estado: {op.status.replace('_', ' ')}
+                      </span>
+                    </div>
                   </div>
-                )}
-              </div>
-            ))}
-          </div>
+                  <p className="text-xs text-[#39483A]/85">{op.message}</p>
+                  {op.contractCode && (
+                    <div className="p-3.5 bg-emerald-50 border border-emerald-300 rounded-sm text-xs space-y-1">
+                      <div className="font-semibold text-emerald-900 font-tabular">
+                        Contrato Registrado: {op.contractCode} ({op.contractStartDate} a{' '}
+                        {op.contractEndDate})
+                      </div>
+                      <p className="text-emerald-950/80">{op.contractTerms}</p>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
       {activeSubView === 'cliente_consultas' &&
         canActAsClient &&
-        renderChatSection(inquiries, false)}
+        renderChatSection(clientInquiries, false)}
 
       {/* =====================================================================
-          PROPIETARIO & AGENTE SCREENS
+          SECCIÓN "MIS PROPIEDADES" DEL PROPIETARIO
          ===================================================================== */}
-      {(activeSubView === 'propietario_inmuebles' || activeSubView === 'agente_cartera') && (
-        <div className="bg-[#FCFBF7] border border-[#D8C7AA] rounded-sm p-6 space-y-5">
+      {activeSubView === 'propietario_inmuebles' && canActAsOwner && (
+        <div className="bg-[#FCFBF7] border border-[#D8C7AA] rounded-sm p-6 space-y-6">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#D8C7AA] pb-4">
             <div>
+              <span className="text-[11px] uppercase tracking-[0.2em] text-[#B86F52] font-semibold block">
+                Panel de Propietario
+              </span>
               <h2 className="text-2xl font-serif-display font-semibold text-[#39483A]">
-                {activeSubView === 'propietario_inmuebles'
-                  ? 'Mis Propiedades Registradas y Asignación de Agente'
-                  : 'Cartera de Propiedades Asignadas'}
+                Mis propiedades
               </h2>
-              <p className="text-xs text-[#39483A]/75">
-                Los cambios de valor, fotografías y estado se actualizan en tiempo real en Firestore.
+              <p className="text-xs text-[#39483A]/75 mt-0.5">
+                Publicá y administrá tus propiedades por tu cuenta o solicitá la asistencia de un agente inmobiliario. Las nuevas publicaciones quedan pendientes de revisión del administrador antes de aparecer públicamente.
               </p>
             </div>
             <button
@@ -788,28 +1051,44 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
             </button>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse text-sm">
-              <thead>
-                <tr className="border-b border-[#D8C7AA] text-xs uppercase tracking-wider text-[#39483A]/70">
-                  <th className="py-3 pr-4">Inmueble</th>
-                  <th className="py-3 px-3">Operación / Valor</th>
-                  <th className="py-3 px-3">Publicación</th>
-                  <th className="py-3 px-3">Disponibilidad</th>
-                  {activeSubView === 'propietario_inmuebles' && (
-                    <th className="py-3 px-3">Agente Asignado</th>
-                  )}
-                  <th className="py-3 pl-3 text-right">Acciones</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[#D8C7AA]/60">
-                {(activeSubView === 'propietario_inmuebles'
-                  ? myOwnedProperties
-                  : myAssignedProperties
-                ).map((prop) => (
-                  <tr key={prop.id}>
-                    <td className="py-3.5 pr-4">
-                      <div className="flex items-center gap-3">
+          {myOwnedProperties.length === 0 ? (
+            <div className="p-10 bg-[#F5F1E8] border border-[#D8C7AA] rounded-sm text-center space-y-3">
+              <p className="text-base font-serif-display font-semibold text-[#39483A]">
+                Aún no tenés inmuebles publicados en &ldquo;Mis propiedades&rdquo;.
+              </p>
+              <p className="text-xs text-[#39483A]/80 max-w-md mx-auto">
+                Podés publicar una o varias propiedades en venta o alquiler y elegir si deseás administrarlas por tu cuenta o con un agente inmobiliario.
+              </p>
+              <button
+                type="button"
+                onClick={onOpenNewProperty}
+                className="px-5 py-2.5 text-xs uppercase tracking-widest font-semibold text-[#FCFBF7] bg-[#B86F52] hover:bg-[#a35e42] rounded-sm transition-colors"
+              >
+                + Publicar mi primera propiedad
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {myOwnedProperties.map((prop) => {
+                const status =
+                  prop.agentAssignmentStatus ||
+                  (prop.agentId?.trim() ? 'asignado' : 'sin_agente');
+                const assignedAgentProfile = prop.agentId
+                  ? users.find((u) => u.uid === prop.agentId)
+                  : undefined;
+                const requestedAgentProfile = prop.requestedAgentId
+                  ? users.find((u) => u.uid === prop.requestedAgentId)
+                  : undefined;
+                const isChoosingAgentHere = agentSelectorPropId === prop.id;
+
+                return (
+                  <div
+                    key={prop.id}
+                    className="p-5 bg-white border border-[#D8C7AA] rounded-sm space-y-4"
+                  >
+                    <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                      {/* Datos de la propiedad */}
+                      <div className="flex items-start gap-4">
                         <img
                           src={resolvePropertyImageUrl(prop.images[0])}
                           alt={prop.title}
@@ -819,101 +1098,572 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
                               e.currentTarget.src = HERO_IMAGE;
                             }
                           }}
-                          className="w-14 h-10 rounded-sm object-cover bg-[#F5F1E8] shrink-0"
+                          className="w-24 h-18 rounded-sm object-cover bg-[#F5F1E8] border border-[#D8C7AA] shrink-0"
                         />
-                        <div>
-                          <div className="font-semibold text-[#1F241F]">{prop.title}</div>
-                          <div className="text-xs text-[#39483A]/70">
-                            {prop.location} · <span className="font-tabular">{prop.surface} m²</span>
+                        <div className="space-y-1.5">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span
+                              className={`inline-flex items-center gap-1 text-[10px] uppercase tracking-wider font-bold px-2.5 py-0.5 rounded-sm border ${getPublicationStatusBadgeClass(
+                                prop.publicationStatus
+                              )}`}
+                            >
+                              {prop.publicationStatus === 'aprobada' && (
+                                <CheckCircle2 className="w-3 h-3 text-emerald-700" />
+                              )}
+                              {prop.publicationStatus === 'pendiente' && (
+                                <Clock className="w-3 h-3 text-amber-700" />
+                              )}
+                              {prop.publicationStatus === 'rechazada' && (
+                                <XCircle className="w-3 h-3 text-red-700" />
+                              )}
+                              {prop.publicationStatus === 'aprobada'
+                                ? 'Publicada (Aprobada)'
+                                : prop.publicationStatus === 'pendiente'
+                                ? 'En revisión (Pendiente de aprobación)'
+                                : 'Rechazada por administración'}
+                            </span>
+                            <span className="text-xs font-tabular font-semibold text-[#39483A]">
+                              {prop.operationType.toUpperCase()} · {prop.currency}{' '}
+                              {prop.price.toLocaleString()}
+                            </span>
                           </div>
+                          <h3 className="text-lg font-serif-display font-semibold text-[#1F241F]">
+                            {prop.title}
+                          </h3>
+                          <div className="text-xs text-[#39483A]/75">
+                            {prop.location} · {prop.address} ·{' '}
+                            <span className="font-tabular">{prop.surface} m²</span>
+                          </div>
+                          {prop.publicationStatus === 'rechazada' && prop.rejectionReason && (
+                            <div className="p-2.5 bg-red-50 border-l-4 border-red-600 text-xs text-red-900 font-medium rounded-r-sm">
+                              <strong>Motivo de rechazo:</strong> {prop.rejectionReason}
+                            </div>
+                          )}
                         </div>
                       </div>
-                    </td>
-                    <td className="py-3.5 px-3 font-tabular text-xs">
-                      <span className="uppercase text-[#B86F52] font-semibold block">
-                        {prop.operationType}
-                      </span>
-                      <span className="font-semibold text-[#39483A]">
-                        {prop.currency} {prop.price.toLocaleString()}
-                      </span>
-                    </td>
-                    <td className="py-3.5 px-3 text-xs">
-                      <span className="capitalize font-semibold text-[#39483A]">
-                        {prop.publicationStatus}
-                      </span>
-                      {prop.rejectionReason && (
-                        <span className="block text-[11px] text-[#B86F52]">
-                          Motivo: {prop.rejectionReason}
-                        </span>
-                      )}
-                    </td>
-                    <td className="py-3.5 px-3">
-                      <select
-                        value={prop.availability}
-                        onChange={(e) =>
-                          onUpdateAvailability(prop.id, e.target.value as AvailabilityStatus)
-                        }
-                        className="px-2.5 py-1.5 text-xs bg-white border border-[#D8C7AA] rounded-sm"
-                      >
-                        <option value="disponible">Disponible</option>
-                        <option value="reservada">Reservada</option>
-                        <option value="alquilada">Alquilada</option>
-                        <option value="vendida">Vendida</option>
-                      </select>
-                    </td>
-                    {activeSubView === 'propietario_inmuebles' && (
-                      <td className="py-3.5 px-3">
-                        <select
-                          value={prop.agentId || ''}
-                          onChange={(e) => {
-                            const ag = agentsList.find((a) => a.uid === e.target.value);
-                            onAssignAgent(prop.id, ag ? ag.uid : '', ag ? ag.displayName : '');
-                          }}
-                          className="px-2.5 py-1.5 text-xs bg-white border border-[#D8C7AA] rounded-sm"
-                        >
-                          <option value="">Sin agente (Gestión directa)</option>
-                          {agentsList.map((ag) => (
-                            <option key={ag.uid} value={ag.uid}>
-                              {ag.displayName}
-                            </option>
-                          ))}
-                        </select>
-                      </td>
-                    )}
-                    <td className="py-3.5 pl-3 text-right">
-                      <div className="inline-flex items-center gap-1.5">
-                        <button
-                          type="button"
-                          onClick={() => onSelectProperty(prop)}
-                          className="p-2 text-[#39483A] border border-[#D8C7AA] rounded-sm hover:bg-[#F5F1E8]"
-                          title="Ver ficha"
-                        >
-                          <Eye className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => onOpenEditProperty(prop)}
-                          className="p-2 text-[#39483A] border border-[#D8C7AA] rounded-sm hover:bg-[#F5F1E8]"
-                          title="Editar propiedad"
-                        >
-                          <Edit3 className="w-3.5 h-3.5" />
-                        </button>
-                        {activeSubView === 'propietario_inmuebles' && (
+
+                      {/* Disponibilidad y Acciones del Propietario */}
+                      <div className="flex flex-wrap items-center gap-2.5 self-start lg:self-center">
+                        <div>
+                          <label className="block text-[10px] uppercase tracking-wider text-[#39483A]/70 mb-0.5">
+                            Disponibilidad
+                          </label>
+                          <select
+                            value={prop.availability}
+                            onChange={(e) =>
+                              onUpdateAvailability(prop.id, e.target.value as AvailabilityStatus)
+                            }
+                            className="px-2.5 py-1.5 text-xs bg-[#FCFBF7] border border-[#D8C7AA] rounded-sm"
+                          >
+                            <option value="disponible">Disponible</option>
+                            <option value="reservada">Reservada</option>
+                            <option value="alquilada">Alquilada</option>
+                            <option value="vendida">Vendida</option>
+                          </select>
+                        </div>
+
+                        <div className="flex items-center gap-1.5 pt-4">
+                          <button
+                            type="button"
+                            onClick={() => onSelectProperty(prop)}
+                            className="px-3 py-1.5 text-xs font-semibold text-[#39483A] border border-[#D8C7AA] rounded-sm hover:bg-[#F5F1E8] inline-flex items-center gap-1"
+                            title="Ver ficha"
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                            Ver
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => onOpenEditProperty(prop)}
+                            className="px-3 py-1.5 text-xs font-semibold text-[#39483A] border border-[#D8C7AA] rounded-sm hover:bg-[#F5F1E8] inline-flex items-center gap-1"
+                            title="Editar propiedad"
+                          >
+                            <Edit3 className="w-3.5 h-3.5" />
+                            Editar
+                          </button>
                           <button
                             type="button"
                             onClick={() => onDeleteProperty(prop.id)}
-                            className="p-2 text-[#B86F52] border border-[#D8C7AA] rounded-sm hover:bg-[#F5F1E8]"
-                            title="Eliminar publicación"
+                            className="p-1.5 text-red-700 bg-red-50 border border-red-300 rounded-sm hover:bg-red-100"
+                            title="Eliminar propiedad"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
                           </button>
-                        )}
+                        </div>
                       </div>
-                    </td>
-                  </tr>
+                    </div>
+
+                    {/* Panel de Modalidad de Gestión y Estado de Solicitud de Agente */}
+                    <div
+                      className={`p-4 rounded-sm space-y-3 border ${
+                        status === 'rechazado'
+                          ? 'bg-red-50 border-red-300'
+                          : status === 'pendiente_agente' || status === 'pendiente_admin'
+                          ? 'bg-amber-50 border-amber-300'
+                          : status === 'asignado'
+                          ? 'bg-emerald-50/70 border-emerald-300'
+                          : 'bg-[#F5F1E8] border-[#D8C7AA]'
+                      }`}
+                    >
+                      {status === 'sin_agente' && (
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                          <div className="space-y-0.5">
+                            <div className="text-xs font-semibold text-[#39483A] flex items-center gap-1.5">
+                              <span>
+                                Modalidad actual: Propietario Independiente (Gestión por mi cuenta)
+                              </span>
+                            </div>
+                            <p className="text-[11px] text-[#39483A]/80">
+                              Recibís y respondés directamente las consultas, visitas y ofertas de esta propiedad.
+                            </p>
+                          </div>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setAgentSelectorPropId(isChoosingAgentHere ? null : prop.id)
+                              }
+                              className="px-3 py-1.5 text-xs font-semibold text-[#FCFBF7] bg-[#39483A] hover:bg-[#2c382d] rounded-sm transition-colors inline-flex items-center gap-1.5"
+                            >
+                              <UserCheck className="w-3.5 h-3.5" />
+                              Elegir un agente
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => onOwnerRequestAgent(prop.id, 'asignacion_admin')}
+                              className="px-3 py-1.5 text-xs font-semibold text-[#39483A] bg-white border border-[#D8C7AA] hover:bg-[#FCFBF7] rounded-sm transition-colors inline-flex items-center gap-1.5"
+                            >
+                              <ShieldCheck className="w-3.5 h-3.5 text-[#B86F52]" />
+                              Que me asignen uno
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {(status === 'pendiente_agente' || status === 'pendiente_admin') && (
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                          <div className="space-y-1">
+                            <div className="inline-flex items-center gap-1.5 text-xs font-bold text-amber-900 bg-amber-200/70 px-2.5 py-1 rounded-sm border border-amber-400">
+                              <Clock className="w-3.5 h-3.5 text-amber-800" />
+                              {status === 'pendiente_agente'
+                                ? `En revisión: Esperando confirmación del agente (${
+                                    prop.requestedAgentName ||
+                                    requestedAgentProfile?.displayName ||
+                                    'Agente seleccionado'
+                                  })`
+                                : 'En revisión: Esperando que el Administrador te asigne un agente'}
+                            </div>
+                            <p className="text-[11px] text-amber-950/90">
+                              {status === 'pendiente_agente'
+                                ? 'El agente elegido debe aceptar tu solicitud (o el administrador confirmarla) antes de quedar asignado. Mientras tanto, vos mantenés el control de la propiedad.'
+                                : 'El administrador recibió tu pedido y te asignará un agente disponible a la brevedad.'}
+                            </p>
+                            {requestedAgentProfile && status === 'pendiente_agente' && (
+                              <div className="text-[11px] text-amber-950 font-tabular">
+                                Datos del agente solicitado:{' '}
+                                <strong>{requestedAgentProfile.displayName}</strong> ·{' '}
+                                {requestedAgentProfile.agencyName || 'Agente Inmobiliario'} ·{' '}
+                                {requestedAgentProfile.email} · {requestedAgentProfile.phone}
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex flex-wrap items-center gap-2 shrink-0">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setAgentSelectorPropId(isChoosingAgentHere ? null : prop.id)
+                              }
+                              className="px-3 py-1.5 text-xs font-semibold text-amber-900 bg-white border border-amber-400 rounded-sm hover:bg-amber-100"
+                            >
+                              Cambiar agente
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => onOwnerRequestAgent(prop.id, 'directa')}
+                              className="px-3 py-1.5 text-xs font-semibold text-red-700 bg-white border border-red-300 rounded-sm hover:bg-red-50"
+                            >
+                              Administrar por mi cuenta
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {status === 'rechazado' && (
+                        <div className="space-y-2.5">
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                            <div className="space-y-1">
+                              <div className="inline-flex items-center gap-1.5 text-xs font-bold text-red-800 bg-red-100 px-2.5 py-1 rounded-sm border border-red-400">
+                                <AlertCircle className="w-4 h-4 text-red-700" />
+                                Solicitud Rechazada: El agente solicitado ({prop.requestedAgentName || 'Agente'}) no está disponible
+                              </div>
+                              {prop.agentRejectionReason && (
+                                <p className="text-xs text-red-900 font-medium">
+                                  Motivo informado: “{prop.agentRejectionReason}”
+                                </p>
+                              )}
+                              <p className="text-[11px] text-red-950/80">
+                                Podés elegir otro agente disponible de la lista, pedir que el administrador te asigne uno, o administrar la propiedad por tu cuenta.
+                              </p>
+                            </div>
+                            <div className="flex flex-wrap items-center gap-2 shrink-0">
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setAgentSelectorPropId(isChoosingAgentHere ? null : prop.id)
+                                }
+                                className="px-3 py-1.5 text-xs font-semibold text-[#FCFBF7] bg-[#39483A] rounded-sm hover:bg-[#2c382d]"
+                              >
+                                Elegir otro agente
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => onOwnerRequestAgent(prop.id, 'asignacion_admin')}
+                                className="px-3 py-1.5 text-xs font-semibold text-[#39483A] bg-white border border-[#D8C7AA] rounded-sm hover:bg-[#FCFBF7]"
+                              >
+                                Que el administrador me asigne uno
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => onOwnerRequestAgent(prop.id, 'directa')}
+                                className="px-3 py-1.5 text-xs font-semibold text-red-700 bg-white border border-red-300 rounded-sm hover:bg-red-100"
+                              >
+                                Administrar por mi cuenta
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {status === 'asignado' && (
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                          <div className="flex items-start gap-3">
+                            <div className="w-10 h-10 rounded-full overflow-hidden bg-[#39483A] text-[#FCFBF7] flex items-center justify-center shrink-0">
+                              {assignedAgentProfile?.photoUrl ? (
+                                <img
+                                  src={assignedAgentProfile.photoUrl}
+                                  alt={prop.agentName}
+                                  className="w-full h-full object-cover"
+                                />
+                              ) : (
+                                <User className="w-5 h-5" />
+                              )}
+                            </div>
+                            <div className="space-y-0.5">
+                              <div className="text-xs font-semibold text-emerald-950 flex flex-wrap items-center gap-2">
+                                <span>Agente Inmobiliario Asignado: {prop.agentName}</span>
+                                <span className="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider bg-emerald-100 text-emerald-900 border border-emerald-400 rounded-sm">
+                                  Asignación Confirmada
+                                </span>
+                              </div>
+                              <div className="text-xs text-emerald-900">
+                                {assignedAgentProfile?.agencyName || 'Corredor Inmobiliario Matriculado'}
+                              </div>
+                              <div className="text-[11px] font-tabular text-emerald-900/80">
+                                Correo: {assignedAgentProfile?.email || 'agente@clavehogar.com'} · Teléfono:{' '}
+                                {assignedAgentProfile?.phone || '+54 9 11 6092-1120'}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="flex flex-wrap items-center gap-2 shrink-0">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setAgentSelectorPropId(isChoosingAgentHere ? null : prop.id)
+                              }
+                              className="px-3 py-1.5 text-xs font-semibold text-[#39483A] bg-white border border-[#D8C7AA] rounded-sm hover:bg-[#FCFBF7]"
+                            >
+                              Cambiar agente
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => onOwnerRequestAgent(prop.id, 'directa')}
+                              className="px-3 py-1.5 text-xs font-semibold text-red-700 bg-white border border-red-300 rounded-sm hover:bg-red-50"
+                            >
+                              Pasar a gestión por mi cuenta
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Desplegable de perfiles de agentes disponibles para elegir */}
+                      {isChoosingAgentHere && (
+                        <div className="pt-3 border-t border-[#D8C7AA] space-y-2.5">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-semibold text-[#39483A]">
+                              Seleccioná un perfil de Agente Inmobiliario disponible (la solicitud quedará pendiente de confirmación):
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => setAgentSelectorPropId(null)}
+                              className="text-xs text-red-600 font-semibold hover:underline"
+                            >
+                              Cerrar perfiles
+                            </button>
+                          </div>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            {agentsList.map((ag) => (
+                              <div
+                                key={ag.uid}
+                                className="p-3.5 bg-white border border-[#D8C7AA] rounded-sm flex items-start justify-between gap-3"
+                              >
+                                <div className="flex items-start gap-3 min-w-0">
+                                  <div className="w-10 h-10 rounded-full overflow-hidden bg-[#39483A] text-[#FCFBF7] flex items-center justify-center shrink-0">
+                                    {ag.photoUrl ? (
+                                      <img
+                                        src={ag.photoUrl}
+                                        alt={ag.displayName}
+                                        className="w-full h-full object-cover"
+                                      />
+                                    ) : (
+                                      <User className="w-5 h-5" />
+                                    )}
+                                  </div>
+                                  <div className="min-w-0 space-y-0.5">
+                                    <div className="text-xs font-semibold text-[#1F241F]">
+                                      {ag.displayName}
+                                    </div>
+                                    <div className="text-[11px] text-[#B86F52] font-medium">
+                                      {ag.agencyName || 'Agente Inmobiliario'}
+                                    </div>
+                                    <div className="text-[11px] font-tabular text-[#39483A]/80">
+                                      {ag.email} · {ag.phone}
+                                    </div>
+                                    {ag.bio && (
+                                      <p className="text-[11px] text-[#39483A]/75 line-clamp-2">
+                                        {ag.bio}
+                                      </p>
+                                    )}
+                                  </div>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={async () => {
+                                    await onOwnerRequestAgent(prop.id, 'elegir_agente', ag);
+                                    setAgentSelectorPropId(null);
+                                  }}
+                                  className="px-3 py-1.5 text-xs font-semibold text-[#FCFBF7] bg-[#39483A] hover:bg-[#2c382d] rounded-sm shrink-0"
+                                >
+                                  Solicitar este agente
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* =====================================================================
+          SECCIÓN CARTERA DEL AGENTE INMOBILIARIO (SOLO PROPIEDADES A SU CARGO)
+         ===================================================================== */}
+      {activeSubView === 'agente_cartera' && currentUser.role === 'agente' && (
+        <div className="space-y-6">
+          {/* Solicitudes pendientes enviadas a este agente */}
+          {myPendingAgentInvitations.length > 0 && (
+            <div className="bg-amber-50 border-2 border-amber-400 rounded-sm p-6 space-y-4">
+              <div>
+                <span className="inline-flex items-center gap-1.5 text-[11px] uppercase tracking-[0.18em] text-amber-900 font-bold bg-amber-200/80 px-2.5 py-0.5 rounded-sm border border-amber-400">
+                  <Clock className="w-3.5 h-3.5" />
+                  Solicitudes de Propietarios en Revisión
+                </span>
+                <h2 className="text-xl font-serif-display font-semibold text-amber-950 mt-2">
+                  Propiedades que solicitaron tu gestión ({myPendingAgentInvitations.length})
+                </h2>
+                <p className="text-xs text-amber-900/90">
+                  Aceptá la solicitud para confirmar la asignación y comenzar a gestionar la propiedad, o rechazala si no tenés disponibilidad.
+                </p>
+              </div>
+
+              <div className="space-y-3">
+                {myPendingAgentInvitations.map((prop) => (
+                  <div
+                    key={prop.id}
+                    className="p-4 bg-white border border-amber-300 rounded-sm flex flex-col lg:flex-row lg:items-center justify-between gap-4"
+                  >
+                    <div className="flex items-center gap-3.5">
+                      <img
+                        src={resolvePropertyImageUrl(prop.images[0])}
+                        alt={prop.title}
+                        referrerPolicy="no-referrer"
+                        onError={(e) => {
+                          if (e.currentTarget.src !== HERO_IMAGE) {
+                            e.currentTarget.src = HERO_IMAGE;
+                          }
+                        }}
+                        className="w-16 h-12 rounded-sm object-cover bg-[#D8C7AA] shrink-0"
+                      />
+                      <div className="space-y-0.5">
+                        <div className="text-xs text-amber-800 font-semibold">
+                          Propietario solicitante: {prop.ownerName}
+                        </div>
+                        <div className="text-sm font-semibold text-[#1F241F]">{prop.title}</div>
+                        <div className="text-xs font-tabular text-[#39483A]">
+                          {prop.location} · {prop.operationType.toUpperCase()} {prop.currency}{' '}
+                          {prop.price.toLocaleString()} ({prop.surface} m²)
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => onAgentRespondAssignment(prop.id, true)}
+                        className="px-3.5 py-2 text-xs font-semibold text-white bg-emerald-700 hover:bg-emerald-800 rounded-sm inline-flex items-center gap-1.5"
+                      >
+                        <Check className="w-3.5 h-3.5" />
+                        Aceptar y Gestionar
+                      </button>
+                      <input
+                        type="text"
+                        value={agentRejectReasonDrafts[prop.id] || ''}
+                        onChange={(e) =>
+                          setAgentRejectReasonDrafts((prev) => ({
+                            ...prev,
+                            [prop.id]: e.target.value,
+                          }))
+                        }
+                        placeholder="Motivo si no estás disponible..."
+                        className="px-2.5 py-1.5 text-xs bg-white border border-[#D8C7AA] rounded-sm"
+                      />
+                      <button
+                        type="button"
+                        onClick={() =>
+                          onAgentRespondAssignment(
+                            prop.id,
+                            false,
+                            agentRejectReasonDrafts[prop.id] || 'Sin disponibilidad en la zona actualmente.'
+                          )
+                        }
+                        className="px-3 py-2 text-xs font-semibold text-red-700 bg-red-50 border border-red-300 hover:bg-red-100 rounded-sm inline-flex items-center gap-1"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                        Rechazar
+                      </button>
+                    </div>
+                  </div>
                 ))}
-              </tbody>
-            </table>
+              </div>
+            </div>
+          )}
+
+          {/* Propiedades confirmadas a cargo de este agente */}
+          <div className="bg-[#FCFBF7] border border-[#D8C7AA] rounded-sm p-6 space-y-5">
+            <div className="border-b border-[#D8C7AA] pb-4">
+              <h2 className="text-2xl font-serif-display font-semibold text-[#39483A]">
+                Propiedades Confirmadas a Mi Cargo ({myAssignedProperties.length})
+              </h2>
+              <p className="text-xs text-[#39483A]/75 mt-0.5">
+                Aquí aparecen únicamente los inmuebles donde estás asignado formalmente como agente responsable. No podés modificar publicaciones de otros agentes ni propiedades sin asignación confirmada.
+              </p>
+            </div>
+
+            {myAssignedProperties.length === 0 ? (
+              <p className="text-sm text-[#39483A]/70 py-8 text-center">
+                Actualmente no tenés propiedades asignadas a tu cargo.
+              </p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse text-sm">
+                  <thead>
+                    <tr className="border-b border-[#D8C7AA] text-xs uppercase tracking-wider text-[#39483A]/70">
+                      <th className="py-3 pr-4">Inmueble</th>
+                      <th className="py-3 px-3">Propietario</th>
+                      <th className="py-3 px-3">Operación / Valor</th>
+                      <th className="py-3 px-3">Publicación</th>
+                      <th className="py-3 px-3">Disponibilidad</th>
+                      <th className="py-3 pl-3 text-right">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[#D8C7AA]/60">
+                    {myAssignedProperties.map((prop) => (
+                      <tr key={prop.id}>
+                        <td className="py-3.5 pr-4">
+                          <div className="flex items-center gap-3">
+                            <img
+                              src={resolvePropertyImageUrl(prop.images[0])}
+                              alt={prop.title}
+                              referrerPolicy="no-referrer"
+                              onError={(e) => {
+                                if (e.currentTarget.src !== HERO_IMAGE) {
+                                  e.currentTarget.src = HERO_IMAGE;
+                                }
+                              }}
+                              className="w-14 h-10 rounded-sm object-cover bg-[#F5F1E8] shrink-0"
+                            />
+                            <div>
+                              <div className="font-semibold text-[#1F241F]">{prop.title}</div>
+                              <div className="text-xs text-[#39483A]/70">
+                                {prop.location} · <span className="font-tabular">{prop.surface} m²</span>
+                              </div>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="py-3.5 px-3 text-xs text-[#39483A]">
+                          <strong className="text-[#1F241F]">{prop.ownerName}</strong>
+                        </td>
+                        <td className="py-3.5 px-3 font-tabular text-xs">
+                          <span className="uppercase text-[#B86F52] font-semibold block">
+                            {prop.operationType}
+                          </span>
+                          <span className="font-semibold text-[#39483A]">
+                            {prop.currency} {prop.price.toLocaleString()}
+                          </span>
+                        </td>
+                        <td className="py-3.5 px-3 text-xs">
+                          <span
+                            className={`inline-block text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-sm border ${getPublicationStatusBadgeClass(
+                              prop.publicationStatus
+                            )}`}
+                          >
+                            {prop.publicationStatus}
+                          </span>
+                        </td>
+                        <td className="py-3.5 px-3">
+                          <select
+                            value={prop.availability}
+                            onChange={(e) =>
+                              onUpdateAvailability(prop.id, e.target.value as AvailabilityStatus)
+                            }
+                            className="px-2.5 py-1.5 text-xs bg-white border border-[#D8C7AA] rounded-sm"
+                          >
+                            <option value="disponible">Disponible</option>
+                            <option value="reservada">Reservada</option>
+                            <option value="alquilada">Alquilada</option>
+                            <option value="vendida">Vendida</option>
+                          </select>
+                        </td>
+                        <td className="py-3.5 pl-3 text-right">
+                          <div className="inline-flex items-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => onSelectProperty(prop)}
+                              className="p-2 text-[#39483A] border border-[#D8C7AA] rounded-sm hover:bg-[#F5F1E8]"
+                              title="Ver ficha"
+                            >
+                              <Eye className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => onOpenEditProperty(prop)}
+                              className="p-2 text-[#39483A] border border-[#D8C7AA] rounded-sm hover:bg-[#F5F1E8]"
+                              title="Gestionar ficha a mi cargo"
+                            >
+                              <Edit3 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -921,210 +1671,247 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
       {(activeSubView === 'propietario_visitas' || activeSubView === 'agente_visitas') && (
         <div className="bg-[#FCFBF7] border border-[#D8C7AA] rounded-sm p-6 space-y-4">
           <h2 className="text-2xl font-serif-display font-semibold text-[#39483A]">
-            Agenda de Visitas y Clientes Interesados
+            {activeSubView === 'propietario_visitas'
+              ? 'Visitas Solicitadas a Mis Propiedades'
+              : 'Agenda de Visitas de Propiedades a Mi Cargo'}
           </h2>
-          <div className="space-y-3">
-            {visits.map((v) => (
-              <div
-                key={v.id}
-                className="p-4 bg-[#F5F1E8] border border-[#D8C7AA] rounded-sm flex flex-col lg:flex-row lg:items-center justify-between gap-4"
-              >
-                <div className="space-y-1">
-                  <div className="text-xs text-[#39483A]/80">
-                    Cliente interesado: <strong className="text-[#1F241F]">{v.clientName}</strong> ·
-                    Estado: <strong className="uppercase text-[#B86F52]">{v.status}</strong>
+          {(activeSubView === 'propietario_visitas' ? ownerVisits : agentVisits).length === 0 ? (
+            <p className="text-sm text-[#39483A]/70 py-8 text-center">
+              No hay visitas registradas en esta sección.
+            </p>
+          ) : (
+            <div className="space-y-3">
+              {(activeSubView === 'propietario_visitas' ? ownerVisits : agentVisits).map((v) => (
+                <div
+                  key={v.id}
+                  className="p-4 bg-[#F5F1E8] border border-[#D8C7AA] rounded-sm flex flex-col lg:flex-row lg:items-center justify-between gap-4"
+                >
+                  <div className="space-y-1.5">
+                    <div className="flex flex-wrap items-center gap-2 text-xs text-[#39483A]/80">
+                      <span>
+                        Cliente interesado: <strong className="text-[#1F241F]">{v.clientName}</strong>
+                      </span>
+                      <span
+                        className={`inline-block text-[10px] uppercase tracking-wider font-bold px-2.5 py-0.5 rounded-sm border ${getVisitStatusBadgeClass(
+                          v.status
+                        )}`}
+                      >
+                        Estado: {v.status}
+                      </span>
+                    </div>
+                    <div className="text-base font-serif-display font-semibold text-[#1F241F]">
+                      {v.propertyTitle}
+                    </div>
+                    <div className="text-xs font-tabular text-[#39483A]">
+                      Fecha solicitada: {v.date} · Horario: {v.timeSlot}
+                    </div>
+                    {v.notes && <div className="text-xs text-[#39483A]/75">Nota: {v.notes}</div>}
                   </div>
-                  <div className="text-base font-serif-display font-semibold text-[#1F241F]">
-                    {v.propertyTitle}
-                  </div>
-                  <div className="text-xs font-tabular text-[#39483A]">
-                    Fecha solicitada: {v.date} · Horario: {v.timeSlot}
-                  </div>
-                  {v.notes && <div className="text-xs text-[#39483A]/75">Nota: {v.notes}</div>}
-                </div>
 
-                <div className="flex flex-wrap items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => onUpdateVisit(v.id, 'confirmada', v.date, v.timeSlot, v.notes)}
-                    className="px-3.5 py-1.5 text-xs font-semibold text-[#FCFBF7] bg-[#39483A] rounded-sm hover:bg-[#2c382d]"
-                  >
-                    Confirmar Visita
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => onUpdateVisit(v.id, 'rechazada', v.date, v.timeSlot, v.notes)}
-                    className="px-3.5 py-1.5 text-xs font-semibold text-[#B86F52] bg-white border border-[#D8C7AA] rounded-sm hover:bg-[#F5F1E8]"
-                  >
-                    Rechazar
-                  </button>
-                  <div className="flex items-center gap-1.5">
-                    <input
-                      type="date"
-                      value={rescheduleDates[v.id] || v.date}
-                      onChange={(e) =>
-                        setRescheduleDates((prev) => ({ ...prev, [v.id]: e.target.value }))
-                      }
-                      className="px-2.5 py-1.5 text-xs bg-white border border-[#D8C7AA] rounded-sm font-tabular"
-                    />
-                    <input
-                      type="text"
-                      value={rescheduleSlots[v.id] || v.timeSlot}
-                      onChange={(e) =>
-                        setRescheduleSlots((prev) => ({ ...prev, [v.id]: e.target.value }))
-                      }
-                      placeholder="Nuevo horario"
-                      className="w-28 px-2.5 py-1.5 text-xs bg-white border border-[#D8C7AA] rounded-sm"
-                    />
+                  <div className="flex flex-wrap items-center gap-2">
                     <button
                       type="button"
-                      onClick={() =>
-                        onUpdateVisit(
-                          v.id,
-                          'reprogramada',
-                          rescheduleDates[v.id] || v.date,
-                          rescheduleSlots[v.id] || v.timeSlot,
-                          'Horario reprogramado por el responsable'
-                        )
-                      }
-                      className="px-3 py-1.5 text-xs font-semibold text-[#39483A] bg-white border border-[#D8C7AA] rounded-sm hover:bg-[#F5F1E8]"
+                      onClick={() => onUpdateVisit(v.id, 'confirmada', v.date, v.timeSlot, v.notes)}
+                      className="px-3.5 py-1.5 text-xs font-semibold text-white bg-emerald-700 rounded-sm hover:bg-emerald-800"
                     >
-                      Reprogramar
+                      Confirmar Visita
                     </button>
+                    <button
+                      type="button"
+                      onClick={() => onUpdateVisit(v.id, 'rechazada', v.date, v.timeSlot, v.notes)}
+                      className="px-3.5 py-1.5 text-xs font-semibold text-red-700 bg-red-50 border border-red-300 rounded-sm hover:bg-red-100"
+                    >
+                      Rechazar
+                    </button>
+                    <div className="flex items-center gap-1.5">
+                      <input
+                        type="date"
+                        value={rescheduleDates[v.id] || v.date}
+                        onChange={(e) =>
+                          setRescheduleDates((prev) => ({ ...prev, [v.id]: e.target.value }))
+                        }
+                        className="px-2.5 py-1.5 text-xs bg-white border border-[#D8C7AA] rounded-sm font-tabular"
+                      />
+                      <input
+                        type="text"
+                        value={rescheduleSlots[v.id] || v.timeSlot}
+                        onChange={(e) =>
+                          setRescheduleSlots((prev) => ({ ...prev, [v.id]: e.target.value }))
+                        }
+                        placeholder="Nuevo horario"
+                        className="w-28 px-2.5 py-1.5 text-xs bg-white border border-[#D8C7AA] rounded-sm"
+                      />
+                      <button
+                        type="button"
+                        onClick={() =>
+                          onUpdateVisit(
+                            v.id,
+                            'reprogramada',
+                            rescheduleDates[v.id] || v.date,
+                            rescheduleSlots[v.id] || v.timeSlot,
+                            'Horario reprogramado por el responsable'
+                          )
+                        }
+                        className="px-3 py-1.5 text-xs font-semibold text-amber-900 bg-amber-100 border border-amber-400 rounded-sm hover:bg-amber-200"
+                      >
+                        Reprogramar
+                      </button>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
-      {(activeSubView === 'propietario_consultas' || activeSubView === 'agente_consultas') &&
-        renderChatSection(inquiries, true)}
+      {activeSubView === 'propietario_consultas' &&
+        canActAsOwner &&
+        renderChatSection(ownerInquiries, true)}
+
+      {activeSubView === 'agente_consultas' &&
+        currentUser.role === 'agente' &&
+        renderChatSection(agentInquiries, true)}
 
       {(activeSubView === 'propietario_operaciones' || activeSubView === 'agente_operaciones') && (
         <div className="bg-[#FCFBF7] border border-[#D8C7AA] rounded-sm p-6 space-y-4">
           <h2 className="text-2xl font-serif-display font-semibold text-[#39483A]">
-            Gestión de Solicitudes de Alquiler/Venta, Operaciones y Contratos
+            {activeSubView === 'propietario_operaciones'
+              ? 'Ofertas y Contratos en Mis Propiedades'
+              : 'Operaciones y Contratos de Propiedades a Mi Cargo'}
           </h2>
-          <div className="space-y-4">
-            {operations.map((op) => {
-              const draft = contractDrafts[op.id] || {
-                code: op.contractCode || `CH-2026-${op.id.slice(-3).toUpperCase()}`,
-                terms:
-                  op.contractTerms ||
-                  `Contrato de ${op.operationType} por ${op.currency} ${op.offeredAmount.toLocaleString()}.`,
-                start: op.contractStartDate || '2026-11-01',
-                end: op.contractEndDate || '2028-10-31',
-              };
-              return (
-                <div
-                  key={op.id}
-                  className="p-5 bg-[#F5F1E8] border border-[#D8C7AA] rounded-sm space-y-3"
-                >
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div>
-                      <span className="text-xs font-semibold text-[#B86F52] uppercase tracking-wider">
-                        {op.operationType} · Solicitante: {op.clientName}
-                      </span>
-                      <h3 className="text-lg font-serif-display font-semibold text-[#1F241F]">
-                        {op.propertyTitle}
-                      </h3>
+          {(activeSubView === 'propietario_operaciones' ? ownerOperations : agentOperations)
+            .length === 0 ? (
+            <p className="text-sm text-[#39483A]/70 py-8 text-center">
+              No hay solicitudes de operación registradas para estas propiedades.
+            </p>
+          ) : (
+            <div className="space-y-4">
+              {(activeSubView === 'propietario_operaciones'
+                ? ownerOperations
+                : agentOperations
+              ).map((op) => {
+                const draft = contractDrafts[op.id] || {
+                  code: op.contractCode || `CH-2026-${op.id.slice(-3).toUpperCase()}`,
+                  terms:
+                    op.contractTerms ||
+                    `Contrato de ${op.operationType} por ${op.currency} ${op.offeredAmount.toLocaleString()}.`,
+                  start: op.contractStartDate || '2026-11-01',
+                  end: op.contractEndDate || '2028-10-31',
+                };
+                return (
+                  <div
+                    key={op.id}
+                    className="p-5 bg-[#F5F1E8] border border-[#D8C7AA] rounded-sm space-y-3"
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div>
+                        <span className="text-xs font-semibold text-[#B86F52] uppercase tracking-wider">
+                          {op.operationType} · Solicitante: {op.clientName}
+                        </span>
+                        <h3 className="text-lg font-serif-display font-semibold text-[#1F241F]">
+                          {op.propertyTitle}
+                        </h3>
+                      </div>
+                      <div className="text-right space-y-1">
+                        <span className="text-base font-semibold font-tabular text-[#39483A] block">
+                          {op.currency} {op.offeredAmount.toLocaleString()}
+                        </span>
+                        <span
+                          className={`inline-block text-[10px] uppercase tracking-wider font-bold px-2.5 py-0.5 rounded-sm border ${getDealStatusBadgeClass(
+                            op.status
+                          )}`}
+                        >
+                          Estado actual: {op.status.replace('_', ' ')}
+                        </span>
+                      </div>
                     </div>
-                    <div className="text-right">
-                      <span className="text-base font-semibold font-tabular text-[#39483A]">
-                        {op.currency} {op.offeredAmount.toLocaleString()}
-                      </span>
-                      <span className="block text-xs font-semibold text-[#B86F52] capitalize">
-                        Estado actual: {op.status.replace('_', ' ')}
-                      </span>
+                    <p className="text-xs text-[#39483A]/85">{op.message}</p>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-4 gap-2 pt-2 border-t border-[#D8C7AA]">
+                      <input
+                        type="text"
+                        value={draft.code}
+                        onChange={(e) =>
+                          setContractDrafts((prev) => ({
+                            ...prev,
+                            [op.id]: { ...draft, code: e.target.value },
+                          }))
+                        }
+                        placeholder="Código de contrato"
+                        className="px-3 py-1.5 text-xs bg-white border border-[#D8C7AA] rounded-sm font-tabular"
+                      />
+                      <input
+                        type="date"
+                        value={draft.start}
+                        onChange={(e) =>
+                          setContractDrafts((prev) => ({
+                            ...prev,
+                            [op.id]: { ...draft, start: e.target.value },
+                          }))
+                        }
+                        className="px-3 py-1.5 text-xs bg-white border border-[#D8C7AA] rounded-sm font-tabular"
+                      />
+                      <input
+                        type="date"
+                        value={draft.end}
+                        onChange={(e) =>
+                          setContractDrafts((prev) => ({
+                            ...prev,
+                            [op.id]: { ...draft, end: e.target.value },
+                          }))
+                        }
+                        className="px-3 py-1.5 text-xs bg-white border border-[#D8C7AA] rounded-sm font-tabular"
+                      />
+                      <input
+                        type="text"
+                        value={draft.terms}
+                        onChange={(e) =>
+                          setContractDrafts((prev) => ({
+                            ...prev,
+                            [op.id]: { ...draft, terms: e.target.value },
+                          }))
+                        }
+                        placeholder="Términos del contrato"
+                        className="px-3 py-1.5 text-xs bg-white border border-[#D8C7AA] rounded-sm"
+                      />
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-2 pt-1">
+                      <button
+                        type="button"
+                        onClick={() => onUpdateOperation(op.id, 'aprobada')}
+                        className="px-3.5 py-1.5 text-xs font-semibold text-emerald-900 bg-emerald-100 border border-emerald-400 rounded-sm hover:bg-emerald-200"
+                      >
+                        Aceptar Solicitud
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          onUpdateOperation(op.id, 'concretada', {
+                            contractCode: draft.code,
+                            contractTerms: draft.terms,
+                            contractStartDate: draft.start,
+                            contractEndDate: draft.end,
+                          })
+                        }
+                        className="px-3.5 py-1.5 text-xs font-semibold text-[#FCFBF7] bg-[#39483A] rounded-sm hover:bg-[#2c382d]"
+                      >
+                        Concretar Operación y Registrar Contrato
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => onUpdateOperation(op.id, 'rechazada')}
+                        className="px-3.5 py-1.5 text-xs font-semibold text-red-700 bg-red-50 border border-red-300 rounded-sm hover:bg-red-100"
+                      >
+                        Rechazar
+                      </button>
                     </div>
                   </div>
-                  <p className="text-xs text-[#39483A]/85">{op.message}</p>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-4 gap-2 pt-2 border-t border-[#D8C7AA]">
-                    <input
-                      type="text"
-                      value={draft.code}
-                      onChange={(e) =>
-                        setContractDrafts((prev) => ({
-                          ...prev,
-                          [op.id]: { ...draft, code: e.target.value },
-                        }))
-                      }
-                      placeholder="Código de contrato"
-                      className="px-3 py-1.5 text-xs bg-white border border-[#D8C7AA] rounded-sm font-tabular"
-                    />
-                    <input
-                      type="date"
-                      value={draft.start}
-                      onChange={(e) =>
-                        setContractDrafts((prev) => ({
-                          ...prev,
-                          [op.id]: { ...draft, start: e.target.value },
-                        }))
-                      }
-                      className="px-3 py-1.5 text-xs bg-white border border-[#D8C7AA] rounded-sm font-tabular"
-                    />
-                    <input
-                      type="date"
-                      value={draft.end}
-                      onChange={(e) =>
-                        setContractDrafts((prev) => ({
-                          ...prev,
-                          [op.id]: { ...draft, end: e.target.value },
-                        }))
-                      }
-                      className="px-3 py-1.5 text-xs bg-white border border-[#D8C7AA] rounded-sm font-tabular"
-                    />
-                    <input
-                      type="text"
-                      value={draft.terms}
-                      onChange={(e) =>
-                        setContractDrafts((prev) => ({
-                          ...prev,
-                          [op.id]: { ...draft, terms: e.target.value },
-                        }))
-                      }
-                      placeholder="Términos del contrato"
-                      className="px-3 py-1.5 text-xs bg-white border border-[#D8C7AA] rounded-sm"
-                    />
-                  </div>
-
-                  <div className="flex flex-wrap items-center gap-2 pt-1">
-                    <button
-                      type="button"
-                      onClick={() => onUpdateOperation(op.id, 'aprobada')}
-                      className="px-3.5 py-1.5 text-xs font-semibold text-[#39483A] bg-white border border-[#D8C7AA] rounded-sm hover:bg-[#FCFBF7]"
-                    >
-                      Aceptar Solicitud
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        onUpdateOperation(op.id, 'concretada', {
-                          contractCode: draft.code,
-                          contractTerms: draft.terms,
-                          contractStartDate: draft.start,
-                          contractEndDate: draft.end,
-                        })
-                      }
-                      className="px-3.5 py-1.5 text-xs font-semibold text-[#FCFBF7] bg-[#39483A] rounded-sm hover:bg-[#2c382d]"
-                    >
-                      Concretar Operación y Registrar Contrato
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => onUpdateOperation(op.id, 'rechazada')}
-                      className="px-3.5 py-1.5 text-xs font-semibold text-[#B86F52] bg-white border border-[#D8C7AA] rounded-sm hover:bg-[#FCFBF7]"
-                    >
-                      Rechazar
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
 
@@ -1142,11 +1929,16 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
                 Propiedades en Firestore
               </div>
               <div className="text-3xl font-semibold font-tabular text-[#1F241F] mt-1">
-                {properties.length}
+                {allProperties.length}
               </div>
               <div className="text-xs text-[#39483A]/70 mt-1">
-                {properties.filter((p) => p.publicationStatus === 'aprobada').length} aprobadas ·{' '}
-                {pendingProperties.length} pendientes
+                <span className="text-emerald-800 font-semibold">
+                  {allProperties.filter((p) => p.publicationStatus === 'aprobada').length} aprobadas
+                </span>{' '}
+                ·{' '}
+                <span className="text-amber-800 font-semibold">
+                  {pendingProperties.length} en revisión
+                </span>
               </div>
             </div>
             <div className="p-5 bg-[#F5F1E8] border border-[#D8C7AA] rounded-sm">
@@ -1160,115 +1952,452 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
                 Clientes, Propietarios y Agentes
               </div>
             </div>
-            <div className="p-5 bg-[#F5F1E8] border border-[#D8C7AA] rounded-sm">
-              <div className="text-xs uppercase tracking-wider font-semibold text-[#39483A]/75">
-                Visitas Gestionadas
+            <div className="p-5 bg-amber-50 border border-amber-300 rounded-sm">
+              <div className="text-xs uppercase tracking-wider font-semibold text-amber-900">
+                Solicitudes Pendientes Admin
               </div>
-              <div className="text-3xl font-semibold font-tabular text-[#1F241F] mt-1">
-                {visits.length}
+              <div className="text-3xl font-semibold font-tabular text-amber-900 mt-1">
+                {adminPendingActionProperties.length}
               </div>
-              <div className="text-xs text-[#39483A]/70 mt-1">
-                {visits.filter((v) => v.status === 'confirmada').length} confirmadas
+              <div className="text-xs text-amber-800 mt-1">
+                Publicaciones o asignaciones por responder
               </div>
             </div>
             <div className="p-5 bg-[#F5F1E8] border border-[#D8C7AA] rounded-sm">
               <div className="text-xs uppercase tracking-wider font-semibold text-[#39483A]/75">
                 Volumen de Operaciones
               </div>
-              <div className="text-2xl font-semibold font-tabular text-[#B86F52] mt-1">
+              <div className="text-2xl font-semibold font-tabular text-[#39483A] mt-1">
                 USD {totalSalesVolume.toLocaleString()}
               </div>
               <div className="text-xs text-[#39483A]/70 mt-1">
-                {operations.length} operaciones registradas
+                {allOperations.length} operaciones registradas
               </div>
             </div>
           </div>
         </div>
       )}
 
+      {/* =====================================================================
+          MODERACIÓN Y SOLICITUDES DEL ADMINISTRADOR CON FILTROS
+          (Pendientes sin acción vs Ya Respondidas)
+         ===================================================================== */}
       {activeSubView === 'admin_publicaciones' && currentUser.role === 'administrador' && (
-        <div className="bg-[#FCFBF7] border border-[#D8C7AA] rounded-sm p-6 space-y-4">
-          <h2 className="text-2xl font-serif-display font-semibold text-[#39483A]">
-            Aprobación y Supervisión General de Publicaciones
-          </h2>
-          <div className="space-y-3">
-            {properties.map((prop) => (
-              <div
-                key={prop.id}
-                className="p-4 bg-[#F5F1E8] border border-[#D8C7AA] rounded-sm flex flex-col lg:flex-row lg:items-center justify-between gap-4"
+        <div className="bg-[#FCFBF7] border border-[#D8C7AA] rounded-sm p-6 space-y-6">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-[#D8C7AA] pb-4">
+            <div>
+              <h2 className="text-2xl font-serif-display font-semibold text-[#39483A]">
+                Moderación de Publicaciones y Solicitudes de Agente
+              </h2>
+              <p className="text-xs text-[#39483A]/75 mt-0.5">
+                Las solicitudes que apruebes o rechaces pasan automáticamente a la pestaña de{' '}
+                <strong>Ya Respondidas / Gestionadas</strong> para mantener limpio tu panel principal.
+              </p>
+            </div>
+
+            {/* Filtro de solicitudes del Administrador */}
+            <div className="flex flex-wrap items-center gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={() => setAdminModerationFilter('pendientes')}
+                className={`px-4 py-2 text-xs font-bold rounded-sm border transition-colors flex items-center gap-2 cursor-pointer ${
+                  adminModerationFilter === 'pendientes'
+                    ? 'bg-amber-600 text-white border-amber-700 shadow-xs'
+                    : 'bg-amber-50 text-amber-900 border-amber-300 hover:bg-amber-100'
+                }`}
               >
-                <div className="flex items-center gap-3.5">
-                  <img
-                    src={resolvePropertyImageUrl(prop.images[0])}
-                    alt={prop.title}
-                    referrerPolicy="no-referrer"
-                    onError={(e) => {
-                      if (e.currentTarget.src !== HERO_IMAGE) {
-                        e.currentTarget.src = HERO_IMAGE;
-                      }
-                    }}
-                    className="w-16 h-12 rounded-sm object-cover bg-[#D8C7AA] shrink-0"
-                  />
-                  <div className="space-y-0.5">
-                    <div className="text-xs text-[#39483A]/75">
-                      Estado: <strong className="uppercase text-[#B86F52]">{prop.publicationStatus}</strong> ·
-                      Titular: {prop.ownerName} · {prop.location}
-                    </div>
-                    <div className="text-sm font-semibold text-[#1F241F]">{prop.title}</div>
-                    <div className="text-xs font-tabular font-semibold text-[#39483A]">
-                      {prop.operationType.toUpperCase()} — {prop.currency} {prop.price.toLocaleString()} ({prop.surface} m²)
-                    </div>
-                  </div>
-                </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => onModerateProperty(prop.id, 'aprobada')}
-                    className="px-3.5 py-1.5 text-xs font-semibold text-[#FCFBF7] bg-[#39483A] rounded-sm hover:bg-[#2c382d]"
-                  >
-                    Aprobar Publicación
-                  </button>
-                  <input
-                    type="text"
-                    value={rejectionReasons[prop.id] || ''}
-                    onChange={(e) =>
-                      setRejectionReasons((prev) => ({ ...prev, [prop.id]: e.target.value }))
-                    }
-                    placeholder="Motivo de rechazo..."
-                    className="px-2.5 py-1.5 text-xs bg-white border border-[#D8C7AA] rounded-sm"
-                  />
-                  <button
-                    type="button"
-                    onClick={() =>
-                      onModerateProperty(
-                        prop.id,
-                        'rechazada',
-                        rejectionReasons[prop.id] || 'Incumple requisitos de verificación'
-                      )
-                    }
-                    className="px-3 py-1.5 text-xs font-semibold text-[#B86F52] bg-white border border-[#D8C7AA] rounded-sm hover:bg-[#FCFBF7]"
-                  >
-                    Rechazar
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => onDeleteProperty(prop.id)}
-                    className="px-3 py-1.5 text-xs font-semibold text-[#B86F52] bg-white border border-[#D8C7AA] rounded-sm hover:bg-[#FCFBF7]"
-                  >
-                    Eliminar
-                  </button>
-                </div>
-              </div>
-            ))}
+                <Clock className="w-3.5 h-3.5" />
+                Pendientes de Acción ({adminPendingActionProperties.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setAdminModerationFilter('respondidas')}
+                className={`px-4 py-2 text-xs font-bold rounded-sm border transition-colors flex items-center gap-2 cursor-pointer ${
+                  adminModerationFilter === 'respondidas'
+                    ? 'bg-[#39483A] text-[#FCFBF7] border-[#39483A] shadow-xs'
+                    : 'bg-[#F5F1E8] text-[#39483A] border-[#D8C7AA] hover:bg-[#D8C7AA]/40'
+                }`}
+              >
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                Ya Respondidas / Historial ({adminRespondedProperties.length})
+              </button>
+            </div>
           </div>
+
+          {adminModerationFilter === 'pendientes' ? (
+            adminPendingActionProperties.length === 0 ? (
+              <div className="p-10 bg-emerald-50 border border-emerald-300 rounded-sm text-center space-y-2">
+                <CheckCircle2 className="w-8 h-8 text-emerald-700 mx-auto" />
+                <div className="text-base font-serif-display font-semibold text-emerald-950">
+                  ¡Todo al día! No hay solicitudes pendientes por revisar
+                </div>
+                <p className="text-xs text-emerald-900/80 max-w-md mx-auto">
+                  Todas las publicaciones y solicitudes de asignación de agentes fueron respondidas. Podés consultarlas en la pestaña{' '}
+                  <button
+                    type="button"
+                    onClick={() => setAdminModerationFilter('respondidas')}
+                    className="underline font-bold"
+                  >
+                    Ya Respondidas / Historial ({adminRespondedProperties.length})
+                  </button>
+                  .
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {adminPendingActionProperties.map((prop) => {
+                  const status =
+                    prop.agentAssignmentStatus ||
+                    (prop.agentId?.trim() ? 'asignado' : 'sin_agente');
+                  const selectedAgentUid =
+                    adminSelectedAgentByProp[prop.id] ??
+                    prop.requestedAgentId ??
+                    prop.agentId ??
+                    agentsList[0]?.uid ??
+                    '';
+                  const isPubPending = prop.publicationStatus === 'pendiente';
+                  const isAgentPending =
+                    status === 'pendiente_admin' || status === 'pendiente_agente';
+
+                  return (
+                    <div
+                      key={prop.id}
+                      className="p-5 bg-amber-50/60 border-2 border-amber-300 rounded-sm space-y-4"
+                    >
+                      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                        <div className="flex items-start gap-3.5">
+                          <img
+                            src={resolvePropertyImageUrl(prop.images[0])}
+                            alt={prop.title}
+                            referrerPolicy="no-referrer"
+                            onError={(e) => {
+                              if (e.currentTarget.src !== HERO_IMAGE) {
+                                e.currentTarget.src = HERO_IMAGE;
+                              }
+                            }}
+                            className="w-20 h-15 rounded-sm object-cover bg-[#D8C7AA] shrink-0"
+                          />
+                          <div className="space-y-1">
+                            <div className="flex flex-wrap items-center gap-2 text-xs">
+                              <span
+                                className={`inline-flex items-center gap-1 text-[10px] uppercase tracking-wider font-bold px-2.5 py-0.5 rounded-sm border ${getPublicationStatusBadgeClass(
+                                  prop.publicationStatus
+                                )}`}
+                              >
+                                {prop.publicationStatus === 'pendiente'
+                                  ? 'Publicación: En Revisión (Pendiente)'
+                                  : prop.publicationStatus === 'aprobada'
+                                  ? 'Publicación: Ya Aprobada'
+                                  : 'Publicación: Rechazada'}
+                              </span>
+                              {isAgentPending && (
+                                <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wider font-bold px-2.5 py-0.5 rounded-sm border bg-amber-200 text-amber-950 border-amber-500">
+                                  <Clock className="w-3 h-3" />
+                                  Asignación de Agente Pendiente
+                                </span>
+                              )}
+                              <span className="text-[#39483A]">
+                                Titular: <strong>{prop.ownerName}</strong> · {prop.location}
+                              </span>
+                            </div>
+                            <div className="text-base font-semibold text-[#1F241F]">
+                              {prop.title}
+                            </div>
+                            <div className="text-xs font-tabular font-semibold text-[#39483A]">
+                              {prop.operationType.toUpperCase()} — {prop.currency}{' '}
+                              {prop.price.toLocaleString()} ({prop.surface} m²)
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Botones de aprobación/rechazo de publicación si está pendiente */}
+                        {isPubPending ? (
+                          <div className="flex flex-wrap items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => onModerateProperty(prop.id, 'aprobada')}
+                              className="px-4 py-2 text-xs font-bold text-white bg-emerald-700 rounded-sm hover:bg-emerald-800 inline-flex items-center gap-1.5 cursor-pointer"
+                            >
+                              <Check className="w-3.5 h-3.5" />
+                              Aprobar Publicación
+                            </button>
+                            <input
+                              type="text"
+                              value={rejectionReasons[prop.id] || ''}
+                              onChange={(e) =>
+                                setRejectionReasons((prev) => ({
+                                  ...prev,
+                                  [prop.id]: e.target.value,
+                                }))
+                              }
+                              placeholder="Motivo si rechazás..."
+                              className="px-2.5 py-1.5 text-xs bg-white border border-[#D8C7AA] rounded-sm"
+                            />
+                            <button
+                              type="button"
+                              onClick={() =>
+                                onModerateProperty(
+                                  prop.id,
+                                  'rechazada',
+                                  rejectionReasons[prop.id] ||
+                                    'Incumple requisitos de verificación'
+                                )
+                              }
+                              className="px-3.5 py-2 text-xs font-bold text-white bg-red-600 rounded-sm hover:bg-red-700 inline-flex items-center gap-1 cursor-pointer"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                              Rechazar
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="text-xs font-semibold text-emerald-800 bg-emerald-100 border border-emerald-300 px-3 py-1.5 rounded-sm">
+                            Publicación ya revisada ({prop.publicationStatus.toUpperCase()})
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Solicitud de Agente en esta propiedad */}
+                      <div className="pt-3 border-t border-amber-300 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                        <div>
+                          {status === 'sin_agente' && (
+                            <span className="text-[#39483A]">
+                              Modalidad elegida por propietario:{' '}
+                              <strong>Propietario independiente (No solicitó agente)</strong>
+                            </span>
+                          )}
+                          {status === 'pendiente_admin' && (
+                            <span className="text-amber-950 font-bold">
+                              ⚠️ Acción requerida: El propietario pidió que el Administrador le asigne un agente inmobiliario
+                            </span>
+                          )}
+                          {status === 'pendiente_agente' && (
+                            <span className="text-amber-950 font-bold">
+                              ⚠️ Acción requerida: El propietario eligió a{' '}
+                              <u>{prop.requestedAgentName || 'un agente'}</u> (podés confirmar la asignación aquí)
+                            </span>
+                          )}
+                          {status === 'asignado' && (
+                            <span className="text-emerald-900 font-semibold">
+                              ✓ Agente confirmado a cargo: {prop.agentName}
+                            </span>
+                          )}
+                        </div>
+
+                        {isAgentPending && (
+                          <div className="flex flex-wrap items-center gap-2">
+                            <select
+                              value={selectedAgentUid}
+                              onChange={(e) =>
+                                setAdminSelectedAgentByProp((prev) => ({
+                                  ...prev,
+                                  [prop.id]: e.target.value,
+                                }))
+                              }
+                              className="px-2.5 py-1.5 text-xs bg-white border border-amber-400 rounded-sm"
+                            >
+                              <option value="">Seleccionar agente...</option>
+                              {agentsList.map((ag) => (
+                                <option key={ag.uid} value={ag.uid}>
+                                  {ag.displayName} ({ag.email})
+                                </option>
+                              ))}
+                            </select>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const ag = agentsList.find((a) => a.uid === selectedAgentUid);
+                                if (!ag) return;
+                                onAdminConfirmAgentAssignment(prop.id, ag.uid, ag.displayName);
+                              }}
+                              disabled={!selectedAgentUid}
+                              className="px-3.5 py-1.5 text-xs font-bold text-white bg-emerald-700 hover:bg-emerald-800 rounded-sm disabled:opacity-50 cursor-pointer"
+                            >
+                              Confirmar y Asignar Agente
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )
+          ) : (
+            /* Pestaña 2: Solicitudes YA RESPONDIDAS por el Administrador */
+            <div className="space-y-4">
+              {adminRespondedProperties.length === 0 ? (
+                <p className="text-sm text-[#39483A]/70 py-8 text-center">
+                  Todavía no hay publicaciones respondidas en el historial.
+                </p>
+              ) : (
+                adminRespondedProperties.map((prop) => {
+                  const status =
+                    prop.agentAssignmentStatus ||
+                    (prop.agentId?.trim() ? 'asignado' : 'sin_agente');
+                  const selectedAgentUid =
+                    adminSelectedAgentByProp[prop.id] ??
+                    prop.requestedAgentId ??
+                    prop.agentId ??
+                    agentsList[0]?.uid ??
+                    '';
+
+                  return (
+                    <div
+                      key={prop.id}
+                      className="p-4 bg-[#F5F1E8] border border-[#D8C7AA] rounded-sm space-y-3"
+                    >
+                      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                        <div className="flex items-center gap-3.5">
+                          <img
+                            src={resolvePropertyImageUrl(prop.images[0])}
+                            alt={prop.title}
+                            referrerPolicy="no-referrer"
+                            onError={(e) => {
+                              if (e.currentTarget.src !== HERO_IMAGE) {
+                                e.currentTarget.src = HERO_IMAGE;
+                              }
+                            }}
+                            className="w-16 h-12 rounded-sm object-cover bg-[#D8C7AA] shrink-0"
+                          />
+                          <div className="space-y-1">
+                            <div className="flex flex-wrap items-center gap-2 text-xs">
+                              <span
+                                className={`inline-flex items-center gap-1 text-[10px] uppercase tracking-wider font-bold px-2.5 py-0.5 rounded-sm border ${getPublicationStatusBadgeClass(
+                                  prop.publicationStatus
+                                )}`}
+                              >
+                                {prop.publicationStatus === 'aprobada' ? (
+                                  <>
+                                    <CheckCircle2 className="w-3 h-3" /> APROBADA
+                                  </>
+                                ) : (
+                                  <>
+                                    <XCircle className="w-3 h-3" /> RECHAZADA
+                                  </>
+                                )}
+                              </span>
+                              <span className="text-[#39483A]/80">
+                                Titular: <strong>{prop.ownerName}</strong> · {prop.location}
+                              </span>
+                            </div>
+                            <div className="text-sm font-semibold text-[#1F241F]">{prop.title}</div>
+                            <div className="text-xs font-tabular font-semibold text-[#39483A]">
+                              {prop.operationType.toUpperCase()} — {prop.currency}{' '}
+                              {prop.price.toLocaleString()} ({prop.surface} m²)
+                            </div>
+                            {prop.publicationStatus === 'rechazada' && prop.rejectionReason && (
+                              <div className="text-xs text-red-700 font-medium">
+                                Motivo de rechazo registrado: “{prop.rejectionReason}”
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-2">
+                          {prop.publicationStatus !== 'aprobada' && (
+                            <button
+                              type="button"
+                              onClick={() => onModerateProperty(prop.id, 'aprobada')}
+                              className="px-3 py-1.5 text-xs font-semibold text-emerald-900 bg-emerald-100 border border-emerald-400 rounded-sm hover:bg-emerald-200"
+                            >
+                              Cambiar a Aprobada
+                            </button>
+                          )}
+                          {prop.publicationStatus !== 'rechazada' && (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                onModerateProperty(
+                                  prop.id,
+                                  'rechazada',
+                                  rejectionReasons[prop.id] || 'Revisión administrativa'
+                                )
+                              }
+                              className="px-3 py-1.5 text-xs font-semibold text-red-700 bg-red-50 border border-red-300 rounded-sm hover:bg-red-100"
+                            >
+                              Cambiar a Rechazada
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => onDeleteProperty(prop.id)}
+                            className="px-3 py-1.5 text-xs font-semibold text-red-700 bg-white border border-red-300 rounded-sm hover:bg-red-50"
+                          >
+                            Eliminar
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="pt-3 border-t border-[#D8C7AA] flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                        <div>
+                          {status === 'sin_agente' && (
+                            <span className="text-[#39483A]/80">
+                              Modalidad: <strong>Propietario independiente (Sin agente)</strong>
+                            </span>
+                          )}
+                          {status === 'rechazado' && (
+                            <span className="text-red-700 font-semibold">
+                              El agente anterior rechazó la solicitud. Podés asignarle otro agente:
+                            </span>
+                          )}
+                          {status === 'asignado' && (
+                            <span className="text-emerald-900 font-semibold">
+                              ✓ Agente confirmado a cargo: <strong>{prop.agentName}</strong>
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-2">
+                          <select
+                            value={selectedAgentUid}
+                            onChange={(e) =>
+                              setAdminSelectedAgentByProp((prev) => ({
+                                ...prev,
+                                [prop.id]: e.target.value,
+                              }))
+                            }
+                            className="px-2.5 py-1.5 text-xs bg-white border border-[#D8C7AA] rounded-sm"
+                          >
+                            <option value="">Seleccionar agente...</option>
+                            {agentsList.map((ag) => (
+                              <option key={ag.uid} value={ag.uid}>
+                                {ag.displayName} ({ag.email})
+                              </option>
+                            ))}
+                          </select>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const ag = agentsList.find((a) => a.uid === selectedAgentUid);
+                              if (!ag) return;
+                              onAdminConfirmAgentAssignment(prop.id, ag.uid, ag.displayName);
+                            }}
+                            disabled={!selectedAgentUid}
+                            className="px-3 py-1.5 text-xs font-semibold text-[#FCFBF7] bg-[#39483A] hover:bg-[#2c382d] rounded-sm disabled:opacity-50"
+                          >
+                            Reasignar Agente
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          )}
         </div>
       )}
 
       {activeSubView === 'admin_usuarios' && currentUser.role === 'administrador' && (
         <div className="bg-[#FCFBF7] border border-[#D8C7AA] rounded-sm p-6 space-y-4">
-          <h2 className="text-2xl font-serif-display font-semibold text-[#39483A]">
-            Administración de Usuarios, Roles y Estado de Cuentas
-          </h2>
+          <div>
+            <h2 className="text-2xl font-serif-display font-semibold text-[#39483A]">
+              Administración de Usuarios, Roles y Estado de Cuentas
+            </h2>
+            <p className="text-xs text-[#39483A]/75 mt-0.5">
+              Cualquier usuario registrado ingresa como Cliente (pudiendo habilitar funciones de Propietario). Desde aquí podés cambiar el rol de un usuario a Agente Inmobiliario.
+            </p>
+          </div>
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse text-sm">
               <thead>
@@ -1283,8 +2412,21 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
                 {users.map((u) => (
                   <tr key={u.uid}>
                     <td className="py-3.5 pr-4">
-                      <div className="font-semibold text-[#1F241F]">{u.displayName}</div>
-                      <div className="text-xs text-[#39483A]/70">{u.agencyName || 'Particular'}</div>
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-9 h-9 rounded-full overflow-hidden bg-[#39483A] text-[#FCFBF7] flex items-center justify-center shrink-0">
+                          {u.photoUrl ? (
+                            <img src={u.photoUrl} alt={u.displayName} className="w-full h-full object-cover" />
+                          ) : (
+                            <User className="w-4 h-4" />
+                          )}
+                        </div>
+                        <div>
+                          <div className="font-semibold text-[#1F241F]">{u.displayName}</div>
+                          <div className="text-xs text-[#39483A]/70">
+                            {u.agencyName || (u.isAlsoOwner ? 'Cliente y Propietario' : 'Particular')}
+                          </div>
+                        </div>
+                      </div>
                     </td>
                     <td className="py-3.5 px-4 text-xs font-tabular text-[#39483A]">
                       <div>{u.email}</div>
@@ -1308,13 +2450,13 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
                       <button
                         type="button"
                         onClick={() => onUpdateUserAdmin(u.uid, u.role, !u.active)}
-                        className={`px-3 py-1.5 text-xs font-semibold rounded-sm border ${
+                        className={`px-3 py-1.5 text-xs font-bold rounded-sm border ${
                           u.active
-                            ? 'text-[#39483A] border-[#D8C7AA] bg-[#F5F1E8]'
-                            : 'text-[#B86F52] border-[#B86F52]/40 bg-white'
+                            ? 'text-emerald-900 border-emerald-400 bg-emerald-100'
+                            : 'text-red-800 border-red-400 bg-red-100'
                         }`}
                       >
-                        {u.active ? 'Activa (Desactivar)' : 'Inactiva (Activar)'}
+                        {u.active ? 'Activa (Desactivar)' : 'Suspendida / Inactiva (Activar)'}
                       </button>
                     </td>
                   </tr>
@@ -1369,8 +2511,10 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
                 <button
                   type="button"
                   onClick={() => onToggleCategory(cat.id, !cat.active)}
-                  className={`text-[11px] font-semibold underline ${
-                    cat.active ? 'text-[#39483A]' : 'text-[#B86F52]'
+                  className={`text-[11px] font-bold px-2 py-0.5 rounded-sm border ${
+                    cat.active
+                      ? 'bg-emerald-100 text-emerald-900 border-emerald-400'
+                      : 'bg-red-100 text-red-800 border-red-400'
                   }`}
                 >
                   {cat.active ? 'Activo' : 'Inactivo'}
@@ -1382,13 +2526,51 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
       )}
 
       {/* =====================================================================
-          CLAIMS / RECLAMOS (Admin & User views)
+          CLAIMS / RECLAMOS (Admin & User views, con filtro para Admin)
          ===================================================================== */}
       {(activeSubView === 'admin_reclamos' || activeSubView === 'reclamos_usuario') && (
         <div className="bg-[#FCFBF7] border border-[#D8C7AA] rounded-sm p-6 space-y-5">
-          <h2 className="text-2xl font-serif-display font-semibold text-[#39483A]">
-            Centro de Reclamos y Soporte
-          </h2>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#D8C7AA] pb-4">
+            <div>
+              <h2 className="text-2xl font-serif-display font-semibold text-[#39483A]">
+                Centro de Reclamos y Soporte
+              </h2>
+              {currentUser.role === 'administrador' && (
+                <p className="text-xs text-[#39483A]/75 mt-0.5">
+                  Filtrá entre los reclamos pendientes de resolución y aquellos ya respondidos.
+                </p>
+              )}
+            </div>
+
+            {currentUser.role === 'administrador' && (
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setAdminClaimFilter('pendientes')}
+                  className={`px-4 py-2 text-xs font-bold rounded-sm border transition-colors flex items-center gap-1.5 cursor-pointer ${
+                    adminClaimFilter === 'pendientes'
+                      ? 'bg-amber-600 text-white border-amber-700'
+                      : 'bg-amber-50 text-amber-900 border-amber-300 hover:bg-amber-100'
+                  }`}
+                >
+                  <Clock className="w-3.5 h-3.5" />
+                  Pendientes de Respuesta ({adminPendingClaims.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAdminClaimFilter('respondidos')}
+                  className={`px-4 py-2 text-xs font-bold rounded-sm border transition-colors flex items-center gap-1.5 cursor-pointer ${
+                    adminClaimFilter === 'respondidos'
+                      ? 'bg-[#39483A] text-[#FCFBF7] border-[#39483A]'
+                      : 'bg-[#F5F1E8] text-[#39483A] border-[#D8C7AA] hover:bg-[#D8C7AA]/40'
+                  }`}
+                >
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  Ya Respondidos ({adminRespondedClaims.length})
+                </button>
+              </div>
+            )}
+          </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
             {currentUser.role !== 'administrador' && (
@@ -1449,59 +2631,97 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
                 currentUser.role === 'administrador' ? 'lg:col-span-12' : 'lg:col-span-7'
               } space-y-3`}
             >
-              {claims.map((clm) => (
-                <div
-                  key={clm.id}
-                  className="p-4 bg-[#F5F1E8] border border-[#D8C7AA] rounded-sm space-y-2"
-                >
-                  <div className="flex items-center justify-between text-xs text-[#39483A]/75">
-                    <span>
-                      Reportado por <strong className="text-[#1F241F]">{clm.reporterName}</strong> ·
-                      Categoría: <span className="uppercase">{clm.targetType}</span> ({clm.targetReference})
-                    </span>
-                    <span className="font-semibold capitalize text-[#B86F52]">
-                      {clm.status.replace('_', ' ')}
-                    </span>
-                  </div>
-                  <div className="text-sm font-semibold text-[#1F241F]">{clm.subject}</div>
-                  <p className="text-xs text-[#39483A]/85">{clm.description}</p>
-                  {clm.adminResolution && (
-                    <p className="text-xs text-[#39483A] bg-[#FCFBF7] border border-[#D8C7AA] p-2.5 rounded-sm">
-                      Resolución Administración: {clm.adminResolution}
-                    </p>
-                  )}
-                  {currentUser.role === 'administrador' && (
-                    <div className="flex gap-2 pt-1">
-                      <input
-                        type="text"
-                        value={claimResolutionDrafts[clm.id] ?? clm.adminResolution}
-                        onChange={(e) =>
-                          setClaimResolutionDrafts((prev) => ({
-                            ...prev,
-                            [clm.id]: e.target.value,
-                          }))
-                        }
-                        placeholder="Dictamen o resolución administrativa..."
-                        className="flex-1 px-3 py-1.5 text-xs bg-white border border-[#D8C7AA] rounded-sm"
-                      />
-                      <button
-                        type="button"
-                        onClick={() =>
-                          onResolveClaim(
-                            clm.id,
-                            'resuelto',
-                            claimResolutionDrafts[clm.id] ||
-                              'Reclamo verificado y resuelto por Administración.'
-                          )
-                        }
-                        className="px-4 py-1.5 text-xs font-semibold text-[#FCFBF7] bg-[#39483A] rounded-sm hover:bg-[#2c382d]"
+              {(currentUser.role === 'administrador'
+                ? adminClaimFilter === 'pendientes'
+                  ? adminPendingClaims
+                  : adminRespondedClaims
+                : claims
+              ).length === 0 ? (
+                <p className="text-sm text-[#39483A]/70 py-8 text-center">
+                  {currentUser.role === 'administrador'
+                    ? adminClaimFilter === 'pendientes'
+                      ? 'No hay reclamos pendientes por responder.'
+                      : 'Aún no hay reclamos respondidos en el historial.'
+                    : 'No tenés reclamos registrados.'}
+                </p>
+              ) : (
+                (currentUser.role === 'administrador'
+                  ? adminClaimFilter === 'pendientes'
+                    ? adminPendingClaims
+                    : adminRespondedClaims
+                  : claims
+                ).map((clm) => (
+                  <div
+                    key={clm.id}
+                    className="p-4 bg-[#F5F1E8] border border-[#D8C7AA] rounded-sm space-y-2.5"
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-[#39483A]/75">
+                      <span>
+                        Reportado por <strong className="text-[#1F241F]">{clm.reporterName}</strong> ·
+                        Categoría: <span className="uppercase">{clm.targetType}</span> ({clm.targetReference})
+                      </span>
+                      <span
+                        className={`inline-block text-[10px] uppercase tracking-wider font-bold px-2.5 py-0.5 rounded-sm border ${getClaimStatusBadgeClass(
+                          clm.status
+                        )}`}
                       >
-                        Resolver Reclamo
-                      </button>
+                        {clm.status.replace('_', ' ')}
+                      </span>
                     </div>
-                  )}
-                </div>
-              ))}
+                    <div className="text-sm font-semibold text-[#1F241F]">{clm.subject}</div>
+                    <p className="text-xs text-[#39483A]/85">{clm.description}</p>
+                    {clm.adminResolution && (
+                      <p className="text-xs text-emerald-950 bg-emerald-50 border border-emerald-300 p-2.5 rounded-sm">
+                        <strong>Resolución Administración:</strong> {clm.adminResolution}
+                      </p>
+                    )}
+                    {currentUser.role === 'administrador' && (
+                      <div className="flex flex-wrap gap-2 pt-1">
+                        <input
+                          type="text"
+                          value={claimResolutionDrafts[clm.id] ?? clm.adminResolution}
+                          onChange={(e) =>
+                            setClaimResolutionDrafts((prev) => ({
+                              ...prev,
+                              [clm.id]: e.target.value,
+                            }))
+                          }
+                          placeholder="Dictamen o resolución administrativa..."
+                          className="flex-1 min-w-[200px] px-3 py-1.5 text-xs bg-white border border-[#D8C7AA] rounded-sm"
+                        />
+                        <button
+                          type="button"
+                          onClick={() =>
+                            onResolveClaim(
+                              clm.id,
+                              'resuelto',
+                              claimResolutionDrafts[clm.id] ||
+                                'Reclamo verificado y resuelto por Administración.'
+                            )
+                          }
+                          className="px-4 py-1.5 text-xs font-bold text-white bg-emerald-700 rounded-sm hover:bg-emerald-800 cursor-pointer"
+                        >
+                          Resolver Reclamo
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            onResolveClaim(
+                              clm.id,
+                              'desestimado',
+                              claimResolutionDrafts[clm.id] ||
+                                'Reclamo desestimado tras revisión administrativa.'
+                            )
+                          }
+                          className="px-3.5 py-1.5 text-xs font-bold text-red-700 bg-red-50 border border-red-300 rounded-sm hover:bg-red-100 cursor-pointer"
+                        >
+                          Desestimar
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ))
+              )}
             </div>
           </div>
         </div>

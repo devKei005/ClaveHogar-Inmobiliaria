@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   Search,
   SlidersHorizontal,
@@ -42,6 +42,7 @@ import {
 import {
   UserProfile,
   UserRole,
+  DEMO_ROLE_EMAILS,
   PropertyItem,
   VisitItem,
   VisitStatus,
@@ -79,7 +80,11 @@ import { PropertyDetailModal } from './components/PropertyDetailModal';
 import { ComparatorView } from './components/ComparatorView';
 import { AuthProfileModal, AuthModalMode } from './components/AuthProfileModal';
 import { PropertyFormModal } from './components/PropertyFormModal';
-import { RoleWorkspaceView, WorkspaceSubView } from './components/RoleWorkspaceView';
+import {
+  RoleWorkspaceView,
+  WorkspaceSubView,
+  isAgentConfirmedOnProperty,
+} from './components/RoleWorkspaceView';
 
 type MainSection = 'catalogo' | 'buscador_ia' | 'comparador' | 'panel_rol';
 
@@ -107,20 +112,27 @@ export default function App() {
   const [activeSection, setActiveSection] = useState<MainSection>('catalogo');
   const [activeSubView, setActiveSubView] = useState<WorkspaceSubView>('cliente_favoritos');
 
-  // Hamburger Side Drawer state (Requirement 1 & 2)
+  // Hamburger Side Drawer state
   const [isSideMenuOpen, setIsSideMenuOpen] = useState(false);
 
   // Auth & User state
   const [users, setUsers] = useState<UserProfile[]>(INITIAL_USERS);
+  const usersRef = useRef<UserProfile[]>(INITIAL_USERS);
+  useEffect(() => {
+    usersRef.current = users;
+  }, [users]);
+
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
+  const isDemoSessionRef = useRef<boolean>(false);
+
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [authModalMode, setAuthModalMode] = useState<AuthModalMode>('login');
   const [showNotifDropdown, setShowNotifDropdown] = useState(false);
 
   // Core Entities state (synced with Firestore)
   const [properties, setProperties] = useState<PropertyItem[]>(INITIAL_PROPERTIES);
-  const [favoriteIds, setFavoriteIds] = useState<string[]>([]);
- const [comparedIds, setComparedIds] = useState<string[]>([]);   //'prop_casa_quilmes_pileta','prop_chalet_quilmes_parque',
+  const [allFavorites, setAllFavorites] = useState<{ userId: string; propertyId: string }[]>([]);
+  const [comparedByUser, setComparedByUser] = useState<Record<string, string[]>>({});
   const [visits, setVisits] = useState<VisitItem[]>(INITIAL_VISITS);
   const [inquiries, setInquiries] = useState<InquiryItem[]>(INITIAL_INQUIRIES);
   const [operations, setOperations] = useState<OperationItem[]>(INITIAL_OPERATIONS);
@@ -155,6 +167,24 @@ export default function App() {
   const [aiLoading, setAiLoading] = useState(false);
   const [aiResult, setAiResult] = useState<AISmartSearchResponse | null>(null);
 
+  // Per-user favorites and per-user comparator
+  const favoriteIds = useMemo(() => {
+    if (!currentUser) return [];
+    return Array.from(
+      new Set(
+        allFavorites
+          .filter((f) => f.userId === currentUser.uid)
+          .map((f) => f.propertyId)
+      )
+    );
+  }, [allFavorites, currentUser]);
+
+  const compareScopeKey = currentUser?.uid || 'guest';
+  const comparedIds = useMemo(
+    () => comparedByUser[compareScopeKey] || [],
+    [comparedByUser, compareScopeKey]
+  );
+
   const notify = (type: 'success' | 'error' | 'info', title: string, description?: string) => {
     const id = `toast_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
     setToasts((prev) => [...prev, { id, type, title, description }]);
@@ -169,6 +199,7 @@ export default function App() {
     message: string,
     type: 'success' | 'info' | 'warning' = 'info'
   ) => {
+    if (!targetUserId || !targetUserId.trim()) return;
     const id = sanitizeId(`notif_${Date.now()}_${Math.random().toString(36).slice(2, 5)}`);
     const newNotif: NotificationItem = {
       id,
@@ -179,7 +210,9 @@ export default function App() {
       read: false,
       createdAtIso: new Date().toISOString(),
     };
-    setNotifications((prev) => [newNotif, ...prev]);
+    setNotifications((prev) =>
+      prev.some((n) => n.id === id) ? prev : [newNotif, ...prev]
+    );
     try {
       await setDoc(doc(db, 'notifications', id), newNotif);
     } catch (err) {
@@ -190,6 +223,11 @@ export default function App() {
   const approvedProperties = useMemo(
     () => properties.filter((p) => p.publicationStatus === 'aprobada'),
     [properties]
+  );
+
+  const availableAgents = useMemo(
+    () => users.filter((u) => u.role === 'agente' && u.active),
+    [users]
   );
 
   useEffect(() => {
@@ -240,16 +278,53 @@ export default function App() {
 
     bootstrapFirestore();
 
+    const getStoredAvatars = (): Record<string, string> => {
+      try {
+        const raw = localStorage.getItem('clavehogar_user_avatars');
+        return raw ? (JSON.parse(raw) as Record<string, string>) : {};
+      } catch {
+        return {};
+      }
+    };
+
     const unsubUsers = onSnapshot(
       collection(db, 'app_users'),
       (snap) => {
         if (!mounted || snap.empty) return;
-        const list = snap.docs.map((d) => d.data() as UserProfile);
-        setUsers(list);
+        const storedAvatars = getStoredAvatars();
+        const list = snap.docs.map((d) => {
+          const u = d.data() as UserProfile;
+          const cachedPhoto =
+            storedAvatars[u.uid] ?? storedAvatars[u.email.toLowerCase()];
+          return {
+            ...u,
+            photoUrl: u.photoUrl || cachedPhoto || '',
+          };
+        });
+        // Ensure all 4 official @clavehogar.com accounts are always present in users list
+        const merged = [...list];
+        for (const demoUser of INITIAL_USERS) {
+          if (!merged.some((u) => u.email.toLowerCase() === demoUser.email.toLowerCase())) {
+            const cachedPhoto =
+              storedAvatars[demoUser.uid] ??
+              storedAvatars[demoUser.email.toLowerCase()];
+            merged.push({
+              ...demoUser,
+              photoUrl: demoUser.photoUrl || cachedPhoto || '',
+            });
+          }
+        }
+        setUsers(merged);
         setCurrentUser((prev) => {
           if (!prev) return null;
-          const updated = list.find((u) => u.uid === prev.uid);
-          return updated || prev;
+          const updated =
+            merged.find((u) => u.uid === prev.uid) ||
+            merged.find((u) => u.email.toLowerCase() === prev.email.toLowerCase());
+          if (!updated) return prev;
+          return {
+            ...updated,
+            photoUrl: updated.photoUrl || prev.photoUrl || '',
+          };
         });
       },
       (err) => handleFirestoreError(err, OperationType.GET, 'app_users')
@@ -259,12 +334,12 @@ export default function App() {
       collection(db, 'properties'),
       (snap) => {
         if (!mounted || snap.empty) return;
-        const list = snap.docs.map((d) => {
+        const uniqueMap = new Map<string, PropertyItem>();
+        snap.docs.forEach((d) => {
           const raw = d.data() as PropertyItem;
-          const resolvedImages = resolvePropertyImages(raw.images, raw.id || d.id);
+          const id = raw.id || d.id;
+          const resolvedImages = resolvePropertyImages(raw.images, id);
 
-          // Si en Firestore quedaron guardadas rutas locales (/src/assets/... o /assets/...),
-          // actualizarlas automáticamente en Firestore con las URLs HTTPS permanentes
           const hasLegacyLocalPath =
             Array.isArray(raw.images) &&
             raw.images.some(
@@ -278,13 +353,13 @@ export default function App() {
             updateDoc(doc(db, 'properties', d.id), { images: resolvedImages }).catch(() => {});
           }
 
-          return {
+          uniqueMap.set(id, {
             ...raw,
-            id: raw.id || d.id,
+            id,
             images: resolvedImages,
-          };
+          });
         });
-        setProperties(list);
+        setProperties(Array.from(uniqueMap.values()));
       },
       (err) => handleFirestoreError(err, OperationType.GET, 'properties')
     );
@@ -358,11 +433,10 @@ export default function App() {
       collection(db, 'favorites'),
       (snap) => {
         if (!mounted) return;
-        setFavoriteIds((prev) => {
-          if (snap.empty) return prev;
-          const allFavs = snap.docs.map((d) => d.data() as { userId: string; propertyId: string });
-          return allFavs.map((f) => f.propertyId);
-        });
+        const favList = snap.docs.map(
+          (d) => d.data() as { userId: string; propertyId: string }
+        );
+        setAllFavorites(favList);
       },
       (err) => handleFirestoreError(err, OperationType.GET, 'favorites')
     );
@@ -381,28 +455,36 @@ export default function App() {
     };
   }, []);
 
-  // Sync Firebase Google Auth if used
+  // Sync Firebase Auth without wiping out quick-access demo sessions
   useEffect(() => {
     const unsubAuth = onAuthStateChanged(auth, async (user) => {
       if (!user) {
-   setCurrentUser(null);
-    return;
-}
-      const uid = sanitizeId(user.uid);
-      const isBootstrapAdmin = user.email === 'programacionkeichi@gmail.com';
-      const defaultRole: UserRole = isBootstrapAdmin ? 'administrador' : 'cliente';
-      const displayName = truncateText(
-        user.displayName || user.email?.split('@')[0] || 'Usuario ClaveHogar',
-        SCHEMA_LIMITS.DISPLAY_NAME_MAX
-      );
-      const email = truncateText(user.email || 'usuario@clavehogar.com', SCHEMA_LIMITS.EMAIL_MAX);
-
-      const existing = users.find((u) => u.uid === uid || u.email.toLowerCase() === email.toLowerCase());
-      if (existing) {
-        setCurrentUser(existing);
-        setActiveSubView(getDefaultSubViewForRole(existing.role));
+        if (!isDemoSessionRef.current) {
+          setCurrentUser(null);
+        }
         return;
       }
+      isDemoSessionRef.current = false;
+      const uid = sanitizeId(user.uid);
+      const email = truncateText(user.email || 'usuario@clavehogar.com', SCHEMA_LIMITS.EMAIL_MAX);
+
+      const currentList = usersRef.current;
+      const existing =
+        currentList.find((u) => u.uid === uid) ||
+        currentList.find((u) => u.email.toLowerCase() === email.toLowerCase()) ||
+        INITIAL_USERS.find((u) => u.email.toLowerCase() === email.toLowerCase());
+
+      if (existing) {
+        setCurrentUser(existing);
+        return;
+      }
+
+      const isBootstrapAdmin = email.toLowerCase() === 'programacionkeichi@gmail.com';
+      const defaultRole: UserRole = isBootstrapAdmin ? 'administrador' : 'cliente';
+      const displayName = truncateText(
+        user.displayName || email.split('@')[0] || 'Usuario ClaveHogar',
+        SCHEMA_LIMITS.DISPLAY_NAME_MAX
+      );
 
       const newProfile: UserProfile = {
         uid,
@@ -415,7 +497,7 @@ export default function App() {
         isAlsoOwner: isBootstrapAdmin,
         active: true,
         agencyName: isBootstrapAdmin ? 'ClaveHogar Administración' : '',
-        bio: 'Cuenta autenticada con Google.',
+        bio: 'Cliente registrado en ClaveHogar.',
       };
 
       setCurrentUser(newProfile);
@@ -427,7 +509,7 @@ export default function App() {
       }
     });
     return () => unsubAuth();
-  }, [users]);
+  }, []);
 
   // Keep selectedProperty in sync when properties update in Firestore
   useEffect(() => {
@@ -495,9 +577,9 @@ export default function App() {
   );
 
   const myNotifications = useMemo(() => {
-  if (!currentUser) return [];
-  return notifications.filter((n) => n.userId === currentUser.uid);
-}, [notifications, currentUser]);
+    if (!currentUser) return [];
+    return notifications.filter((n) => n.userId === currentUser.uid);
+  }, [notifications, currentUser]);
 
   const unreadCount = myNotifications.filter((n) => !n.read).length;
 
@@ -511,6 +593,7 @@ export default function App() {
 
   const handleGoogleLogin = async () => {
     try {
+      isDemoSessionRef.current = false;
       await signInWithPopup(auth, googleProvider);
       notify('success', 'Sesión iniciada con Google', 'Bienvenido a ClaveHogar.');
     } catch {
@@ -518,124 +601,195 @@ export default function App() {
     }
   };
 
+  const findOfficialDemoProfileByEmail = (emailLower: string): UserProfile | undefined => {
+    const isOfficialDemo = Object.values(DEMO_ROLE_EMAILS).some(
+      (demoMail) => demoMail.toLowerCase() === emailLower
+    );
+    if (!isOfficialDemo) return undefined;
+    return (
+      users.find((u) => u.email.toLowerCase() === emailLower) ||
+      INITIAL_USERS.find((u) => u.email.toLowerCase() === emailLower)
+    );
+  };
+
   const handleLoginSubmit = async (email: string, password: string): Promise<boolean> => {
-  try {
-    const cred = await signInWithEmailAndPassword(auth, email, password);
-    const profile =
-      users.find((u) => u.uid === cred.user.uid) ||
-      users.find((u) => u.email.toLowerCase() === email.toLowerCase());
+    const emailClean = email.trim().toLowerCase();
+    const officialDemoProfile = findOfficialDemoProfileByEmail(emailClean);
 
-    if (!profile) {
-      notify('error', 'Perfil no encontrado', 'Tu cuenta existe pero falta el perfil en la base de datos.');
+    try {
+      isDemoSessionRef.current = false;
+      const cred = await signInWithEmailAndPassword(auth, email.trim(), password);
+      const profile =
+        officialDemoProfile ||
+        users.find((u) => u.uid === cred.user.uid) ||
+        users.find((u) => u.email.toLowerCase() === emailClean);
+
+      if (!profile) {
+        notify('error', 'Perfil no encontrado', 'Tu cuenta existe pero falta el perfil en la base de datos.');
+        return false;
+      }
+      if (!profile.active) {
+        notify('error', 'Cuenta suspendida', 'Tu cuenta está desactivada por el administrador.');
+        await signOut(auth);
+        return false;
+      }
+
+      setCurrentUser(profile);
+      setActiveSubView(getDefaultSubViewForRole(profile.role));
+      notify('success', `¡Bienvenido/a, ${profile.displayName}!`, `Ingresaste con tu cuenta de ${profile.role}.`);
+      return true;
+    } catch (err: any) {
+      // Si el usuario ingresó manualmente una de las 4 cuentas oficiales @clavehogar.com con su clave demo (123456)
+      if (officialDemoProfile && password === '123456') {
+        if (!officialDemoProfile.active) {
+          notify('error', 'Cuenta suspendida', 'Esta cuenta está desactivada por el administrador.');
+          return false;
+        }
+        isDemoSessionRef.current = true;
+        setCurrentUser(officialDemoProfile);
+        setActiveSubView(getDefaultSubViewForRole(officialDemoProfile.role));
+        notify(
+          'success',
+          `¡Bienvenido/a, ${officialDemoProfile.displayName}!`,
+          `Ingresaste con la cuenta oficial ${officialDemoProfile.email} (${officialDemoProfile.role}).`
+        );
+        return true;
+      }
+
+      const msg =
+        err?.code === 'auth/wrong-password' || err?.code === 'auth/invalid-credential'
+          ? 'Correo o contraseña incorrectos.'
+          : err?.code === 'auth/user-not-found'
+          ? 'No existe una cuenta con ese correo.'
+          : err?.code === 'auth/too-many-requests'
+          ? 'Demasiados intentos. Probá más tarde.'
+          : 'No se pudo iniciar sesión.';
+      notify('error', 'Error al iniciar sesión', msg);
       return false;
     }
-    if (!profile.active) {
-      notify('error', 'Cuenta suspendida', 'Tu cuenta está desactivada por el administrador.');
-      await signOut(auth);
-      return false;
-    }
-
-    setCurrentUser(profile);
-    setActiveSubView(getDefaultSubViewForRole(profile.role));
-    notify('success', `¡Bienvenido/a, ${profile.displayName}!`, `Ingresaste con tu cuenta de ${profile.role}.`);
-    return true;
-  } catch (err: any) {
-    const msg =
-      err?.code === 'auth/wrong-password' || err?.code === 'auth/invalid-credential'
-        ? 'Correo o contraseña incorrectos.'
-        : err?.code === 'auth/user-not-found'
-        ? 'No existe una cuenta con ese correo.'
-        : err?.code === 'auth/too-many-requests'
-        ? 'Demasiados intentos. Probá más tarde.'
-        : 'No se pudo iniciar sesión.';
-    notify('error', 'Error al iniciar sesión', msg);
-    return false;
-  }
-};
+  };
 
   const handleRegisterSubmit = async (data: {
-  displayName: string;
-  email: string;
-  password: string;
-  phone: string;
-  address: string;
-  dni: string;
-}): Promise<boolean> => {
-  if (!data.displayName || !data.email || !data.password || !data.phone || !data.dni) {
-    notify('error', 'Error: faltan completar campos', 'Completá todos los campos obligatorios del registro.');
-    return false;
-  }
+    displayName: string;
+    email: string;
+    password: string;
+    phone: string;
+    address: string;
+    dni: string;
+  }): Promise<boolean> => {
+    if (!data.displayName || !data.email || !data.password || !data.phone || !data.dni) {
+      notify('error', 'Error: faltan completar campos', 'Completá todos los campos obligatorios del registro.');
+      return false;
+    }
 
-  try {
-    const cred = await createUserWithEmailAndPassword(auth, data.email, data.password);
-    await updateProfile(cred.user, { displayName: data.displayName });
+    const emailLower = data.email.trim().toLowerCase();
+    if (Object.values(DEMO_ROLE_EMAILS).some((m) => m.toLowerCase() === emailLower)) {
+      notify(
+        'error',
+        'Correo reservado',
+        'Las cuentas oficiales @clavehogar.com ya existen para demostración. Usá otro correo para registrarte.'
+      );
+      return false;
+    }
 
-    const newUser: UserProfile = {
-      uid: cred.user.uid,            // ⬅️ UID REAL de Firebase Auth
-      displayName: data.displayName,
-      email: data.email,
-      phone: data.phone,
-      address: data.address,
-      dni: data.dni,
-      role: 'cliente',
-      isAlsoOwner: false,
-      active: true,
-      agencyName: '',
-      bio: 'Cliente registrado en ClaveHogar.',
-      // ⬅️ NO guardes password acá
+    try {
+      isDemoSessionRef.current = false;
+      const cred = await createUserWithEmailAndPassword(auth, data.email.trim(), data.password);
+      await updateProfile(cred.user, { displayName: data.displayName });
+
+      const newUser: UserProfile = {
+        uid: cred.user.uid,
+        displayName: data.displayName,
+        email: data.email.trim(),
+        phone: data.phone,
+        address: data.address,
+        dni: data.dni,
+        role: 'cliente',
+        isAlsoOwner: false,
+        active: true,
+        agencyName: '',
+        bio: 'Cliente registrado en ClaveHogar.',
+        photoUrl: '',
+      };
+
+      await setDoc(doc(db, 'app_users', cred.user.uid), newUser);
+      setUsers((prev) => [newUser, ...prev.filter((u) => u.uid !== newUser.uid)]);
+      setCurrentUser(newUser);
+      setActiveSubView('cliente_favoritos');
+      notify(
+        'success',
+        'Cuenta creada correctamente',
+        'Te registraste como Cliente. Podés convertirte también en Propietario desde tu misma cuenta cuando quieras publicar un inmueble.'
+      );
+      return true;
+    } catch (err: any) {
+      const code = err?.code || 'desconocido';
+      const humanMsg =
+        code === 'auth/operation-not-allowed'
+          ? 'El registro con email/contraseña no está habilitado en Firebase. Andá a Authentication → Sign-in method y activá Email/Password.'
+          : code === 'auth/email-already-in-use'
+          ? 'Ese correo ya está registrado. Probá iniciar sesión.'
+          : code === 'auth/weak-password'
+          ? 'La contraseña debe tener al menos 6 caracteres.'
+          : code === 'auth/invalid-email'
+          ? 'El correo no tiene un formato válido.'
+          : code === 'permission-denied' || code === 'firestore/permission-denied'
+          ? 'Firestore rechazó guardar el perfil. Revisá las reglas de seguridad.'
+          : `No se pudo crear la cuenta. (${code})`;
+
+      notify('error', 'Error al registrarte', humanMsg);
+      return false;
+    }
+  };
+
+  const handlePasswordReset = async (email: string) => {
+    try {
+      await sendPasswordResetEmail(auth, email);
+      notify('info', 'Enlace enviado', `Revisá la casilla de ${email}.`);
+    } catch {
+      notify('error', 'No se pudo enviar el enlace', 'Verificá el correo ingresado.');
+    }
+  };
+
+  /**
+   * Acceso rápido: ESTRICTAMENTE las 4 cuentas oficiales con mail @clavehogar.com
+   * (cliente@clavehogar.com, propietario@clavehogar.com, agente@clavehogar.com, admin@clavehogar.com)
+   */
+  const handleQuickRoleLogin = (role: UserRole) => {
+    const officialEmail = DEMO_ROLE_EMAILS[role].toLowerCase();
+    let cachedPhoto = '';
+    try {
+      const raw = localStorage.getItem('clavehogar_user_avatars');
+      const map = raw ? (JSON.parse(raw) as Record<string, string>) : {};
+      cachedPhoto = map[officialEmail] || '';
+    } catch {
+      // ignore
+    }
+
+    const baseTarget =
+      users.find((u) => u.email.toLowerCase() === officialEmail) ||
+      INITIAL_USERS.find((u) => u.email.toLowerCase() === officialEmail) ||
+      INITIAL_USERS[0];
+    const target: UserProfile = {
+      ...baseTarget,
+      photoUrl: baseTarget.photoUrl || cachedPhoto || '',
     };
 
-    await setDoc(doc(db, 'app_users', cred.user.uid), newUser);
-    setUsers((prev) => [newUser, ...prev.filter((u) => u.uid !== newUser.uid)]);
-    setCurrentUser(newUser);
-    setActiveSubView('cliente_favoritos');
-    notify('success', 'Cuenta creada correctamente', 'Te registraste como Cliente.');
-    return true;
- } catch (err: any) {
-  const code = err?.code || 'desconocido';
-  const msg  = err?.message || String(err);
-  console.error('❌ ERROR REGISTRO FIREBASE:', code, msg);
-
-  // Mapeo de errores comunes a mensajes humanos
-  const humanMsg =
-    code === 'auth/operation-not-allowed'
-      ? 'El registro con email/contraseña no está habilitado en Firebase. Andá a Authentication → Sign-in method y activá Email/Password.'
-      : code === 'auth/email-already-in-use'
-      ? 'Ese correo ya está registrado. Probá iniciar sesión.'
-      : code === 'auth/weak-password'
-      ? 'La contraseña debe tener al menos 6 caracteres.'
-      : code === 'auth/invalid-email'
-      ? 'El correo no tiene un formato válido.'
-      : code === 'permission-denied' || code === 'firestore/permission-denied'
-      ? 'Firestore rechazó guardar el perfil. Revisá las reglas de seguridad.'
-      : `No se pudo crear la cuenta. (${code})`;
-
-  notify('error', 'Error al registrarte', humanMsg);
-  return false;
-}
-};
-
- const handlePasswordReset = async (email: string) => {
-  try {
-    await sendPasswordResetEmail(auth, email);
-    notify('info', 'Enlace enviado', `Revisá la casilla de ${email}.`);
-  } catch {
-    notify('error', 'No se pudo enviar el enlace', 'Verificá el correo ingresado.');
-  }
-};
-
-  const handleQuickRoleLogin = (role: UserRole) => {
-    const target = users.find((u) => u.role === role) || INITIAL_USERS.find((u) => u.role === role) || INITIAL_USERS[0];
+    isDemoSessionRef.current = true;
+    if (auth.currentUser) {
+      signOut(auth).catch(() => {});
+    }
     setCurrentUser(target);
     setActiveSubView(getDefaultSubViewForRole(target.role));
     notify(
       'success',
       `Sesión iniciada: ${target.displayName}`,
-      `Accediste a la cuenta correspondiente al perfil ${target.role}.`
+      `Ingresaste con la cuenta oficial ${target.email} (${target.role}).`
     );
   };
 
   const handleLogout = async () => {
+    isDemoSessionRef.current = false;
     try {
       await signOut(auth);
     } catch {
@@ -643,6 +797,7 @@ export default function App() {
     }
     setCurrentUser(null);
     setIsSideMenuOpen(false);
+    setShowNotifDropdown(false);
     setActiveSection('catalogo');
     notify('info', 'Sesión cerrada correctamente', 'Has salido de tu cuenta.');
   };
@@ -662,8 +817,8 @@ export default function App() {
       setIsSideMenuOpen(false);
       notify(
         'success',
-        'Perfil de Propietario habilitado',
-        'Ahora conservás tus funciones de Cliente y además podés publicar y administrar tus propios inmuebles.'
+        'Funciones de Propietario habilitadas',
+        'Ahora conservás tus funciones de Cliente y podés publicar y administrar tus inmuebles desde "Mis propiedades".'
       );
     } catch (err) {
       notify('error', 'Error al guardar los datos', 'No se pudo actualizar tu perfil en Firestore.');
@@ -675,13 +830,57 @@ export default function App() {
     if (!currentUser) return;
     const updated: UserProfile = { ...currentUser, ...partial };
     setCurrentUser(updated);
-    setUsers((prev) => prev.map((u) => (u.uid === updated.uid ? updated : u)));
+    setUsers((prev) =>
+      prev.map((u) =>
+        u.uid === updated.uid || u.email.toLowerCase() === updated.email.toLowerCase()
+          ? updated
+          : u
+      )
+    );
+
+    if (partial.photoUrl !== undefined) {
+      try {
+        const raw = localStorage.getItem('clavehogar_user_avatars');
+        const map = raw ? (JSON.parse(raw) as Record<string, string>) : {};
+        map[updated.uid] = partial.photoUrl || '';
+        map[updated.email.toLowerCase()] = partial.photoUrl || '';
+        localStorage.setItem('clavehogar_user_avatars', JSON.stringify(map));
+      } catch {
+        // ignore storage quota errors
+      }
+    }
+
     try {
       await setDoc(doc(db, 'app_users', updated.uid), updated, { merge: true });
-      notify('success', 'Perfil actualizado correctamente', 'Tus datos personales se guardaron en Firestore.');
+      notify(
+        'success',
+        'Perfil actualizado correctamente',
+        'Tu foto y datos personales se guardaron y actualizaron en el icono de perfil y en Mi Espacio.'
+      );
     } catch (err) {
       notify('error', 'Error al guardar los datos', 'No se pudo actualizar tu perfil.');
       handleFirestoreError(err, OperationType.UPDATE, `app_users/${updated.uid}`);
+    }
+  };
+
+  const handleDeleteOwnProfile = async () => {
+    if (!currentUser) return;
+    const isOfficialDemo = Object.values(DEMO_ROLE_EMAILS).some(
+      (m) => m.toLowerCase() === currentUser.email.toLowerCase()
+    );
+    if (isOfficialDemo) {
+      notify('error', 'Acción no permitida', 'Las cuentas oficiales @clavehogar.com no pueden eliminarse.');
+      return;
+    }
+    const uidToDelete = currentUser.uid;
+    try {
+      await deleteDoc(doc(db, 'app_users', uidToDelete));
+      setUsers((prev) => prev.filter((u) => u.uid !== uidToDelete));
+      await handleLogout();
+      notify('info', 'Perfil eliminado', 'Tus datos personales fueron eliminados correctamente.');
+    } catch (err) {
+      notify('error', 'Error al eliminar perfil', 'No se pudo eliminar tu cuenta.');
+      handleFirestoreError(err, OperationType.DELETE, `app_users/${uidToDelete}`);
     }
   };
 
@@ -698,7 +897,9 @@ export default function App() {
     const favDocId = sanitizeId(`${currentUser.uid}_${propertyId}`);
 
     if (isFav) {
-      setFavoriteIds((prev) => prev.filter((id) => id !== propertyId));
+      setAllFavorites((prev) =>
+        prev.filter((f) => !(f.userId === currentUser.uid && f.propertyId === propertyId))
+      );
       try {
         await deleteDoc(doc(db, 'favorites', favDocId));
         notify('info', 'Eliminado de favoritos', 'La propiedad se quitó de tu lista de favoritos.');
@@ -706,14 +907,14 @@ export default function App() {
         handleFirestoreError(err, OperationType.DELETE, `favorites/${favDocId}`);
       }
     } else {
-      setFavoriteIds((prev) => [...prev, propertyId]);
+      setAllFavorites((prev) => [...prev, { userId: currentUser.uid, propertyId }]);
       try {
         await setDoc(doc(db, 'favorites', favDocId), {
           userId: currentUser.uid,
           propertyId,
           createdAtIso: new Date().toISOString(),
         });
-        notify('success', 'Propiedad guardada en favoritos', 'Podés consultarla desde el menú lateral.');
+        notify('success', 'Propiedad guardada en favoritos', 'Podés consultarla desde Mis Favoritos.');
       } catch (err) {
         handleFirestoreError(err, OperationType.CREATE, `favorites/${favDocId}`);
       }
@@ -721,17 +922,24 @@ export default function App() {
   };
 
   const handleToggleCompare = (propertyId: string) => {
-    setComparedIds((prev) => {
-      if (prev.includes(propertyId)) {
-        notify('info', 'Quitada del comparador', 'Se retiró la propiedad de la tabla comparativa.');
-        return prev.filter((id) => id !== propertyId);
+    setComparedByUser((prev) => {
+      const currentList = prev[compareScopeKey] || [];
+      if (currentList.includes(propertyId)) {
+        notify('info', 'Quitada del comparador', 'Se retiró la propiedad de tu tabla comparativa.');
+        return {
+          ...prev,
+          [compareScopeKey]: currentList.filter((id) => id !== propertyId),
+        };
       }
-      if (prev.length >= 4) {
+      if (currentList.length >= 4) {
         notify('error', 'Límite de comparación alcanzado', 'Podés comparar hasta 4 propiedades en simultáneo.');
         return prev;
       }
       notify('success', 'Agregada al comparador', 'Abrí la sección Comparador para contrastar características.');
-      return [...prev, propertyId];
+      return {
+        ...prev,
+        [compareScopeKey]: [...currentList, propertyId],
+      };
     });
   };
 
@@ -744,26 +952,112 @@ export default function App() {
     const propId = existingId ? sanitizeId(existingId) : sanitizeId(`prop_${Date.now()}`);
     const existingProp = properties.find((p) => p.id === propId);
 
+    // Verificar permisos estrictos de edición: solo el propietario dueño, el agente confirmado a cargo, o el administrador
+    if (isEdit && existingProp) {
+      const isOwner = existingProp.ownerId === currentUser.uid;
+      const isAssignedAgent =
+        currentUser.role === 'agente' && isAgentConfirmedOnProperty(existingProp, currentUser.uid);
+      const isAdmin = currentUser.role === 'administrador';
+      if (!isOwner && !isAssignedAgent && !isAdmin) {
+        notify(
+          'error',
+          'Sin permisos sobre esta publicación',
+          'Solo el propietario titular o el agente confirmado a cargo pueden modificar este inmueble.'
+        );
+        return;
+      }
+    }
+
+    // Las nuevas publicaciones de propietarios quedan pendientes de revisión del administrador
+    const publicationStatus: PublicationStatus = isEdit
+      ? existingProp?.publicationStatus || 'pendiente'
+      : currentUser.role === 'administrador'
+      ? 'aprobada'
+      : 'pendiente';
+
     const newProp: PropertyItem = {
       ...data,
       id: propId,
       ownerId: existingProp?.ownerId || currentUser.uid,
       ownerName: existingProp?.ownerName || currentUser.displayName,
-      agentId: data.agentId || existingProp?.agentId || '',
-      agentName: data.agentName || existingProp?.agentName || '',
-      publicationStatus: existingProp?.publicationStatus || 'aprobada',
+      agentId: data.agentId ?? existingProp?.agentId ?? '',
+      agentName: data.agentName ?? existingProp?.agentName ?? '',
+      managementMode: data.managementMode || existingProp?.managementMode || 'directa',
+      agentRequestType: data.agentRequestType || existingProp?.agentRequestType || 'ninguna',
+      agentAssignmentStatus:
+        data.agentAssignmentStatus || existingProp?.agentAssignmentStatus || 'sin_agente',
+      requestedAgentId: data.requestedAgentId ?? existingProp?.requestedAgentId ?? '',
+      requestedAgentName: data.requestedAgentName ?? existingProp?.requestedAgentName ?? '',
+      agentRejectionReason: data.agentRejectionReason ?? existingProp?.agentRejectionReason ?? '',
+      publicationStatus,
       createdAtIso: existingProp?.createdAtIso || new Date().toISOString(),
     };
 
     try {
       await setDoc(doc(db, 'properties', propId), newProp);
+      // Actualizar estado deduplicando por id para que NUNCA aparezca duplicada
       setProperties((prev) =>
-        isEdit ? prev.map((p) => (p.id === propId ? newProp : p)) : [newProp, ...prev]
+        prev.some((p) => p.id === propId)
+          ? prev.map((p) => (p.id === propId ? newProp : p))
+          : [newProp, ...prev]
       );
+
+      // Notificaciones según solicitud de agente y moderación
+      const adminUser =
+        users.find((u) => u.email.toLowerCase() === DEMO_ROLE_EMAILS.administrador) ||
+        INITIAL_USERS.find((u) => u.role === 'administrador');
+
+      if (!isEdit && publicationStatus === 'pendiente') {
+        await pushUserNotification(
+          newProp.ownerId,
+          'Publicación enviada a revisión',
+          `Tu propiedad "${newProp.title}" fue registrada en "Mis propiedades" y está pendiente de aprobación del administrador.`,
+          'info'
+        );
+        if (adminUser) {
+          await pushUserNotification(
+            adminUser.uid,
+            'Nueva propiedad pendiente de revisión',
+            `${newProp.ownerName} publicó "${newProp.title}" y aguarda tu aprobación.`,
+            'info'
+          );
+        }
+      }
+
+      if (
+        newProp.agentAssignmentStatus === 'pendiente_agente' &&
+        newProp.requestedAgentId &&
+        (!existingProp || existingProp.requestedAgentId !== newProp.requestedAgentId)
+      ) {
+        await pushUserNotification(
+          newProp.requestedAgentId,
+          'Nueva solicitud de gestión de propiedad',
+          `${newProp.ownerName} te eligió como agente para gestionar "${newProp.title}". Ingresá a tu panel para aceptar o rechazar la solicitud.`,
+          'info'
+        );
+      } else if (
+        newProp.agentAssignmentStatus === 'pendiente_admin' &&
+        (!existingProp || existingProp.agentAssignmentStatus !== 'pendiente_admin') &&
+        adminUser
+      ) {
+        await pushUserNotification(
+          adminUser.uid,
+          'Solicitud de asignación de agente',
+          `${newProp.ownerName} solicitó que le asignes un agente inmobiliario para "${newProp.title}".`,
+          'info'
+        );
+      }
+
       notify(
         'success',
-        isEdit ? 'Propiedad actualizada correctamente' : 'Propiedad publicada correctamente',
-        `El inmueble "${newProp.title}" se guardó en Firebase Firestore.`
+        isEdit
+          ? 'Propiedad actualizada correctamente'
+          : publicationStatus === 'pendiente'
+          ? 'Propiedad registrada (Pendiente de revisión)'
+          : 'Propiedad publicada correctamente',
+        isEdit
+          ? `Los cambios en "${newProp.title}" se guardaron en Firestore.`
+          : `El inmueble "${newProp.title}" se guardó en "Mis propiedades" y quedó pendiente de aprobación del administrador.`
       );
     } catch (err) {
       notify('error', 'Error al guardar los datos', 'No se pudo guardar la propiedad en Firestore.');
@@ -772,6 +1066,13 @@ export default function App() {
   };
 
   const handleDeleteProperty = async (propertyId: string) => {
+    const target = properties.find((p) => p.id === propertyId);
+    if (!currentUser || !target) return;
+    if (currentUser.role !== 'administrador' && target.ownerId !== currentUser.uid) {
+      notify('error', 'Sin permisos', 'Solo el propietario titular o el administrador pueden eliminar esta publicación.');
+      return;
+    }
+
     try {
       await deleteDoc(doc(db, 'properties', propertyId));
       setProperties((prev) => prev.filter((p) => p.id !== propertyId));
@@ -786,6 +1087,17 @@ export default function App() {
   };
 
   const handleUpdateAvailability = async (propertyId: string, availability: AvailabilityStatus) => {
+    const target = properties.find((p) => p.id === propertyId);
+    if (!currentUser || !target) return;
+    const canModify =
+      currentUser.role === 'administrador' ||
+      target.ownerId === currentUser.uid ||
+      (currentUser.role === 'agente' && isAgentConfirmedOnProperty(target, currentUser.uid));
+    if (!canModify) {
+      notify('error', 'Sin permisos', 'No tenés permisos para modificar esta propiedad.');
+      return;
+    }
+
     try {
       await updateDoc(doc(db, 'properties', propertyId), { availability });
       setProperties((prev) =>
@@ -798,21 +1110,232 @@ export default function App() {
     }
   };
 
-  const handleAssignAgent = async (propertyId: string, agentId: string, agentName: string) => {
+  /**
+   * Flujo del Propietario para elegir modalidad de gestión o solicitar agente:
+   * - 'directa': Propietario independiente (sin agente)
+   * - 'elegir_agente': El propietario elige un agente disponible -> queda 'pendiente_agente' hasta que el agente acepte o el admin confirme
+   * - 'asignacion_admin': El propietario pide "Que me asignen uno" -> queda 'pendiente_admin' hasta que el admin le asigne uno
+   */
+  const handleOwnerRequestAgent = async (
+    propertyId: string,
+    mode: 'directa' | 'elegir_agente' | 'asignacion_admin',
+    chosenAgent?: UserProfile
+  ) => {
+    const target = properties.find((p) => p.id === propertyId);
+    if (!currentUser || !target) return;
+    if (currentUser.role !== 'administrador' && target.ownerId !== currentUser.uid) {
+      notify('error', 'Sin permisos', 'Solo el propietario titular puede cambiar la modalidad de gestión.');
+      return;
+    }
+
+    const adminUser =
+      users.find((u) => u.email.toLowerCase() === DEMO_ROLE_EMAILS.administrador) ||
+      INITIAL_USERS.find((u) => u.role === 'administrador');
+
+    let patch: Partial<PropertyItem>;
+    if (mode === 'directa') {
+      patch = {
+        managementMode: 'directa',
+        agentRequestType: 'ninguna',
+        agentAssignmentStatus: 'sin_agente',
+        agentId: '',
+        agentName: '',
+        requestedAgentId: '',
+        requestedAgentName: '',
+        agentRejectionReason: '',
+      };
+    } else if (mode === 'elegir_agente' && chosenAgent) {
+      patch = {
+        managementMode: 'con_agente',
+        agentRequestType: 'elegir_agente',
+        agentAssignmentStatus: 'pendiente_agente',
+        agentId: '',
+        agentName: '',
+        requestedAgentId: chosenAgent.uid,
+        requestedAgentName: chosenAgent.displayName,
+        agentRejectionReason: '',
+      };
+    } else {
+      patch = {
+        managementMode: 'con_agente',
+        agentRequestType: 'asignacion_admin',
+        agentAssignmentStatus: 'pendiente_admin',
+        agentId: '',
+        agentName: '',
+        requestedAgentId: '',
+        requestedAgentName: '',
+        agentRejectionReason: '',
+      };
+    }
+
     try {
-      await updateDoc(doc(db, 'properties', propertyId), { agentId, agentName });
+      await updateDoc(doc(db, 'properties', propertyId), patch);
       setProperties((prev) =>
-        prev.map((p) => (p.id === propertyId ? { ...p, agentId, agentName } : p))
+        prev.map((p) => (p.id === propertyId ? { ...p, ...patch } : p))
+      );
+
+      if (mode === 'directa') {
+        notify(
+          'info',
+          'Modalidad: Propietario Independiente',
+          'Ahora administrás esta propiedad y sus consultas directamente por tu cuenta.'
+        );
+      } else if (mode === 'elegir_agente' && chosenAgent) {
+        await pushUserNotification(
+          chosenAgent.uid,
+          'Nueva solicitud de propietario',
+          `${target.ownerName} te seleccionó para gestionar "${target.title}". Ingresá a tu cartera para aceptar o rechazar la solicitud.`,
+          'info'
+        );
+        if (adminUser) {
+          await pushUserNotification(
+            adminUser.uid,
+            'Solicitud de agente pendiente de confirmación',
+            `${target.ownerName} solicitó al agente ${chosenAgent.displayName} para "${target.title}".`,
+            'info'
+          );
+        }
+        notify(
+          'success',
+          'Solicitud enviada al agente',
+          `Elegiste a ${chosenAgent.displayName}. La solicitud queda pendiente hasta que el agente la acepte o el administrador confirme la asignación.`
+        );
+      } else if (mode === 'asignacion_admin') {
+        if (adminUser) {
+          await pushUserNotification(
+            adminUser.uid,
+            'Propietario solicita asignación de agente',
+            `${target.ownerName} pidió que le asignes un agente inmobiliario para "${target.title}".`,
+            'info'
+          );
+        }
+        notify(
+          'success',
+          'Solicitud enviada al Administrador',
+          'Tu solicitud quedó pendiente hasta que el administrador te asigne un agente inmobiliario.'
+        );
+      }
+    } catch (err) {
+      notify('error', 'Error al actualizar solicitud', 'No se pudo actualizar la solicitud de agente.');
+      handleFirestoreError(err, OperationType.UPDATE, `properties/${propertyId}`);
+    }
+  };
+
+  /**
+   * El agente elegido acepta o rechaza la solicitud del propietario
+   */
+  const handleAgentRespondAssignment = async (
+    propertyId: string,
+    accept: boolean,
+    reason?: string
+  ) => {
+    const target = properties.find((p) => p.id === propertyId);
+    if (!currentUser || !target) return;
+    if (currentUser.role !== 'agente' || target.requestedAgentId !== currentUser.uid) {
+      notify('error', 'Sin permisos', 'Esta solicitud no corresponde a tu perfil de agente.');
+      return;
+    }
+
+    const patch: Partial<PropertyItem> = accept
+      ? {
+          managementMode: 'con_agente',
+          agentAssignmentStatus: 'asignado',
+          agentId: currentUser.uid,
+          agentName: currentUser.displayName,
+          agentRejectionReason: '',
+        }
+      : {
+          agentAssignmentStatus: 'rechazado',
+          agentId: '',
+          agentName: '',
+          agentRejectionReason:
+            reason || 'El agente seleccionado no cuenta con disponibilidad en este momento.',
+        };
+
+    try {
+      await updateDoc(doc(db, 'properties', propertyId), patch);
+      setProperties((prev) =>
+        prev.map((p) => (p.id === propertyId ? { ...p, ...patch } : p))
+      );
+
+      if (accept) {
+        await pushUserNotification(
+          target.ownerId,
+          'Agente inmobiliario confirmado',
+          `${currentUser.displayName} aceptó tu solicitud y ya está gestionando "${target.title}".`,
+          'success'
+        );
+        notify(
+          'success',
+          'Asignación aceptada',
+          `La propiedad "${target.title}" ya forma parte de las propiedades a tu cargo.`
+        );
+      } else {
+        await pushUserNotification(
+          target.ownerId,
+          'Solicitud de agente rechazada / Sin disponibilidad',
+          `${currentUser.displayName} no puede tomar la gestión de "${target.title}" (${patch.agentRejectionReason}). Podés elegir otro agente o pedir que el administrador te asigne uno.`,
+          'warning'
+        );
+        notify(
+          'info',
+          'Solicitud rechazada',
+          'Se notificó al propietario para que pueda elegir otro agente o pedir asignación al administrador.'
+        );
+      }
+    } catch (err) {
+      notify('error', 'Error al procesar solicitud', 'No se pudo responder la solicitud.');
+      handleFirestoreError(err, OperationType.UPDATE, `properties/${propertyId}`);
+    }
+  };
+
+  /**
+   * El Administrador confirma o asigna un agente inmobiliario a la propiedad
+   */
+  const handleAdminConfirmAgentAssignment = async (
+    propertyId: string,
+    agentId: string,
+    agentName: string
+  ) => {
+    const target = properties.find((p) => p.id === propertyId);
+    if (!currentUser || currentUser.role !== 'administrador' || !target) return;
+
+    const patch: Partial<PropertyItem> = {
+      managementMode: 'con_agente',
+      agentAssignmentStatus: 'asignado',
+      agentId,
+      agentName,
+      requestedAgentId: agentId,
+      requestedAgentName: agentName,
+      agentRejectionReason: '',
+    };
+
+    try {
+      await updateDoc(doc(db, 'properties', propertyId), patch);
+      setProperties((prev) =>
+        prev.map((p) => (p.id === propertyId ? { ...p, ...patch } : p))
+      );
+
+      await pushUserNotification(
+        target.ownerId,
+        'Agente inmobiliario asignado',
+        `El administrador confirmó a ${agentName} como agente a cargo de "${target.title}". Podés consultar sus datos en "Mis propiedades".`,
+        'success'
       );
       await pushUserNotification(
         agentId,
-        'Nueva propiedad asignada',
-        `Se te asignó la gestión inmobiliaria de una propiedad en ClaveHogar.`,
+        'Nueva propiedad asignada a tu cartera',
+        `El administrador te asignó la gestión de "${target.title}" (Propietario: ${target.ownerName}).`,
         'info'
       );
-      notify('success', 'Agente inmobiliario asignado', `${agentName} gestionará esta propiedad.`);
+
+      notify(
+        'success',
+        'Agente confirmado y asignado',
+        `${agentName} ya tiene la propiedad en su panel y puede gestionarla.`
+      );
     } catch (err) {
-      notify('error', 'Error al guardar los datos', 'No se pudo asignar el agente.');
+      notify('error', 'Error al asignar agente', 'No se pudo asignar el agente.');
       handleFirestoreError(err, OperationType.UPDATE, `properties/${propertyId}`);
     }
   };
@@ -840,7 +1363,7 @@ export default function App() {
           target.ownerId,
           publicationStatus === 'aprobada' ? 'Publicación aprobada' : 'Publicación rechazada',
           publicationStatus === 'aprobada'
-            ? `Tu propiedad "${target.title}" fue aprobada y está visible en el catálogo.`
+            ? `Tu propiedad "${target.title}" fue aprobada y está visible en el catálogo público.`
             : `Tu propiedad "${target.title}" fue rechazada: ${rejectionReason || 'Revisar datos'}`,
           publicationStatus === 'aprobada' ? 'success' : 'warning'
         );
@@ -866,6 +1389,8 @@ export default function App() {
   ) => {
     if (!currentUser) return;
     const visitId = sanitizeId(`vis_${Date.now()}`);
+    const confirmedAgentId = isAgentConfirmedOnProperty(property) ? property.agentId || '' : '';
+
     const newVisit: VisitItem = {
       id: visitId,
       propertyId: property.id,
@@ -873,7 +1398,7 @@ export default function App() {
       clientId: currentUser.uid,
       clientName: currentUser.displayName,
       ownerId: property.ownerId,
-      agentId: property.agentId || ' ',
+      agentId: confirmedAgentId,
       date,
       timeSlot,
       status: 'pendiente',
@@ -883,17 +1408,33 @@ export default function App() {
 
     try {
       await setDoc(doc(db, 'visits', visitId), newVisit);
-      setVisits((prev) => [newVisit, ...prev]);
+      setVisits((prev) =>
+        prev.some((v) => v.id === visitId) ? prev : [newVisit, ...prev]
+      );
       await pushUserNotification(
         currentUser.uid,
         'Reserva de visita enviada',
         `Solicitaste visitar "${property.title}" el ${date} (${timeSlot}).`,
         'info'
       );
+      await pushUserNotification(
+        property.ownerId,
+        'Nueva solicitud de visita',
+        `${currentUser.displayName} solicitó visitar "${property.title}" el ${date} (${timeSlot}).`,
+        'info'
+      );
+      if (confirmedAgentId) {
+        await pushUserNotification(
+          confirmedAgentId,
+          'Nueva solicitud de visita a propiedad a tu cargo',
+          `${currentUser.displayName} solicitó visitar "${property.title}" el ${date} (${timeSlot}).`,
+          'info'
+        );
+      }
       notify(
         'success',
         'Reserva realizada correctamente',
-        `Tu solicitud de visita para el ${date} (${timeSlot}) fue registrada en Firestore.`
+        `Tu solicitud de visita para el ${date} (${timeSlot}) fue registrada.`
       );
     } catch (err) {
       notify('error', 'Error al guardar los datos', 'No se pudo registrar la visita.');
@@ -946,7 +1487,7 @@ export default function App() {
           : status === 'rechazada'
           ? 'Reserva rechazada'
           : 'Estado de visita actualizado',
-        `El cliente ${existing.clientName} ha recibido una notificación.`
+        `Se actualizaron los datos de la visita.`
       );
     } catch (err) {
       notify('error', 'Error al guardar los datos', 'No se pudo actualizar la visita.');
@@ -978,12 +1519,12 @@ export default function App() {
 
     if (targetInquiry) {
       const updatedMessages = [...(targetInquiry.messages || []), newMsg];
-      const isStaff = currentUser.role !== 'cliente';
+      const isClientSender = currentUser.uid === targetInquiry.clientId;
       const updatedInquiry: InquiryItem = {
         ...targetInquiry,
-        reply: isStaff ? newMsg.text : targetInquiry.reply,
+        reply: !isClientSender ? newMsg.text : targetInquiry.reply,
         messages: updatedMessages,
-        status: isStaff ? 'respondida' : 'pendiente',
+        status: !isClientSender ? 'respondida' : 'pendiente',
         updatedAtIso: new Date().toISOString(),
       };
 
@@ -993,21 +1534,37 @@ export default function App() {
           prev.map((i) => (i.id === targetInquiry.id ? updatedInquiry : i))
         );
 
-        if (isStaff) {
+        if (!isClientSender) {
           await pushUserNotification(
             targetInquiry.clientId,
             `Nueva respuesta sobre ${property.title}`,
             `${currentUser.displayName} respondió en tu conversación: "${truncateText(newMsg.text, 80)}"`,
             'info'
           );
+        } else {
+          await pushUserNotification(
+            targetInquiry.ownerId,
+            `Nuevo mensaje de ${currentUser.displayName}`,
+            `Consulta en "${property.title}": "${truncateText(newMsg.text, 80)}"`,
+            'info'
+          );
+          if (targetInquiry.agentId && targetInquiry.agentId.trim()) {
+            await pushUserNotification(
+              targetInquiry.agentId,
+              `Nuevo mensaje de ${currentUser.displayName}`,
+              `Consulta en "${property.title}": "${truncateText(newMsg.text, 80)}"`,
+              'info'
+            );
+          }
         }
-        notify('success', 'Consulta enviada correctamente', 'Tu mensaje se agregó a la conversación en Firestore.');
+        notify('success', 'Mensaje enviado correctamente', 'Tu mensaje se agregó a la conversación.');
       } catch (err) {
         notify('error', 'Error al guardar los datos', 'No se pudo enviar el mensaje.');
         handleFirestoreError(err, OperationType.UPDATE, `inquiries/${targetInquiry.id}`);
       }
     } else {
       const inqId = sanitizeId(`inq_${Date.now()}`);
+      const hasConfirmedAgent = isAgentConfirmedOnProperty(property);
       const newInquiry: InquiryItem = {
         id: inqId,
         propertyId: property.id,
@@ -1016,8 +1573,8 @@ export default function App() {
         clientName: currentUser.displayName,
         ownerId: property.ownerId,
         ownerName: property.ownerName,
-        agentId: property.agentId || ' ',
-        agentName: property.agentName || ' ',
+        agentId: hasConfirmedAgent ? property.agentId || '' : '',
+        agentName: hasConfirmedAgent ? property.agentName || '' : '',
         question: newMsg.text,
         reply: '',
         messages: [newMsg],
@@ -1028,11 +1585,29 @@ export default function App() {
 
       try {
         await setDoc(doc(db, 'inquiries', inqId), newInquiry);
-        setInquiries((prev) => [newInquiry, ...prev]);
+        setInquiries((prev) =>
+          prev.some((i) => i.id === inqId) ? prev : [newInquiry, ...prev]
+        );
+        await pushUserNotification(
+          property.ownerId,
+          `Nueva consulta sobre ${property.title}`,
+          `${currentUser.displayName}: "${truncateText(newMsg.text, 80)}"`,
+          'info'
+        );
+        if (hasConfirmedAgent && property.agentId) {
+          await pushUserNotification(
+            property.agentId,
+            `Nueva consulta sobre ${property.title}`,
+            `${currentUser.displayName}: "${truncateText(newMsg.text, 80)}"`,
+            'info'
+          );
+        }
         notify(
           'success',
           'Consulta enviada correctamente',
-          'Se inició el chat con el propietario y agente inmobiliario.'
+          hasConfirmedAgent
+            ? `Se inició el chat con el agente asignado (${property.agentName}) y el propietario.`
+            : `Se inició el chat directo con el propietario (${property.ownerName}).`
         );
       } catch (err) {
         notify('error', 'Error al guardar los datos', 'No se pudo crear la consulta.');
@@ -1049,6 +1624,8 @@ export default function App() {
   ) => {
     if (!currentUser) return;
     const opId = sanitizeId(`op_${Date.now()}`);
+    const confirmedAgentId = isAgentConfirmedOnProperty(property) ? property.agentId || '' : '';
+
     const newOp: OperationItem = {
       id: opId,
       propertyId: property.id,
@@ -1059,7 +1636,7 @@ export default function App() {
       clientId: currentUser.uid,
       clientName: currentUser.displayName,
       ownerId: property.ownerId,
-      agentId: property.agentId || ' ',
+      agentId: confirmedAgentId,
       status: 'solicitada',
       message,
       createdAtIso: new Date().toISOString(),
@@ -1067,7 +1644,23 @@ export default function App() {
 
     try {
       await setDoc(doc(db, 'operations', opId), newOp);
-      setOperations((prev) => [newOp, ...prev]);
+      setOperations((prev) =>
+        prev.some((o) => o.id === opId) ? prev : [newOp, ...prev]
+      );
+      await pushUserNotification(
+        property.ownerId,
+        `Nueva oferta de ${operationType} — ${property.title}`,
+        `${currentUser.displayName} presentó una propuesta por ${property.currency} ${offeredAmount.toLocaleString()}.`,
+        'info'
+      );
+      if (confirmedAgentId) {
+        await pushUserNotification(
+          confirmedAgentId,
+          `Nueva oferta de ${operationType} — ${property.title}`,
+          `${currentUser.displayName} presentó una propuesta por ${property.currency} ${offeredAmount.toLocaleString()}.`,
+          'info'
+        );
+      }
       notify(
         'success',
         'Solicitud enviada correctamente',
@@ -1164,7 +1757,9 @@ export default function App() {
 
     try {
       await setDoc(doc(db, 'claims', clmId), newClaim);
-      setClaims((prev) => [newClaim, ...prev]);
+      setClaims((prev) =>
+        prev.some((c) => c.id === clmId) ? prev : [newClaim, ...prev]
+      );
       notify('success', 'Reclamo enviado correctamente', 'Administración revisará tu caso a la brevedad.');
     } catch (err) {
       notify('error', 'Error al guardar los datos', 'No se pudo registrar el reclamo.');
@@ -1207,6 +1802,12 @@ export default function App() {
       if (currentUser?.uid === uid) {
         setCurrentUser(updated);
       }
+      await pushUserNotification(
+        uid,
+        'Actualización de rol / cuenta',
+        `El administrador actualizó tu rol a ${role.toUpperCase()} (${active ? 'Activa' : 'Suspendida'}).`,
+        'info'
+      );
       notify(
         'success',
         'Usuario actualizado correctamente',
@@ -1223,7 +1824,9 @@ export default function App() {
     const newCat: CategoryConfigItem = { id: catId, name, kind, active: true };
     try {
       await setDoc(doc(db, 'categories', catId), newCat);
-      setCategories((prev) => [...prev, newCat]);
+      setCategories((prev) =>
+        prev.some((c) => c.id === catId) ? prev : [...prev, newCat]
+      );
       notify('success', 'Categoría agregada correctamente', `Se incorporó "${name}" al catálogo.`);
     } catch (err) {
       notify('error', 'Error al guardar los datos', 'No se pudo crear la categoría.');
@@ -1319,8 +1922,8 @@ export default function App() {
       );
       if (currentUser.isAlsoOwner) {
         items.push(
-          { id: 'propietario_inmuebles', label: 'Mis Inmuebles Publicados' },
-          { id: 'propietario_visitas', label: 'Visitas a mis Inmuebles' },
+          { id: 'propietario_inmuebles', label: 'Mis propiedades (Propietario)' },
+          { id: 'propietario_visitas', label: 'Visitas a mis propiedades' },
           { id: 'propietario_operaciones', label: 'Ofertas Recibidas' },
           { id: 'propietario_consultas', label: 'Chat con Interesados' }
         );
@@ -1328,16 +1931,19 @@ export default function App() {
       items.push({ id: 'reclamos_usuario', label: 'Soporte y Reclamos' });
     } else if (currentUser.role === 'propietario') {
       items.push(
-        { id: 'propietario_inmuebles', label: 'Mis Inmuebles Publicados' },
-        { id: 'propietario_visitas', label: 'Visitas Solicitadas' },
+        { id: 'propietario_inmuebles', label: 'Mis propiedades' },
+        { id: 'propietario_visitas', label: 'Visitas Recibidas' },
         { id: 'propietario_operaciones', label: 'Ofertas y Contratos' },
-        { id: 'propietario_consultas', label: 'Consultas / Chat' },
+        { id: 'propietario_consultas', label: 'Chat con Interesados' },
         { id: 'cliente_favoritos', label: `Mis Favoritos (${favoriteIds.length})` },
+        { id: 'cliente_visitas', label: 'Mis Visitas como Cliente' },
+        { id: 'cliente_operaciones', label: 'Mis Solicitudes como Cliente' },
+        { id: 'cliente_consultas', label: 'Mis Consultas como Cliente' },
         { id: 'reclamos_usuario', label: 'Soporte y Reclamos' }
       );
     } else if (currentUser.role === 'agente') {
       items.push(
-        { id: 'agente_cartera', label: 'Propiedades Asignadas' },
+        { id: 'agente_cartera', label: 'Propiedades Asignadas a Mi Cargo' },
         { id: 'agente_visitas', label: 'Agenda de Visitas' },
         { id: 'agente_operaciones', label: 'Operaciones y Contratos' },
         { id: 'agente_consultas', label: 'Atención de Consultas / Chat' },
@@ -1346,7 +1952,7 @@ export default function App() {
     } else if (currentUser.role === 'administrador') {
       items.push(
         { id: 'admin_dashboard', label: 'Panel de Control y Métricas' },
-        { id: 'admin_publicaciones', label: 'Moderación de Publicaciones' },
+        { id: 'admin_publicaciones', label: 'Moderación y Asignación de Agentes' },
         { id: 'admin_usuarios', label: 'Gestión de Usuarios y Roles' },
         { id: 'admin_categorias', label: 'Tipos y Características' },
         { id: 'admin_reclamos', label: 'Centro de Reclamos' }
@@ -1361,7 +1967,9 @@ export default function App() {
 
   const markAllNotificationsRead = async () => {
     const unread = myNotifications.filter((n) => !n.read);
-    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+    setNotifications((prev) =>
+      prev.map((n) => (n.userId === currentUser?.uid ? { ...n, read: true } : n))
+    );
     for (const item of unread) {
       try {
         await updateDoc(doc(db, 'notifications', item.id), { read: true });
@@ -1370,75 +1978,120 @@ export default function App() {
       }
     }
   };
-// ============================================================================
-// FILTRADO POR ROL — cada usuario ve SOLO lo que le corresponde
-// ============================================================================
 
-// Propiedades según rol
-const scopedProperties = useMemo(() => {
-  if (!currentUser) return [];
-  if (currentUser.role === 'administrador') return properties;
-  if (currentUser.role === 'agente') {
-    return properties.filter((p) => p.agentId === currentUser.uid);
-  }
-  // cliente y propietario ven solo las que publicaron
-  return properties.filter((p) => p.ownerId === currentUser.uid);
-}, [properties, currentUser]);
+  /**
+   * Al apretar cualquier cartel de notificación, lleva directamente a la sección
+   * correspondiente según el contenido de la notificación y el rol del usuario.
+   */
+  const handleNotificationClick = (n: NotificationItem) => {
+    if (!currentUser) return;
+    setShowNotifDropdown(false);
+    setSelectedProperty(null);
 
-// Visitas
-const scopedVisits = useMemo(() => {
-  if (!currentUser) return [];
-  if (currentUser.role === 'administrador') return visits;
-  if (currentUser.role === 'cliente') {
-    return visits.filter((v) => v.clientId === currentUser.uid);
-  }
-  if (currentUser.role === 'propietario') {
-    return visits.filter((v) => v.ownerId === currentUser.uid);
-  }
-  if (currentUser.role === 'agente') {
-    return visits.filter((v) => v.agentId === currentUser.uid);
-  }
-  return [];
-}, [visits, currentUser]);
+    if (!n.read) {
+      setNotifications((prev) =>
+        prev.map((item) => (item.id === n.id ? { ...item, read: true } : item))
+      );
+      updateDoc(doc(db, 'notifications', n.id), { read: true }).catch(() => {});
+    }
 
-// Consultas / chat
-const scopedInquiries = useMemo(() => {
-  if (!currentUser) return [];
-  if (currentUser.role === 'administrador') return inquiries;
-  if (currentUser.role === 'cliente') {
-    return inquiries.filter((i) => i.clientId === currentUser.uid);
-  }
-  if (currentUser.role === 'propietario') {
-    return inquiries.filter((i) => i.ownerId === currentUser.uid);
-  }
-  if (currentUser.role === 'agente') {
-    return inquiries.filter((i) => i.agentId === currentUser.uid);
-  }
-  return [];
-}, [inquiries, currentUser]);
+    const text = `${n.title} ${n.message}`.toLowerCase();
+    const isOwnerCapable =
+      currentUser.role === 'propietario' ||
+      (currentUser.role === 'cliente' && Boolean(currentUser.isAlsoOwner));
 
-// Operaciones / contratos
-const scopedOperations = useMemo(() => {
-  if (!currentUser) return [];
-  if (currentUser.role === 'administrador') return operations;
-  if (currentUser.role === 'cliente') {
-    return operations.filter((o) => o.clientId === currentUser.uid);
-  }
-  if (currentUser.role === 'propietario') {
-    return operations.filter((o) => o.ownerId === currentUser.uid);
-  }
-  if (currentUser.role === 'agente') {
-    return operations.filter((o) => o.agentId === currentUser.uid);
-  }
-  return [];
-}, [operations, currentUser]);
+    let destinationSubView: WorkspaceSubView = getDefaultSubViewForRole(currentUser.role);
 
-// Reclamos
-const scopedClaims = useMemo(() => {
-  if (!currentUser) return [];
-  if (currentUser.role === 'administrador') return claims;
-  return claims.filter((c) => c.reporterId === currentUser.uid);
-}, [claims, currentUser]);
+    if (n.targetSubView) {
+      destinationSubView = n.targetSubView as WorkspaceSubView;
+    } else if (text.includes('reclamo')) {
+      destinationSubView =
+        currentUser.role === 'administrador' ? 'admin_reclamos' : 'reclamos_usuario';
+    } else if (text.includes('visita') || text.includes('agenda')) {
+      if (currentUser.role === 'agente') {
+        destinationSubView = 'agente_visitas';
+      } else if (
+        text.includes('nueva solicitud de visita') &&
+        isOwnerCapable
+      ) {
+        destinationSubView = 'propietario_visitas';
+      } else if (currentUser.role === 'propietario' && !text.includes('tu reserva')) {
+        destinationSubView = 'propietario_visitas';
+      } else {
+        destinationSubView = 'cliente_visitas';
+      }
+    } else if (
+      text.includes('consulta') ||
+      text.includes('mensaje') ||
+      text.includes('respuesta') ||
+      text.includes('conversación') ||
+      text.includes('chat')
+    ) {
+      if (currentUser.role === 'agente') {
+        destinationSubView = 'agente_consultas';
+      } else if (
+        (text.includes('nueva consulta') || text.includes('nuevo mensaje de')) &&
+        isOwnerCapable
+      ) {
+        destinationSubView = 'propietario_consultas';
+      } else if (currentUser.role === 'propietario' && !text.includes('tu conversación')) {
+        destinationSubView = 'propietario_consultas';
+      } else {
+        destinationSubView = 'cliente_consultas';
+      }
+    } else if (
+      text.includes('oferta') ||
+      text.includes('operación') ||
+      text.includes('contrato') ||
+      text.includes('propuesta') ||
+      text.includes('solicitud aprobada') ||
+      text.includes('solicitud rechazada') ||
+      text.includes('solicitud en_revision')
+    ) {
+      if (currentUser.role === 'agente') {
+        destinationSubView = 'agente_operaciones';
+      } else if (text.includes('nueva oferta') && isOwnerCapable) {
+        destinationSubView = 'propietario_operaciones';
+      } else if (currentUser.role === 'propietario' && text.includes('oferta')) {
+        destinationSubView = 'propietario_operaciones';
+      } else {
+        destinationSubView = 'cliente_operaciones';
+      }
+    } else if (
+      text.includes('publicación') ||
+      text.includes('propiedad') ||
+      text.includes('agente') ||
+      text.includes('asignación') ||
+      text.includes('revisión') ||
+      text.includes('moderación') ||
+      text.includes('cartera')
+    ) {
+      if (currentUser.role === 'administrador') {
+        destinationSubView = 'admin_publicaciones';
+      } else if (currentUser.role === 'agente') {
+        destinationSubView = 'agente_cartera';
+      } else if (isOwnerCapable) {
+        destinationSubView = 'propietario_inmuebles';
+      } else {
+        destinationSubView = 'cliente_favoritos';
+      }
+    } else if (text.includes('rol') || text.includes('usuario')) {
+      destinationSubView =
+        currentUser.role === 'administrador'
+          ? 'admin_usuarios'
+          : getDefaultSubViewForRole(currentUser.role);
+    }
+
+    setActiveSection('panel_rol');
+    setActiveSubView(destinationSubView);
+  };
+
+  // Reclamos según rol
+  const scopedClaims = useMemo(() => {
+    if (!currentUser) return [];
+    if (currentUser.role === 'administrador') return claims;
+    return claims.filter((c) => c.reporterId === currentUser.uid);
+  }, [claims, currentUser]);
 
   return (
     <div className="min-h-screen flex flex-col bg-[#FCFBF7] text-[#1F241F]">
@@ -1449,24 +2102,25 @@ const scopedClaims = useMemo(() => {
         {toasts.map((t) => (
           <div
             key={t.id}
-            className={`pointer-events-auto flex items-start justify-between gap-3 p-4 rounded-sm border shadow-md animate-fade-slide ${
+            className={`pointer-events-auto flex items-start justify-between gap-3 p-4 rounded-sm border-2 shadow-lg animate-fade-slide ${
               t.type === 'success'
-                ? 'bg-[#39483A] text-[#FCFBF7] border-[#A8B5A0]'
+                ? 'bg-emerald-900 text-white border-emerald-400'
                 : t.type === 'error'
-                ? 'bg-[#B86F52] text-[#FCFBF7] border-[#D8C7AA]'
-                : 'bg-[#F5F1E8] text-[#1F241F] border-[#D8C7AA]'
+                ? 'bg-red-700 text-white border-red-300'
+                : 'bg-amber-50 text-amber-950 border-amber-400'
             }`}
           >
             <div className="flex-1 text-xs">
               <div className="font-semibold text-sm">{t.title}</div>
-              {t.description && <p className="opacity-90 mt-0.5 leading-relaxed">{t.description}</p>}
+              {t.description && <p className="opacity-95 mt-0.5 leading-relaxed">{t.description}</p>}
             </div>
             <button
               type="button"
               onClick={() => setToasts((prev) => prev.filter((item) => item.id !== t.id))}
-              className="opacity-70 hover:opacity-100"
+              title="Cerrar aviso"
+              className="p-1 rounded-sm bg-white/90 text-red-600 hover:text-red-700 hover:bg-white transition-colors shrink-0 cursor-pointer"
             >
-              <X className="w-4 h-4" />
+              <X className="w-4 h-4 stroke-[2.5]" />
             </button>
           </div>
         ))}
@@ -1474,7 +2128,6 @@ const scopedClaims = useMemo(() => {
 
       {/* =====================================================================
           MINIMALIST ARCHITECTURAL HEADER WITH INTEGRATED HAMBURGER MENU
-          (No second horizontal bar; no role switcher dropdown)
          ===================================================================== */}
       <header className="sticky top-0 z-40 bg-[#FCFBF7]/95 backdrop-blur-xs border-b border-[#D8C7AA]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 h-20 flex items-center justify-between gap-4">
@@ -1556,7 +2209,7 @@ const scopedClaims = useMemo(() => {
             )}
           </nav>
 
-          {/* Right: Auth & User Actions (Without role selector dropdown) */}
+          {/* Right: Auth & User Actions */}
           <div className="flex items-center gap-3">
             {!currentUser ? (
               <>
@@ -1592,24 +2245,31 @@ const scopedClaims = useMemo(() => {
                   >
                     <Bell className="w-4 h-4" />
                     {unreadCount > 0 && (
-                      <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-[#B86F52] text-[10px] font-bold flex items-center justify-center text-[#FCFBF7]">
+                      <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-600 text-[10px] font-bold flex items-center justify-center text-white">
                         {unreadCount}
                       </span>
                     )}
                   </button>
 
                   {showNotifDropdown && (
-                    <div className="absolute right-0 mt-2 w-80 bg-[#FCFBF7] text-[#1F241F] border border-[#D8C7AA] rounded-sm shadow-lg p-4 z-50 space-y-3">
-                      <div className="flex items-center justify-between border-b border-[#D8C7AA] pb-2">
-                        <span className="text-xs uppercase tracking-wider font-semibold text-[#39483A]">
-                          Notificaciones
-                        </span>
+                    <div className="absolute right-0 mt-2 w-84 sm:w-96 bg-[#FCFBF7] text-[#1F241F] border border-[#D8C7AA] rounded-sm shadow-xl p-4 z-50 space-y-3">
+                      <div className="flex items-center justify-between border-b border-[#D8C7AA] pb-2.5">
+                        <div>
+                          <span className="text-xs uppercase tracking-wider font-bold text-[#39483A] block">
+                            Mis Notificaciones ({myNotifications.length})
+                          </span>
+                          <span className="text-[10px] text-[#39483A]/70">
+                            Tocá cualquier cartel para ir directamente a esa sección
+                          </span>
+                        </div>
                         <button
                           type="button"
                           onClick={() => setShowNotifDropdown(false)}
-                          className="text-xs text-[#39483A]/70 hover:text-[#1F241F]"
+                          aria-label="Cerrar notificaciones"
+                          title="Cerrar notificaciones"
+                          className="p-1.5 rounded-sm bg-red-50 text-red-600 hover:bg-red-600 hover:text-white border border-red-300 transition-colors cursor-pointer"
                         >
-                          Cerrar
+                          <X className="w-4 h-4 stroke-[2.5]" />
                         </button>
                       </div>
                       {myNotifications.length === 0 ? (
@@ -1617,19 +2277,64 @@ const scopedClaims = useMemo(() => {
                           No tenés notificaciones recientes.
                         </p>
                       ) : (
-                        <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
-                          {myNotifications.slice(0, 8).map((n) => (
-                            <div
-                              key={n.id}
-                              className="p-2.5 rounded-sm bg-[#F5F1E8] border border-[#D8C7AA] text-xs space-y-1"
-                            >
-                              <div className="font-semibold text-[#39483A]">{n.title}</div>
-                              <p className="text-[#1F241F]/80 leading-snug">{n.message}</p>
-                              <div className="text-[10px] text-[#39483A]/60 font-tabular">
-                                {n.createdAtIso.slice(0, 16).replace('T', ' ')}
-                              </div>
-                            </div>
-                          ))}
+                        <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
+                          {myNotifications.slice(0, 12).map((n) => {
+                            const lowerTitle = n.title.toLowerCase();
+                            const isRejectedOrError =
+                              n.type === 'warning' ||
+                              lowerTitle.includes('rechaza') ||
+                              lowerTitle.includes('cancel');
+                            const isPendingOrReview =
+                              lowerTitle.includes('pendiente') ||
+                              lowerTitle.includes('revisión') ||
+                              lowerTitle.includes('solicitud');
+                            const isSuccess =
+                              n.type === 'success' ||
+                              lowerTitle.includes('aprobada') ||
+                              lowerTitle.includes('confirmada') ||
+                              lowerTitle.includes('asignado');
+
+                            const cardColorClass = isRejectedOrError
+                              ? 'bg-red-50 border-red-300 hover:border-red-500'
+                              : isSuccess
+                              ? 'bg-emerald-50/80 border-emerald-300 hover:border-emerald-600'
+                              : isPendingOrReview
+                              ? 'bg-amber-50 border-amber-300 hover:border-amber-500'
+                              : 'bg-[#F5F1E8] border-[#D8C7AA] hover:border-[#39483A]';
+
+                            const titleColorClass = isRejectedOrError
+                              ? 'text-red-800'
+                              : isSuccess
+                              ? 'text-emerald-900'
+                              : isPendingOrReview
+                              ? 'text-amber-900'
+                              : 'text-[#39483A]';
+
+                            return (
+                              <button
+                                key={n.id}
+                                type="button"
+                                onClick={() => handleNotificationClick(n)}
+                                className={`w-full text-left p-3 rounded-sm border text-xs space-y-1.5 transition-all cursor-pointer group ${cardColorClass}`}
+                              >
+                                <div className="flex items-start justify-between gap-2">
+                                  <span className={`font-bold leading-snug ${titleColorClass}`}>
+                                    {n.title}
+                                  </span>
+                                  <ArrowRight className="w-3.5 h-3.5 shrink-0 text-[#39483A]/60 group-hover:text-[#1F241F] group-hover:translate-x-0.5 transition-all mt-0.5" />
+                                </div>
+                                <p className="text-[#1F241F]/85 leading-snug">{n.message}</p>
+                                <div className="flex items-center justify-between pt-0.5 text-[10px]">
+                                  <span className="text-[#39483A]/65 font-tabular">
+                                    {n.createdAtIso.slice(0, 16).replace('T', ' ')}
+                                  </span>
+                                  <span className="font-semibold text-[#39483A] group-hover:underline">
+                                    Ir a la sección →
+                                  </span>
+                                </div>
+                              </button>
+                            );
+                          })}
                         </div>
                       )}
                     </div>
@@ -1640,15 +2345,27 @@ const scopedClaims = useMemo(() => {
                 <button
                   type="button"
                   onClick={() => openAuthModal('profile')}
-                  className="flex items-center gap-2 px-3 py-2 bg-[#F5F1E8] hover:bg-[#D8C7AA]/40 border border-[#D8C7AA] rounded-sm text-left transition-colors"
+                  className="flex items-center gap-2 px-3 py-1.5 bg-[#F5F1E8] hover:bg-[#D8C7AA]/40 border border-[#D8C7AA] rounded-sm text-left transition-colors"
                 >
-                  <User className="w-4 h-4 text-[#39483A] shrink-0" />
+                  <div className="w-6 h-6 rounded-full overflow-hidden bg-[#39483A] text-[#FCFBF7] flex items-center justify-center shrink-0">
+                    {currentUser.photoUrl ? (
+                      <img
+                        src={currentUser.photoUrl}
+                        alt={currentUser.displayName}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <User className="w-3.5 h-3.5 text-[#FCFBF7]" />
+                    )}
+                  </div>
                   <div className="hidden sm:block">
                     <div className="text-xs font-semibold text-[#1F241F] leading-none">
                       {currentUser.displayName.split(' ')[0]}
                     </div>
                     <div className="text-[10px] text-[#B86F52] uppercase tracking-wider leading-none mt-0.5">
-                      {currentUser.role}
+                      {currentUser.role === 'cliente' && currentUser.isAlsoOwner
+                        ? 'cliente / prop.'
+                        : currentUser.role}
                     </div>
                   </div>
                 </button>
@@ -1669,22 +2386,18 @@ const scopedClaims = useMemo(() => {
       </header>
 
       {/* =====================================================================
-          SLIDE-OVER HAMBURGER LATERAL MENU PANEL (Requirement 2)
-          Closes when clicking outside backdrop, close button, or any option
+          SLIDE-OVER HAMBURGER LATERAL MENU PANEL
          ===================================================================== */}
       {isSideMenuOpen && (
         <div className="fixed inset-0 z-50 flex">
-          {/* Backdrop (click outside to close) */}
           <div
             onClick={() => setIsSideMenuOpen(false)}
             className="fixed inset-0 bg-[#1F241F]/50 transition-opacity"
             aria-hidden="true"
           />
 
-          {/* Side Panel */}
           <aside className="relative z-10 w-80 max-w-[85vw] bg-[#FCFBF7] border-r border-[#D8C7AA] h-full flex flex-col justify-between overflow-y-auto p-6">
             <div className="space-y-8">
-              {/* Drawer Header */}
               <div className="flex items-center justify-between border-b border-[#D8C7AA] pb-4">
                 <div>
                   <span className="text-xl font-serif-display font-semibold text-[#39483A] block">
@@ -1704,7 +2417,6 @@ const scopedClaims = useMemo(() => {
                 </button>
               </div>
 
-              {/* Main Sections */}
               <div className="space-y-1.5">
                 <div className="text-[10px] uppercase tracking-[0.2em] text-[#39483A]/60 font-semibold px-2 mb-2">
                   Explorar Plataforma
@@ -1753,16 +2465,30 @@ const scopedClaims = useMemo(() => {
                 </button>
               </div>
 
-              {/* Current User Role Options */}
               {currentUser ? (
                 <div className="space-y-2 pt-2 border-t border-[#D8C7AA]">
-                  <div className="px-2 py-1">
-                    <span className="text-[10px] uppercase tracking-[0.2em] text-[#B86F52] font-semibold block">
-                      Opciones de {currentUser.role}
-                    </span>
-                    <span className="text-sm font-serif-display font-semibold text-[#39483A]">
-                      {currentUser.displayName}
-                    </span>
+                  <div className="px-2 py-1 flex items-center gap-2.5">
+                    <div className="w-9 h-9 rounded-full overflow-hidden bg-[#39483A] text-[#FCFBF7] flex items-center justify-center shrink-0">
+                      {currentUser.photoUrl ? (
+                        <img
+                          src={currentUser.photoUrl}
+                          alt={currentUser.displayName}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <User className="w-4 h-4 text-[#FCFBF7]" />
+                      )}
+                    </div>
+                    <div className="min-w-0">
+                      <span className="text-[10px] uppercase tracking-[0.2em] text-[#B86F52] font-semibold block">
+                        {currentUser.role === 'cliente' && currentUser.isAlsoOwner
+                          ? 'Cliente y Propietario'
+                          : `Opciones de ${currentUser.role}`}
+                      </span>
+                      <span className="text-sm font-serif-display font-semibold text-[#39483A] truncate block">
+                        {currentUser.displayName}
+                      </span>
+                    </div>
                   </div>
 
                   <div className="space-y-1">
@@ -1793,7 +2519,7 @@ const scopedClaims = useMemo(() => {
                         onClick={handleEnableOwnerRole}
                         className="w-full py-2.5 px-3.5 text-xs font-semibold text-[#FCFBF7] bg-[#B86F52] hover:bg-[#a35e42] rounded-sm transition-colors text-left"
                       >
-                        + Publicar una propiedad (Habilitar Propietario)
+                        + Convertirme en Propietario (Vender / Alquilar mi propiedad)
                       </button>
                     </div>
                   )}
@@ -1827,7 +2553,6 @@ const scopedClaims = useMemo(() => {
               )}
             </div>
 
-            {/* Drawer Footer */}
             {currentUser && (
               <div className="pt-4 border-t border-[#D8C7AA] space-y-2">
                 <button
@@ -1838,7 +2563,7 @@ const scopedClaims = useMemo(() => {
                   }}
                   className="w-full text-left px-3.5 py-2 text-xs font-semibold text-[#39483A] hover:bg-[#F5F1E8] rounded-sm"
                 >
-                  Editar Mi Perfil Personal
+                  Mi Perfil Personal y Foto
                 </button>
                 <button
                   type="button"
@@ -1862,10 +2587,8 @@ const scopedClaims = useMemo(() => {
            =================================================================== */}
         {activeSection === 'catalogo' && (
           <div>
-            {/* Editorial Architectural Hero */}
             <section className="bg-[#F5F1E8] border-b border-[#D8C7AA] py-12 lg:py-20">
               <div className="max-w-7xl mx-auto px-6 grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
-                {/* Left Column: Editorial Typography & AI Search */}
                 <div className="lg:col-span-6 space-y-6 animate-fade-slide">
                   <div className="text-[11px] uppercase tracking-[0.24em] text-[#B86F52] font-semibold">
                     Curaduría Inmobiliaria · Alquiler &amp; Venta
@@ -1879,7 +2602,6 @@ const scopedClaims = useMemo(() => {
                     Explorá residencias, casas con jardín y departamentos seleccionados. Describí con tus propias palabras el espacio que buscás y dejá que nuestra búsqueda inteligente te recomiende las mejores opciones reales.
                   </p>
 
-                  {/* Clean Editorial AI Search Box */}
                   <form
                     onSubmit={(e) => handleRunAISearch(e)}
                     className="bg-[#FCFBF7] p-4 rounded-sm border border-[#D8C7AA] space-y-3"
@@ -1930,7 +2652,6 @@ const scopedClaims = useMemo(() => {
                   </form>
                 </div>
 
-                {/* Right Column: Large Architectural Photography Feature */}
                 <div className="lg:col-span-6">
                   <div
                     onClick={() => setSelectedProperty(heroFeaturedProperty)}
@@ -1962,7 +2683,7 @@ const scopedClaims = useMemo(() => {
                           {heroFeaturedProperty.title}
                         </h3>
                       </div>
-                      <div className=" sm:text-right shrink-0">
+                      <div className="sm:text-right shrink-0">
                         <span className="text-xl font-semibold font-tabular text-[#39483A] block">
                           {heroFeaturedProperty.currency} {heroFeaturedProperty.price.toLocaleString()}
                         </span>
@@ -1973,7 +2694,6 @@ const scopedClaims = useMemo(() => {
                     </div>
                   </div>
 
-                  {/* Subtle Editorial Pagination */}
                   <div className="flex items-center justify-end gap-2 mt-3">
                     {approvedProperties.slice(0, 5).map((prop, idx) => (
                       <button
@@ -2182,6 +2902,15 @@ const scopedClaims = useMemo(() => {
                         + Publicar Propiedad
                       </button>
                     )}
+                  {currentUser && currentUser.role === 'cliente' && !currentUser.isAlsoOwner && (
+                    <button
+                      type="button"
+                      onClick={handleEnableOwnerRole}
+                      className="px-4 py-2.5 text-xs uppercase tracking-wider font-semibold text-[#FCFBF7] bg-[#B86F52] hover:bg-[#a35e42] rounded-sm transition-colors"
+                    >
+                      Quiero publicar mi propiedad
+                    </button>
+                  )}
                 </div>
               </div>
 
@@ -2209,7 +2938,6 @@ const scopedClaims = useMemo(() => {
                         className="group flex flex-col justify-between bg-[#FCFBF7] border border-[#D8C7AA] rounded-sm overflow-hidden hover:border-[#39483A] transition-colors"
                       >
                         <div>
-                          {/* Prominent Photography */}
                           <div
                             onClick={() => setSelectedProperty(prop)}
                             className="relative aspect-[4/3] bg-[#F5F1E8] overflow-hidden cursor-pointer"
@@ -2261,13 +2989,20 @@ const scopedClaims = useMemo(() => {
                             </div>
                           </div>
 
-                          {/* Editorial Card Content */}
                           <div className="p-6 space-y-3">
                             <div className="flex items-center justify-between text-xs">
                               <span className="uppercase tracking-wider text-[#B86F52] font-semibold truncate">
                                 {prop.location}
                               </span>
-                              <span className="text-[11px] uppercase tracking-wider text-[#39483A]/70">
+                              <span
+                                className={`text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-sm border ${
+                                  prop.availability === 'disponible'
+                                    ? 'bg-emerald-100 text-emerald-900 border-emerald-400'
+                                    : prop.availability === 'reservada'
+                                    ? 'bg-amber-100 text-amber-900 border-amber-400'
+                                    : 'bg-red-100 text-red-800 border-red-400'
+                                }`}
+                              >
                                 {prop.availability}
                               </span>
                             </div>
@@ -2490,14 +3225,16 @@ const scopedClaims = useMemo(() => {
         )}
 
         {/* ===================================================================
-            VIEW 3: COMPARADOR DE PROPIEDADES
+            VIEW 3: COMPARADOR DE PROPIEDADES (PROPIO DE CADA USUARIO)
            =================================================================== */}
         {activeSection === 'comparador' && (
           <ComparatorView
             comparedProperties={comparedProperties}
             allFeatures={activeFeatures}
             onRemoveFromCompare={handleToggleCompare}
-            onClearCompare={() => setComparedIds([])}
+            onClearCompare={() =>
+              setComparedByUser((prev) => ({ ...prev, [compareScopeKey]: [] }))
+            }
             onSelectProperty={(prop) => setSelectedProperty(prop)}
             onGoToCatalog={() => setActiveSection('catalogo')}
           />
@@ -2512,14 +3249,15 @@ const scopedClaims = useMemo(() => {
             activeSubView={activeSubView}
             onChangeSubView={setActiveSubView}
             users={users}
-            properties={scopedProperties}     
+            allProperties={properties}
             favoriteIds={favoriteIds}
-            visits={scopedVisits}             
-            inquiries={scopedInquiries}      
-            operations={scopedOperations}      
-            claims={scopedClaims}         
+            allVisits={visits}
+            allInquiries={inquiries}
+            allOperations={operations}
+            claims={scopedClaims}
             categories={categories}
             onEnableOwnerRole={handleEnableOwnerRole}
+            onOpenProfileModal={() => openAuthModal('profile')}
             onOpenNewProperty={() => {
               setEditingProperty(null);
               setIsPropertyFormOpen(true);
@@ -2531,7 +3269,9 @@ const scopedClaims = useMemo(() => {
             onSelectProperty={(prop) => setSelectedProperty(prop)}
             onDeleteProperty={handleDeleteProperty}
             onUpdateAvailability={handleUpdateAvailability}
-            onAssignAgent={handleAssignAgent}
+            onOwnerRequestAgent={handleOwnerRequestAgent}
+            onAgentRespondAssignment={handleAgentRespondAssignment}
+            onAdminConfirmAgentAssignment={handleAdminConfirmAgentAssignment}
             onModerateProperty={handleModerateProperty}
             onToggleFavorite={handleToggleFavorite}
             onUpdateVisit={handleUpdateVisit}
@@ -2576,6 +3316,8 @@ const scopedClaims = useMemo(() => {
       <PropertyFormModal
         isOpen={isPropertyFormOpen}
         editingProperty={editingProperty}
+        currentUser={currentUser}
+        availableAgents={availableAgents}
         categories={categories}
         onClose={() => {
           setIsPropertyFormOpen(false);
@@ -2595,6 +3337,7 @@ const scopedClaims = useMemo(() => {
         onRegisterSubmit={handleRegisterSubmit}
         onPasswordReset={handlePasswordReset}
         onUpdateProfile={handleUpdateProfile}
+        onDeleteOwnProfile={handleDeleteOwnProfile}
         onEnableOwnerRole={handleEnableOwnerRole}
         onQuickRoleLogin={handleQuickRoleLogin}
       />

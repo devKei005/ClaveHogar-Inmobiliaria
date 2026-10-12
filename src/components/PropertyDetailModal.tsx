@@ -80,13 +80,25 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
   const [operationMessage, setOperationMessage] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  const propertyInquiries = inquiries.filter((inq) => inq.propertyId === property.id);
+  const isConfirmedAgent =
+    Boolean(property.agentId?.trim()) &&
+    (!property.agentAssignmentStatus || property.agentAssignmentStatus === 'asignado');
+  const activeAgentName = isConfirmedAgent ? property.agentName : '';
+
+  const propertyInquiries = inquiries.filter((inq) => {
+    if (inq.propertyId !== property.id) return false;
+    if (!currentUser) return false;
+    if (currentUser.role === 'administrador') return true;
+    if (property.ownerId === currentUser.uid) return true;
+    if (isConfirmedAgent && property.agentId === currentUser.uid) return true;
+    return inq.clientId === currentUser.uid;
+  });
   const myThread = currentUser
     ? propertyInquiries.find(
         (inq) =>
           inq.clientId === currentUser.uid ||
           inq.ownerId === currentUser.uid ||
-          inq.agentId === currentUser.uid
+          (isConfirmedAgent && inq.agentId === currentUser.uid)
       )
     : undefined;
 
@@ -377,10 +389,15 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
                 </div>
                 <div className="pt-2 text-xs text-[#39483A]/80 flex flex-wrap items-center gap-x-2 gap-y-1">
                   <span>Propietario: <strong className="text-[#1F241F]">{property.ownerName}</strong></span>
-                  {property.agentName && (
+                  {activeAgentName ? (
                     <>
                       <span aria-hidden="true">·</span>
-                      <span>Agente: <strong className="text-[#1F241F]">{property.agentName}</strong></span>
+                      <span>Agente a cargo: <strong className="text-[#1F241F]">{activeAgentName}</strong></span>
+                    </>
+                  ) : (
+                    <>
+                      <span aria-hidden="true">·</span>
+                      <span className="text-[#B86F52] font-semibold">Gestión directa por propietario</span>
                     </>
                   )}
                 </div>

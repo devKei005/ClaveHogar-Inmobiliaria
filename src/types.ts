@@ -1,5 +1,3 @@
-import { deprecate } from "util";
-
 export type UserRole = 'cliente' | 'propietario' | 'agente' | 'administrador';
 
 export type OperationTypeChoice = 'alquiler' | 'venta';
@@ -10,6 +8,22 @@ export type InquiryStatus = 'pendiente' | 'respondida';
 export type DealStatus = 'solicitada' | 'en_revision' | 'aprobada' | 'rechazada' | 'concretada';
 export type ClaimTargetType = 'publicacion' | 'usuario' | 'visita' | 'operacion';
 export type ClaimStatus = 'abierto' | 'en_revision' | 'resuelto' | 'desestimado';
+
+export type PropertyManagementMode = 'directa' | 'con_agente';
+export type AgentRequestType = 'ninguna' | 'elegir_agente' | 'asignacion_admin';
+export type AgentAssignmentStatus =
+  | 'sin_agente'
+  | 'pendiente_agente'
+  | 'pendiente_admin'
+  | 'asignado'
+  | 'rechazado';
+
+export const DEMO_ROLE_EMAILS: Record<UserRole, string> = {
+  cliente: 'cliente@clavehogar.com',
+  propietario: 'propietario@clavehogar.com',
+  agente: 'agente@clavehogar.com',
+  administrador: 'admin@clavehogar.com',
+};
 
 export const SCHEMA_LIMITS = {
   ID_MAX: 128,
@@ -49,7 +63,6 @@ export interface UserProfile {
   uid: string;
   displayName: string;
   email: string;
-  // password?: string; 
   phone: string;
   address: string;
   dni: string;
@@ -59,6 +72,7 @@ export interface UserProfile {
   active: boolean;
   agencyName: string;
   bio: string;
+  photoUrl?: string;
 }
 
 export interface PropertyItem {
@@ -82,8 +96,20 @@ export interface PropertyItem {
   rejectionReason?: string;
   ownerId: string;
   ownerName: string;
+  /** Confirmado únicamente cuando la solicitud fue aceptada por el agente o confirmada por el admin */
   agentId?: string;
   agentName?: string;
+  /** Modalidad elegida por el propietario: 'directa' (independiente) o 'con_agente' */
+  managementMode?: PropertyManagementMode;
+  /** Cómo solicitó el agente: 'ninguna' | 'elegir_agente' | 'asignacion_admin' */
+  agentRequestType?: AgentRequestType;
+  /** Estado de la solicitud de agente */
+  agentAssignmentStatus?: AgentAssignmentStatus;
+  /** Agente candidato elegido por el propietario mientras está pendiente */
+  requestedAgentId?: string;
+  requestedAgentName?: string;
+  /** Motivo si el agente elegido rechazó o no está disponible */
+  agentRejectionReason?: string;
   createdAtIso: string;
 }
 
@@ -176,6 +202,9 @@ export interface NotificationItem {
   message: string;
   type?: 'success' | 'info' | 'warning';
   read: boolean;
+  targetSubView?: string;
+  targetPropertyId?: string;
+  targetInquiryId?: string;
   createdAtIso: string;
 }
 
@@ -184,6 +213,7 @@ export interface ToastMessage {
   type: 'success' | 'error' | 'info';
   title: string;
   description?: string;
+  targetSubView?: string;
 }
 
 export interface AIInterpretedPreferences {

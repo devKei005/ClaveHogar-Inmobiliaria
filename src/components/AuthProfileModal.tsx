@@ -1,9 +1,18 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   X,
   ArrowLeft,
+  Camera,
+  Trash2,
+  User,
 } from 'lucide-react';
-import { UserProfile, UserRole, SCHEMA_LIMITS, truncateText } from '../types';
+import {
+  UserProfile,
+  UserRole,
+  DEMO_ROLE_EMAILS,
+  SCHEMA_LIMITS,
+  truncateText,
+} from '../types';
 
 export type AuthModalMode = 'login' | 'register' | 'recover' | 'profile';
 
@@ -24,8 +33,40 @@ interface AuthProfileModalProps {
   }) => Promise<boolean>;
   onPasswordReset: (email: string) => Promise<void>;
   onUpdateProfile: (updated: Partial<UserProfile>) => Promise<void>;
+  onDeleteOwnProfile?: () => Promise<void>;
   onEnableOwnerRole: () => Promise<void>;
   onQuickRoleLogin: (role: UserRole) => void;
+}
+
+function processAvatarFile(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const SIZE = 320;
+        canvas.width = SIZE;
+        canvas.height = SIZE;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          resolve(String(event.target?.result || ''));
+          return;
+        }
+        // Center crop square
+        const minSide = Math.min(img.width, img.height);
+        const sx = (img.width - minSide) / 2;
+        const sy = (img.height - minSide) / 2;
+        ctx.drawImage(img, sx, sy, minSide, minSide, 0, 0, SIZE, SIZE);
+        const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.82);
+        resolve(compressedDataUrl);
+      };
+      img.onerror = () => reject(new Error('No se pudo procesar la foto de perfil.'));
+      img.src = String(event.target?.result || '');
+    };
+    reader.onerror = () => reject(new Error('Error al leer el archivo del dispositivo.'));
+    reader.readAsDataURL(file);
+  });
 }
 
 export const AuthProfileModal: React.FC<AuthProfileModalProps> = ({
@@ -33,15 +74,16 @@ export const AuthProfileModal: React.FC<AuthProfileModalProps> = ({
   initialMode,
   currentUser,
   onClose,
-  onGoogleLogin,
   onLoginSubmit,
   onRegisterSubmit,
   onPasswordReset,
   onUpdateProfile,
+  onDeleteOwnProfile,
   onEnableOwnerRole,
   onQuickRoleLogin,
 }) => {
   const [mode, setMode] = useState<AuthModalMode>(initialMode);
+  const avatarInputRef = useRef<HTMLInputElement | null>(null);
 
   // Login state
   const [loginEmail, setLoginEmail] = useState('');
@@ -59,38 +101,64 @@ export const AuthProfileModal: React.FC<AuthProfileModalProps> = ({
   const [recoverEmail, setRecoverEmail] = useState('');
 
   // Profile edit state
-  const [profName, setProfName] = useState(currentUser?.displayName || '');
-  const [profPhone, setProfPhone] = useState(currentUser?.phone || '');
-  const [profAddress, setProfAddress] = useState(currentUser?.address || '');
-  const [profDni, setProfDni] = useState(currentUser?.dni || '');
-  const [profAgency, setProfAgency] = useState(currentUser?.agencyName || '');
-  const [profBio, setProfBio] = useState(currentUser?.bio || '');
+  const [profName, setProfName] = useState('');
+  const [profPhone, setProfPhone] = useState('');
+  const [profAddress, setProfAddress] = useState('');
+  const [profDni, setProfDni] = useState('');
+  const [profAgency, setProfAgency] = useState('');
+  const [profBio, setProfBio] = useState('');
+  const [profPhotoUrl, setProfPhotoUrl] = useState('');
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [confirmDeleteAccount, setConfirmDeleteAccount] = useState(false);
 
   const [busy, setBusy] = useState(false);
 
+  const clearAuthForms = () => {
+    setLoginEmail('');
+    setLoginPassword('');
+    setRegName('');
+    setRegEmail('');
+    setRegPassword('');
+    setRegPhone('');
+    setRegDni('');
+    setRegAddress('');
+    setRecoverEmail('');
+    setConfirmDeleteAccount(false);
+  };
+
   useEffect(() => {
     setMode(initialMode);
+    clearAuthForms();
   }, [initialMode, isOpen]);
 
   useEffect(() => {
-    if (currentUser) {
-      setProfName(currentUser.displayName);
-      setProfPhone(currentUser.phone);
-      setProfAddress(currentUser.address);
-      setProfDni(currentUser.dni);
-      setProfAgency(currentUser.agencyName);
-      setProfBio(currentUser.bio);
+    if (currentUser && isOpen) {
+      setProfName(currentUser.displayName || '');
+      setProfPhone(currentUser.phone || '');
+      setProfAddress(currentUser.address || '');
+      setProfDni(currentUser.dni || '');
+      setProfAgency(currentUser.agencyName || '');
+      setProfBio(currentUser.bio || '');
+      setProfPhotoUrl(currentUser.photoUrl || '');
     }
-  }, [currentUser]);
+  }, [currentUser, isOpen]);
 
   if (!isOpen) return null;
+
+  const switchMode = (nextMode: AuthModalMode) => {
+    clearAuthForms();
+    setMode(nextMode);
+  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setBusy(true);
     try {
       const ok = await onLoginSubmit(loginEmail.trim(), loginPassword);
-      if (ok) onClose();
+      if (ok) {
+        clearAuthForms();
+        onClose();
+      }
     } finally {
       setBusy(false);
     }
@@ -108,7 +176,10 @@ export const AuthProfileModal: React.FC<AuthProfileModalProps> = ({
         address: truncateText(regAddress || 'Buenos Aires, Argentina', SCHEMA_LIMITS.ADDRESS_MAX),
         dni: truncateText(regDni, SCHEMA_LIMITS.DNI_MAX),
       });
-      if (ok) onClose();
+      if (ok) {
+        clearAuthForms();
+        onClose();
+      }
     } finally {
       setBusy(false);
     }
@@ -120,15 +191,45 @@ export const AuthProfileModal: React.FC<AuthProfileModalProps> = ({
     setBusy(true);
     try {
       await onPasswordReset(recoverEmail.trim());
-      setRecoverEmail('');
+      clearAuthForms();
       setMode('login');
     } finally {
       setBusy(false);
     }
   };
 
+  const handleAvatarSelection = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) return;
+    setUploadingPhoto(true);
+    try {
+      const dataUrl = await processAvatarFile(file);
+      if (dataUrl) {
+        setProfPhotoUrl(dataUrl);
+        await onUpdateProfile({ photoUrl: dataUrl });
+      }
+    } finally {
+      setUploadingPhoto(false);
+      if (avatarInputRef.current) {
+        avatarInputRef.current.value = '';
+      }
+    }
+  };
+
+  const handleRemoveAvatar = async () => {
+    setProfPhotoUrl('');
+    setUploadingPhoto(true);
+    try {
+      await onUpdateProfile({ photoUrl: '' });
+    } finally {
+      setUploadingPhoto(false);
+    }
+  };
+
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!profName.trim() || !profPhone.trim()) return;
     setBusy(true);
     try {
       await onUpdateProfile({
@@ -138,12 +239,37 @@ export const AuthProfileModal: React.FC<AuthProfileModalProps> = ({
         dni: truncateText(profDni, SCHEMA_LIMITS.DNI_MAX),
         agencyName: truncateText(profAgency, SCHEMA_LIMITS.AGENCY_MAX),
         bio: truncateText(profBio, SCHEMA_LIMITS.BIO_MAX),
+        photoUrl: profPhotoUrl,
       });
       onClose();
     } finally {
       setBusy(false);
     }
   };
+
+  const handleClearOptionalProfileData = async () => {
+    setProfAddress('');
+    setProfDni('');
+    setProfAgency('');
+    setProfBio('');
+    setProfPhotoUrl('');
+    setBusy(true);
+    try {
+      await onUpdateProfile({
+        address: '',
+        dni: '',
+        agencyName: '',
+        bio: '',
+        photoUrl: '',
+      });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const isOfficialDemoUser = currentUser
+    ? Object.values(DEMO_ROLE_EMAILS).includes(currentUser.email.toLowerCase())
+    : false;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#1F241F]/60 p-4 overflow-y-auto">
@@ -163,24 +289,29 @@ export const AuthProfileModal: React.FC<AuthProfileModalProps> = ({
           </div>
           <button
             type="button"
-            onClick={onClose}
+            onClick={() => {
+              clearAuthForms();
+              onClose();
+            }}
             className="p-1.5 text-[#D8C7AA] hover:text-[#FCFBF7] rounded-sm hover:bg-white/10 transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        <div className="p-6">
+        <div className="p-6 max-h-[82vh] overflow-y-auto">
           {/* SCREEN 1: INICIAR SESIÓN */}
           {mode === 'login' && (
             <div className="space-y-5">
-              <form onSubmit={handleLogin} className="space-y-4">
+              <form onSubmit={handleLogin} autoComplete="off" className="space-y-4">
                 <div>
                   <label className="block text-xs font-semibold text-[#39483A] mb-1">
                     Correo electrónico
                   </label>
                   <input
                     type="email"
+                    name="clavehogar_login_email"
+                    autoComplete="off"
                     required
                     value={loginEmail}
                     onChange={(e) => setLoginEmail(e.target.value)}
@@ -195,7 +326,7 @@ export const AuthProfileModal: React.FC<AuthProfileModalProps> = ({
                     </label>
                     <button
                       type="button"
-                      onClick={() => setMode('recover')}
+                      onClick={() => switchMode('recover')}
                       className="text-xs font-medium text-[#B86F52] hover:underline"
                     >
                       ¿Olvidaste tu contraseña?
@@ -203,6 +334,8 @@ export const AuthProfileModal: React.FC<AuthProfileModalProps> = ({
                   </div>
                   <input
                     type="password"
+                    name="clavehogar_login_password"
+                    autoComplete="new-password"
                     required
                     value={loginPassword}
                     onChange={(e) => setLoginPassword(e.target.value)}
@@ -221,66 +354,73 @@ export const AuthProfileModal: React.FC<AuthProfileModalProps> = ({
 
               <div className="relative flex py-1 items-center">
                 <div className="flex-grow border-t border-[#D8C7AA]"></div>
-                <span className="flex-shrink mx-3 text-xs text-[#39483A]/60">O acceso rápido:</span>
+                <span className="flex-shrink mx-3 text-xs text-[#39483A]/60">
+                  O acceso rápido oficial (@clavehogar.com):
+                </span>
                 <div className="flex-grow border-t border-[#D8C7AA]"></div>
               </div>
-{/* 
-              <button
-                type="button"
-                onClick={async () => {
-                  await onGoogleLogin();
-                  onClose();
-                }}
-                className="w-full py-2.5 px-4 text-xs font-semibold text-[#39483A] bg-white border border-[#D8C7AA] hover:bg-[#F5F1E8] rounded-sm transition-colors"
-              >
-                Continuar con Google Auth
-              </button> */}
 
-              {/* Quick Demo Credentials helper */}
+              {/* Quick Demo Credentials helper strictly for the 4 @clavehogar.com accounts */}
               <div className="p-4 bg-[#F5F1E8] border border-[#D8C7AA] rounded-sm space-y-2.5">
                 <div className="text-[11px] font-semibold text-[#39483A]">
-                  Acceso rápido a cuentas verificadas (según su rol):
+                  Cuentas de demostración (@clavehogar.com · clave: <span className="font-tabular">123456</span>):
                 </div>
                 <div className="grid grid-cols-2 gap-2">
                   <button
                     type="button"
                     onClick={() => {
+                      clearAuthForms();
                       onQuickRoleLogin('cliente');
                       onClose();
                     }}
                     className="px-3 py-2 text-xs font-medium bg-[#FCFBF7] hover:bg-[#39483A] hover:text-[#FCFBF7] text-[#39483A] border border-[#D8C7AA] rounded-sm transition-colors text-left"
                   >
-                    Cliente
+                    <span className="font-semibold block">Cliente</span>
+                    <span className="text-[10px] opacity-75 block truncate">
+                      {DEMO_ROLE_EMAILS.cliente}
+                    </span>
                   </button>
                   <button
                     type="button"
                     onClick={() => {
+                      clearAuthForms();
                       onQuickRoleLogin('propietario');
                       onClose();
                     }}
                     className="px-3 py-2 text-xs font-medium bg-[#FCFBF7] hover:bg-[#39483A] hover:text-[#FCFBF7] text-[#39483A] border border-[#D8C7AA] rounded-sm transition-colors text-left"
                   >
-                    Propietario
+                    <span className="font-semibold block">Propietario</span>
+                    <span className="text-[10px] opacity-75 block truncate">
+                      {DEMO_ROLE_EMAILS.propietario}
+                    </span>
                   </button>
                   <button
                     type="button"
                     onClick={() => {
+                      clearAuthForms();
                       onQuickRoleLogin('agente');
                       onClose();
                     }}
                     className="px-3 py-2 text-xs font-medium bg-[#FCFBF7] hover:bg-[#39483A] hover:text-[#FCFBF7] text-[#39483A] border border-[#D8C7AA] rounded-sm transition-colors text-left"
                   >
-                    Agente Inmobiliario
+                    <span className="font-semibold block">Agente Inmobiliario</span>
+                    <span className="text-[10px] opacity-75 block truncate">
+                      {DEMO_ROLE_EMAILS.agente}
+                    </span>
                   </button>
                   <button
                     type="button"
                     onClick={() => {
+                      clearAuthForms();
                       onQuickRoleLogin('administrador');
                       onClose();
                     }}
                     className="px-3 py-2 text-xs font-medium bg-[#FCFBF7] hover:bg-[#39483A] hover:text-[#FCFBF7] text-[#39483A] border border-[#D8C7AA] rounded-sm transition-colors text-left"
                   >
-                    Administrador
+                    <span className="font-semibold block">Administrador</span>
+                    <span className="text-[10px] opacity-75 block truncate">
+                      {DEMO_ROLE_EMAILS.administrador}
+                    </span>
                   </button>
                 </div>
               </div>
@@ -289,7 +429,7 @@ export const AuthProfileModal: React.FC<AuthProfileModalProps> = ({
                 ¿No tenés una cuenta?{' '}
                 <button
                   type="button"
-                  onClick={() => setMode('register')}
+                  onClick={() => switchMode('register')}
                   className="font-semibold text-[#B86F52] hover:underline"
                 >
                   Registrate aquí
@@ -302,16 +442,18 @@ export const AuthProfileModal: React.FC<AuthProfileModalProps> = ({
           {mode === 'register' && (
             <div className="space-y-4">
               <div className="p-3 bg-[#F5F1E8] border border-[#D8C7AA] rounded-sm text-xs text-[#39483A]">
-                Tu cuenta se creará con perfil de <strong>Cliente</strong>.Luego podrás habilitar también funciones de <strong>Propietario</strong> si deseás publicar un inmueble.
+                Tu cuenta se creará con perfil de <strong>Cliente</strong>. Desde la misma cuenta podrás convertirte también en <strong>Propietario</strong> cuando quieras publicar y administrar tus inmuebles.
               </div>
 
-              <form onSubmit={handleRegister} className="space-y-3.5">
+              <form onSubmit={handleRegister} autoComplete="off" className="space-y-3.5">
                 <div>
                   <label className="block text-xs font-semibold text-[#39483A] mb-1">
                     Nombre y Apellido *
                   </label>
                   <input
                     type="text"
+                    name="clavehogar_reg_name"
+                    autoComplete="off"
                     required
                     value={regName}
                     onChange={(e) => setRegName(e.target.value)}
@@ -325,6 +467,8 @@ export const AuthProfileModal: React.FC<AuthProfileModalProps> = ({
                   </label>
                   <input
                     type="email"
+                    name="clavehogar_reg_email"
+                    autoComplete="off"
                     required
                     value={regEmail}
                     onChange={(e) => setRegEmail(e.target.value)}
@@ -339,6 +483,8 @@ export const AuthProfileModal: React.FC<AuthProfileModalProps> = ({
                     </label>
                     <input
                       type="text"
+                      name="clavehogar_reg_phone"
+                      autoComplete="off"
                       required
                       value={regPhone}
                       onChange={(e) => setRegPhone(e.target.value)}
@@ -352,6 +498,8 @@ export const AuthProfileModal: React.FC<AuthProfileModalProps> = ({
                     </label>
                     <input
                       type="text"
+                      name="clavehogar_reg_dni"
+                      autoComplete="off"
                       required
                       value={regDni}
                       onChange={(e) => setRegDni(e.target.value)}
@@ -366,6 +514,8 @@ export const AuthProfileModal: React.FC<AuthProfileModalProps> = ({
                   </label>
                   <input
                     type="text"
+                    name="clavehogar_reg_address"
+                    autoComplete="off"
                     value={regAddress}
                     onChange={(e) => setRegAddress(e.target.value)}
                     placeholder="Quilmes / CABA / Zona Norte"
@@ -378,6 +528,8 @@ export const AuthProfileModal: React.FC<AuthProfileModalProps> = ({
                   </label>
                   <input
                     type="password"
+                    name="clavehogar_reg_password"
+                    autoComplete="new-password"
                     required
                     minLength={6}
                     value={regPassword}
@@ -399,7 +551,7 @@ export const AuthProfileModal: React.FC<AuthProfileModalProps> = ({
                 ¿Ya tenés una cuenta?{' '}
                 <button
                   type="button"
-                  onClick={() => setMode('login')}
+                  onClick={() => switchMode('login')}
                   className="font-semibold text-[#B86F52] hover:underline"
                 >
                   Iniciar sesión
@@ -413,7 +565,7 @@ export const AuthProfileModal: React.FC<AuthProfileModalProps> = ({
             <div className="space-y-4">
               <button
                 type="button"
-                onClick={() => setMode('login')}
+                onClick={() => switchMode('login')}
                 className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#39483A] hover:underline"
               >
                 <ArrowLeft className="w-3.5 h-3.5" />
@@ -422,13 +574,14 @@ export const AuthProfileModal: React.FC<AuthProfileModalProps> = ({
               <p className="text-xs text-[#39483A]/80 leading-relaxed">
                 Ingresá el correo electrónico de tu cuenta y te enviaremos un enlace para restablecer tu contraseña.
               </p>
-              <form onSubmit={handleRecover} className="space-y-4">
+              <form onSubmit={handleRecover} autoComplete="off" className="space-y-4">
                 <div>
                   <label className="block text-xs font-semibold text-[#39483A] mb-1">
                     Correo electrónico registrado
                   </label>
                   <input
                     type="email"
+                    autoComplete="off"
                     required
                     value={recoverEmail}
                     onChange={(e) => setRecoverEmail(e.target.value)}
@@ -447,13 +600,68 @@ export const AuthProfileModal: React.FC<AuthProfileModalProps> = ({
             </div>
           )}
 
-          {/* SCREEN 4: MI PERFIL */}
+          {/* SCREEN 4: MI PERFIL PERSONAL (Foto propia + CRUD Datos Personales) */}
           {mode === 'profile' && currentUser && (
             <div className="space-y-4">
+              {/* Foto de perfil propia */}
+              <div className="p-4 bg-[#F5F1E8] border border-[#D8C7AA] rounded-sm flex items-center gap-4">
+                <div className="relative w-16 h-16 rounded-full overflow-hidden bg-[#39483A] text-[#FCFBF7] border-2 border-[#D8C7AA] flex items-center justify-center shrink-0">
+                  {profPhotoUrl ? (
+                    <img
+                      src={profPhotoUrl}
+                      alt={profName || currentUser.displayName}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <User className="w-7 h-7 text-[#FCFBF7]" />
+                  )}
+                </div>
+
+                <div className="flex-1 min-w-0 space-y-1.5">
+                  <div className="text-xs font-semibold text-[#1F241F] truncate">
+                    {currentUser.email}
+                  </div>
+                  <div className="text-[11px] uppercase tracking-wider text-[#B86F52] font-semibold">
+                    Rol: {currentUser.role === 'cliente' && currentUser.isAlsoOwner ? 'Cliente y Propietario' : currentUser.role}
+                  </div>
+
+                  <input
+                    ref={avatarInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleAvatarSelection}
+                    className="hidden"
+                  />
+
+                  <div className="flex flex-wrap items-center gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => avatarInputRef.current?.click()}
+                      disabled={uploadingPhoto}
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-semibold bg-[#39483A] text-[#FCFBF7] rounded-sm hover:bg-[#2c382d] transition-colors cursor-pointer"
+                    >
+                      <Camera className="w-3.5 h-3.5" />
+                      {uploadingPhoto ? 'Guardando foto...' : profPhotoUrl ? 'Cambiar foto' : 'Subir foto propia'}
+                    </button>
+                    {profPhotoUrl && (
+                      <button
+                        type="button"
+                        disabled={uploadingPhoto}
+                        onClick={handleRemoveAvatar}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold text-red-700 bg-red-50 border border-red-300 rounded-sm hover:bg-red-100 cursor-pointer"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                        Quitar foto
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+
               <form onSubmit={handleSaveProfile} className="space-y-3.5">
                 <div>
                   <label className="block text-xs font-semibold text-[#39483A] mb-1">
-                    Nombre y Apellido
+                    Nombre y Apellido *
                   </label>
                   <input
                     type="text"
@@ -466,7 +674,7 @@ export const AuthProfileModal: React.FC<AuthProfileModalProps> = ({
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-semibold text-[#39483A] mb-1">
-                      Teléfono
+                      Teléfono *
                     </label>
                     <input
                       type="text"
@@ -490,7 +698,7 @@ export const AuthProfileModal: React.FC<AuthProfileModalProps> = ({
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-[#39483A] mb-1">
-                    Domicilio
+                    Domicilio / Localidad
                   </label>
                   <input
                     type="text"
@@ -529,10 +737,10 @@ export const AuthProfileModal: React.FC<AuthProfileModalProps> = ({
                 {currentUser.role === 'cliente' && !currentUser.isAlsoOwner && (
                   <div className="p-4 bg-[#F5F1E8] border border-[#D8C7AA] rounded-sm space-y-2">
                     <div className="text-xs font-semibold text-[#39483A]">
-                      ¿Deseás publicar una propiedad?
+                      ¿Querés vender o alquilar tu propia propiedad?
                     </div>
                     <p className="text-[11px] text-[#39483A]/80">
-                      Podés habilitar tu perfil de Propietario manteniendo todas tus funciones de Cliente (favoritos, búsquedas y reservas).
+                      Podés convertirte en <strong>Propietario</strong> desde esta misma cuenta manteniendo todas tus funciones de Cliente (favoritos, búsquedas y reservas).
                     </p>
                     <button
                       type="button"
@@ -542,18 +750,71 @@ export const AuthProfileModal: React.FC<AuthProfileModalProps> = ({
                       }}
                       className="w-full py-2 px-3 text-xs font-semibold text-[#FCFBF7] bg-[#B86F52] hover:bg-[#a35e42] rounded-sm transition-colors"
                     >
-                      Convertirme también en Propietario
+                      Convertirme en Propietario
                     </button>
                   </div>
                 )}
 
-                <button
-                  type="submit"
-                  disabled={busy}
-                  className="w-full py-3 px-4 text-xs uppercase tracking-widest font-semibold text-[#FCFBF7] bg-[#39483A] hover:bg-[#2c382d] rounded-sm transition-colors"
-                >
-                  Guardar Datos Personales
-                </button>
+                <div className="flex flex-col gap-2 pt-2">
+                  <button
+                    type="submit"
+                    disabled={busy}
+                    className="w-full py-3 px-4 text-xs uppercase tracking-widest font-semibold text-[#FCFBF7] bg-[#39483A] hover:bg-[#2c382d] rounded-sm transition-colors"
+                  >
+                    {busy ? 'Guardando...' : 'Guardar Datos Personales'}
+                  </button>
+
+                  <div className="flex items-center justify-between gap-2 pt-2 border-t border-[#D8C7AA]">
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={handleClearOptionalProfileData}
+                      className="px-3 py-1.5 text-[11px] font-semibold text-[#39483A] bg-[#F5F1E8] border border-[#D8C7AA] rounded-sm hover:bg-[#D8C7AA]/40 transition-colors"
+                    >
+                      Limpiar datos opcionales
+                    </button>
+
+                    {!isOfficialDemoUser && onDeleteOwnProfile && (
+                      <>
+                        {!confirmDeleteAccount ? (
+                          <button
+                            type="button"
+                            onClick={() => setConfirmDeleteAccount(true)}
+                            className="px-3 py-1.5 text-[11px] font-semibold text-red-700 bg-red-50 border border-red-300 rounded-sm hover:bg-red-100 transition-colors"
+                          >
+                            Eliminar mi perfil
+                          </button>
+                        ) : (
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              type="button"
+                              disabled={busy}
+                              onClick={async () => {
+                                setBusy(true);
+                                try {
+                                  await onDeleteOwnProfile();
+                                  onClose();
+                                } finally {
+                                  setBusy(false);
+                                }
+                              }}
+                              className="px-2.5 py-1 text-[11px] font-semibold text-white bg-red-600 hover:bg-red-700 rounded-sm"
+                            >
+                              Confirmar baja
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setConfirmDeleteAccount(false)}
+                              className="px-2 py-1 text-[11px] text-[#39483A] underline"
+                            >
+                              Cancelar
+                            </button>
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
+                </div>
               </form>
             </div>
           )}
