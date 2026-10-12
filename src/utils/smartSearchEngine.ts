@@ -32,6 +32,9 @@ export interface SmartSearchResultPayload {
     explanation: string;
     matchedCriteria: string[];
   }[];
+  assistantMessage?: string;
+  isOffTopic?: boolean;
+  needsClarification?: boolean;
 }
 
 export function normalizeSearchText(text: string): string {
@@ -285,6 +288,175 @@ export function buildFlexibleSmartSearch(
 ): SmartSearchResultPayload {
   const qNorm = normalizeSearchText(queryText);
 
+  // REGLA 2 & EJEMPLO: Saludos
+  const GREETINGS = [
+    'hola',
+    'buenas',
+    'buen dia',
+    'buenos dias',
+    'buenas tardes',
+    'buenas noches',
+    'que tal',
+    'como estas',
+    'hey',
+    'saludos',
+  ];
+  const isJustGreeting =
+    GREETINGS.includes(qNorm) ||
+    GREETINGS.some((g) => qNorm === `${g}!` || qNorm === `${g}?` || qNorm === `${g}.`);
+  if (isJustGreeting) {
+    return {
+      interpretedPreferences: {
+        summary: 'Saludo inicial recibido.',
+        operationType: 'ambos',
+        preferredLocations: ['Todas las zonas'],
+        maxPrice: 0,
+        minRooms: 1,
+        minSurface: 30,
+        keyFeatures: ['Búsqueda asistida'],
+      },
+      recommendations: [],
+      assistantMessage:
+        '¡Hola! Puedo ayudarte a buscar inmuebles. ¿Qué tipo de propiedad y en qué zona te interesa?',
+      isOffTopic: true,
+    };
+  }
+
+  // REGLA 3 & EJEMPLO: Objetos ajenos que no existen en el catálogo inmobiliario (papa, helado, auto, comida, etc.)
+  const NON_REAL_ESTATE_ITEMS = [
+    'papa',
+    'papas',
+    'helado',
+    'auto',
+    'autos',
+    'coche',
+    'coches',
+    'moto',
+    'motos',
+    'bicicleta',
+    'comida',
+    'pizza',
+    'hamburguesa',
+    'celular',
+    'computadora',
+    'televisor',
+    'ropa',
+    'chiste',
+    'musica',
+    'perro',
+    'gato',
+  ];
+  const mentionsNonRealEstateItem = NON_REAL_ESTATE_ITEMS.some(
+    (item) =>
+      qNorm.split(/\s+/).includes(item) ||
+      qNorm.includes(`una ${item}`) ||
+      qNorm.includes(`un ${item}`) ||
+      qNorm.includes(`quiero ${item}`)
+  );
+  // Verificar si a la vez NO está pidiendo una casa o departamento (ej: "casa que acepte perro" sí es válido)
+  const isAskingRealEstateExplicitly =
+    qNorm.includes('casa') ||
+    qNorm.includes('departamento') ||
+    qNorm.includes('depto') ||
+    qNorm.includes('ph') ||
+    qNorm.includes('terreno') ||
+    qNorm.includes('lote') ||
+    qNorm.includes('oficina') ||
+    qNorm.includes('local') ||
+    qNorm.includes('alquiler') ||
+    qNorm.includes('venta') ||
+    qNorm.includes('inmueble') ||
+    qNorm.includes('propiedad');
+
+  if (mentionsNonRealEstateItem && !isAskingRealEstateExplicitly) {
+    return {
+      interpretedPreferences: {
+        summary: 'Elemento ajeno al catálogo inmobiliario.',
+        operationType: 'ninguna',
+        preferredLocations: [],
+        maxPrice: 0,
+        minRooms: 0,
+        minSurface: 0,
+        keyFeatures: [],
+      },
+      recommendations: [],
+      assistantMessage:
+        'Ese elemento no forma parte de nuestro catálogo de inmuebles. ¿Buscás una casa, departamento, terreno u otro tipo de propiedad?',
+      isOffTopic: true,
+    };
+  }
+
+  // REGLA 6 & EJEMPLO: Ubicaciones extraterrestres o inexistentes ("en Marte", "la luna", etc.)
+  const IMPOSSIBLE_LOCATIONS = [
+    'marte',
+    'luna',
+    'jupiter',
+    'saturno',
+    'espacio',
+    'narnia',
+    'atlantida',
+    'sol',
+  ];
+  if (IMPOSSIBLE_LOCATIONS.some((loc) => qNorm.includes(loc))) {
+    return {
+      interpretedPreferences: {
+        summary: 'Ubicación no cubierta por la plataforma.',
+        operationType: 'ninguna',
+        preferredLocations: [],
+        maxPrice: 0,
+        minRooms: 0,
+        minSurface: 0,
+        keyFeatures: [],
+      },
+      recommendations: [],
+      assistantMessage:
+        'No tenemos inmuebles en esa ubicación. ¿Querés buscar en otra zona?',
+      isOffTopic: true,
+    };
+  }
+
+  // REGLA 5 & EJEMPLO: Consultas ambiguas ("algo para vivir", "busco algo barato", "algo economico")
+  const AMBIGUOUS_PHRASES = [
+    'algo para vivir',
+    'algo barato',
+    'busco algo barato',
+    'algo economico',
+    'lo mas barato',
+    'lo mas economico',
+    'algo lindo',
+    'algo bueno',
+    'quiero vivir',
+    'un lugar para vivir',
+  ];
+  const isAmbiguousOnly =
+    AMBIGUOUS_PHRASES.includes(qNorm) ||
+    (AMBIGUOUS_PHRASES.some((a) => qNorm.includes(a)) &&
+      !qNorm.includes('palermo') &&
+      !qNorm.includes('quilmes') &&
+      !qNorm.includes('caba') &&
+      !qNorm.includes('belgrano') &&
+      !qNorm.includes('recoleta') &&
+      !qNorm.includes('buenos aires') &&
+      !/\d+/.test(qNorm));
+  if (isAmbiguousOnly) {
+    return {
+      interpretedPreferences: {
+        summary: 'Consulta ambigua, se requiere especificación de criterios.',
+        operationType: 'ambos',
+        preferredLocations: [],
+        maxPrice: 0,
+        minRooms: 1,
+        minSurface: 30,
+        keyFeatures: [],
+      },
+      recommendations: [],
+      assistantMessage: qNorm.includes('vivir')
+        ? '¿Preferís comprar o alquilar? ¿En qué zona y con cuántos ambientes?'
+        : '¿Podés indicarme la zona y el tipo de propiedad que buscás?',
+      needsClarification: true,
+    };
+  }
+
   // 1. Detectar operación (alquiler / venta / ambos)
   const isRent =
     qNorm.includes('alquil') || qNorm.includes('renta') || qNorm.includes('temporario');
@@ -437,6 +609,45 @@ export function buildFlexibleSmartSearch(
   const keyFeatures = featureKeywords
     .filter((fk) => fk.keys.some((k) => qNorm.includes(k)))
     .map((fk) => fk.label);
+
+  // REGLAS 1 & 2: Verificar si la consulta contiene al menos algún criterio inmobiliario válido
+  const hasRealEstateCriteria =
+    isRent ||
+    isSale ||
+    isAskingRealEstateExplicitly ||
+    mentionsBuenosAiresOrCaba ||
+    mentionsZonaSur ||
+    mentionsZonaNorte ||
+    mentionsZonaOeste ||
+    specificMatchedPlaces.length > 0 ||
+    minPrice > 0 ||
+    maxPrice > 0 ||
+    minBedrooms > 0 ||
+    wantsCasa ||
+    wantsDepto ||
+    wantsPH ||
+    wantsTerreno ||
+    wantsLocalOrOficina ||
+    keyFeatures.length > 0;
+
+  if (!hasRealEstateCriteria) {
+    return {
+      interpretedPreferences: {
+        summary: 'Consulta sin criterios inmobiliarios válidos.',
+        operationType: 'ninguna',
+        preferredLocations: [],
+        maxPrice: 0,
+        minRooms: 0,
+        minSurface: 0,
+        keyFeatures: [],
+      },
+      recommendations: [],
+      assistantMessage:
+        'No encontré inmuebles relacionados con tu consulta. Puedo ayudarte a buscar por zona, tipo de propiedad, presupuesto o cantidad de ambientes.',
+      isOffTopic: true,
+      needsClarification: false,
+    };
+  }
 
   // 8. Puntuar cada propiedad con criterios flexibles e inteligentes
   const scored = properties
@@ -681,6 +892,14 @@ export function buildFlexibleSmartSearch(
     .filter((item) => item.matchScore >= 55 && !item.hardMismatch)
     .sort((a, b) => b.matchScore - a.matchScore);
 
+  const finalRecs = scored.map(({ hardMismatch, ...rest }) => rest);
+  const assistantMessage =
+    finalRecs.length > 0
+      ? `Encontré ${finalRecs.length} ${
+          finalRecs.length === 1 ? 'inmueble disponible' : 'inmuebles disponibles'
+        } en el catálogo que coinciden con tu búsqueda.`
+      : 'No hay inmuebles que coincidan con esos criterios. Probá ampliar la zona o el rango de precio.';
+
   return {
     interpretedPreferences: {
       summary:
@@ -697,6 +916,9 @@ export function buildFlexibleSmartSearch(
       minSurface: 30,
       keyFeatures: keyFeatures.length > 0 ? keyFeatures : ['Búsqueda flexible por ubicación y precio'],
     },
-    recommendations: scored.map(({ hardMismatch, ...rest }) => rest),
+    recommendations: finalRecs,
+    assistantMessage,
+    isOffTopic: false,
+    needsClarification: false,
   };
 }

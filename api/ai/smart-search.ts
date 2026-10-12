@@ -25,6 +25,12 @@ export default async function handler(req: any, res: any) {
 
   const heuristicResult = buildFlexibleSmartSearch(query, properties);
 
+  // Respuesta ultra rápida (<10ms) para saludos, chistes, consultas fuera de tema o pedidos de aclaración
+  if (heuristicResult.isOffTopic || heuristicResult.needsClarification) {
+    res.status(200).json(heuristicResult);
+    return;
+  }
+
   const apiKey = process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY;
   if (!apiKey || apiKey === 'MY_GEMINI_API_KEY') {
     res.status(200).json(heuristicResult);
@@ -44,7 +50,6 @@ export default async function handler(req: any, res: any) {
       id: p.id,
       title: p.title,
       location: p.location,
-      address: p.address,
       operationType: p.operationType,
       propertyType: p.propertyType,
       price: p.price,
@@ -52,33 +57,47 @@ export default async function handler(req: any, res: any) {
       surface: p.surface,
       rooms: p.rooms,
       bedrooms: p.bedrooms,
-      bathrooms: p.bathrooms,
-      features: p.features,
-      availability: p.availability,
-      description: (p.description || '').slice(0, 300),
+      features: (p.features || []).slice(0, 5),
     }));
 
     const response = await ai.models.generateContent({
-      model: 'gemini-3.8-flash',
+      model: 'gemini-3.1-flash-lite',
       contents: `Analiza la siguiente búsqueda inmobiliaria en lenguaje natural de un cliente en ClaveHogar y compárala de manera flexible e inteligente contra las propiedades reales almacenadas en Firestore.
 
 Consulta del cliente: "${query}"
 
 Propiedades reales en Firestore (JSON):
-${JSON.stringify(catalogContext, null, 2)}
+${JSON.stringify(catalogContext)}
 
 Reglas de interpretación flexible:
 1. Sinónimos geográficos: "Ciudad de Buenos Aires", "Capital Federal", "Capital", "CABA" y todos sus barrios (Palermo, Belgrano, Recoleta, Puerto Madero, Núñez, Colegiales, Caballito, San Telmo, etc.) son equivalentes a CABA. Si el usuario dice "cerca de la ciudad de buenos aires" (incluso con errores de tipeo como "cera de"), incluye tanto propiedades en CABA como en el Gran Buenos Aires (Quilmes, Bernal, Avellaneda, San Isidro, Vicente López, Tigre, etc.).
 2. Rangos y montos abreviados: interpreta expresiones como "entre 10 a 15 mil dólares" como un rango de 10.000 a 15.000 (y permite un margen cercano de ±20%). "15 mil" = 15000, "200 mil" = 200000.
 3. Si el usuario pide genéricamente "un inmueble" o "una propiedad", acepta cualquier tipo (Casa, Departamento, PH, Loft, Terreno, etc.) que cumpla con la zona y el rango de precio.
-4. Recomienda todas las propiedades compatibles (matchScore >= 55) y explica en español por qué coinciden.`,
+4. NUNCA recomiendes propiedades que no cumplan los criterios ni inventes nada. Solo recomienda propiedades reales con matchScore >= 55. Si no hay coincidencias exactas o cercanas, recommendations = [].`,
       config: {
-        systemInstruction:
-          'Eres el motor de inteligencia inmobiliaria de ClaveHogar. Comprendes sinónimos geográficos argentinos (CABA = Ciudad de Buenos Aires = Capital Federal), cercanías, errores de tipeo y rangos de precios abreviados ("10 a 15 mil"). Devuelves JSON válido.',
+        systemInstruction: `# ROL
+Eres el asistente virtual de búsqueda de un sistema inmobiliario (ClaveHogar). Tu única función es ayudar a los usuarios a encontrar inmuebles disponibles en el catálogo (casas, departamentos, terrenos, locales, oficinas, etc.).
+
+# REGLAS ESTRICTAS
+1. SOLO buscas inmuebles cuando la consulta contiene criterios inmobiliarios válidos: tipo de propiedad, operación (venta/alquiler), ubicación, precio, ambientes, dormitorios, baños, metros cuadrados, amenities, etc.
+2. Si la consulta NO tiene relación con inmuebles (saludos, chistes, temas random, objetos que no son propiedades), NO devuelvas recomendaciones (recommendations = []) y responde en assistantMessage:
+   "No encontré inmuebles relacionados con tu consulta. Puedo ayudarte a buscar por zona, tipo de propiedad, presupuesto o cantidad de ambientes." (o si es saludo: "¡Hola! Puedo ayudarte a buscar inmuebles. ¿Qué tipo de propiedad y en qué zona te interesa?").
+3. Si el usuario menciona algo que no existe en el catálogo inmobiliario (ej: "una papa", "un helado", "un auto"), NO devuelvas recomendaciones y responde:
+   "Ese elemento no forma parte de nuestro catálogo de inmuebles. ¿Buscás una casa, departamento, terreno u otro tipo de propiedad?"
+4. NUNCA inventes propiedades, precios, direcciones, fotos ni características. Si el catálogo no tiene coincidencias reales, devuélvelo claramente en assistantMessage:
+   "No hay inmuebles que coincidan con esos criterios. Probá ampliar la zona o el rango de precio."
+5. Si la consulta es ambigua (ej: "busco algo barato", "algo para vivir"), pide aclaración en assistantMessage antes de buscar:
+   "¿Podés indicarme la zona y el tipo de propiedad que buscás?" (o si dice "algo para vivir": "¿Preferís comprar o alquilar? ¿En qué zona y con cuántos ambientes?").
+6. Si la ubicación es inexistente (ej: "en Marte"):
+   "No tenemos inmuebles en esa ubicación. ¿Querés buscar en otra zona?"
+7. Si hay criterios válidos, busca de manera flexible: comprende que CABA = Ciudad de Buenos Aires = Capital Federal, cercanías ("cerca de" o "cera de"), y montos abreviados ("10 a 15 mil" = 10000 a 15000). Recomienda solo las propiedades compatibles reales del JSON provisto y genera un assistantMessage claro.`,
         responseMimeType: 'application/json',
         responseSchema: {
           type: Type.OBJECT,
           properties: {
+            assistantMessage: { type: Type.STRING },
+            isOffTopic: { type: Type.BOOLEAN },
+            needsClarification: { type: Type.BOOLEAN },
             interpretedPreferences: {
               type: Type.OBJECT,
               properties: {
@@ -123,7 +142,7 @@ Reglas de interpretación flexible:
               },
             },
           },
-          required: ['interpretedPreferences', 'recommendations'],
+          required: ['assistantMessage', 'interpretedPreferences', 'recommendations'],
         },
       },
     });
@@ -147,11 +166,29 @@ Reglas de interpretación flexible:
         mergedMap.set(hRec.propertyId, hRec);
       }
     }
-    const mergedRecs = Array.from(mergedMap.values()).sort(
-      (a: any, b: any) => (b.matchScore || 0) - (a.matchScore || 0)
+    const isOffTopic = Boolean(parsed.isOffTopic || heuristicResult.isOffTopic);
+    const needsClarification = Boolean(
+      parsed.needsClarification || heuristicResult.needsClarification
     );
+    const finalRecs =
+      isOffTopic || needsClarification
+        ? []
+        : Array.from(mergedMap.values())
+            .filter((r: any) => (r.matchScore || 0) >= 55)
+            .sort((a: any, b: any) => (b.matchScore || 0) - (a.matchScore || 0));
+    const assistantMessage =
+      parsed.assistantMessage ||
+      heuristicResult.assistantMessage ||
+      (finalRecs.length > 0
+        ? `Encontré ${finalRecs.length} ${
+            finalRecs.length === 1 ? 'inmueble disponible' : 'inmuebles disponibles'
+          } en el catálogo que coinciden con tu búsqueda.`
+        : 'No hay inmuebles que coincidan con esos criterios. Probá ampliar la zona o el rango de precio.');
 
     res.status(200).json({
+      assistantMessage,
+      isOffTopic,
+      needsClarification,
       interpretedPreferences: {
         ...parsed.interpretedPreferences,
         summary:
@@ -172,7 +209,7 @@ Reglas de interpretación flexible:
             : parsed.interpretedPreferences?.preferredLocations ||
               heuristicResult.interpretedPreferences.preferredLocations,
       },
-      recommendations: mergedRecs,
+      recommendations: finalRecs,
     });
   } catch (err) {
     console.error('Fallback smart search triggered:', err);

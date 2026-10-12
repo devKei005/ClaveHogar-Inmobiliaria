@@ -236,4 +236,7 @@ export interface AIRecommendation {
 export interface AISmartSearchResponse {
   interpretedPreferences: AIInterpretedPreferences;
   recommendations: AIRecommendation[];
+  assistantMessage?: string;
+  isOffTopic?: boolean;
+  needsClarification?: boolean;
 }

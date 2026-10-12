@@ -156,8 +156,8 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
       } else {
         setAgentRequestType('elegir_agente');
         setSelectedAgentId(
-          editingProperty.requestedAgentId ||
-            editingProperty.agentId ||
+          editingProperty.agentId ||
+            editingProperty.requestedAgentId ||
             availableAgents[0]?.uid ||
             ''
         );
@@ -297,7 +297,6 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
         finalManagementMode = 'con_agente';
         if (agentRequestType === 'asignacion_admin') {
           finalRequestType = 'asignacion_admin';
-          // Si ya estaba asignado y cambia a pedir al admin, pasa a pendiente_admin
           finalStatus = 'pendiente_admin';
           finalAgentId = '';
           finalAgentName = '';
@@ -308,19 +307,23 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
           finalRequestType = 'elegir_agente';
           const chosenAgent = availableAgents.find((a) => a.uid === selectedAgentId);
           const chosenName = chosenAgent?.displayName || '';
-          // Si al editar mantiene el mismo agente que ya estaba confirmado ('asignado'), conservar la asignación
-          if (
-            editingProperty &&
-            editingProperty.agentAssignmentStatus === 'asignado' &&
-            editingProperty.agentId === selectedAgentId
-          ) {
+          const alreadyHadAgent =
+            Boolean(editingProperty?.agentId) ||
+            editingProperty?.agentAssignmentStatus === 'asignado';
+          const keepingSameAgent =
+            alreadyHadAgent &&
+            (editingProperty?.agentId === selectedAgentId ||
+              editingProperty?.requestedAgentId === selectedAgentId ||
+              !selectedAgentId);
+
+          if (keepingSameAgent) {
             finalStatus = 'asignado';
-            finalAgentId = selectedAgentId;
-            finalAgentName = editingProperty.agentName || chosenName;
-            finalRequestedAgentId = selectedAgentId;
-            finalRequestedAgentName = chosenName;
+            finalAgentId = editingProperty?.agentId || selectedAgentId;
+            finalAgentName = editingProperty?.agentName || chosenName;
+            finalRequestedAgentId = editingProperty?.agentId || selectedAgentId;
+            finalRequestedAgentName = chosenName || editingProperty?.agentName || '';
           } else {
-            // Elegir un agente NO lo asigna automáticamente: queda pendiente hasta que el agente acepte o el admin confirme
+            // Si el propietario elige un agente nuevo o diferente, queda pendiente hasta que el agente acepte o el admin confirme
             finalStatus = 'pendiente_agente';
             finalAgentId = '';
             finalAgentName = '';
@@ -330,6 +333,15 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
           }
         }
       }
+    } else {
+      // Si el editor es el Agente responsable a cargo de la propiedad:
+      finalManagementMode = editingProperty?.managementMode || 'con_agente';
+      finalRequestType = editingProperty?.agentRequestType || 'elegir_agente';
+      finalStatus = 'asignado';
+      finalAgentId = editingProperty?.agentId || currentUser?.uid || '';
+      finalAgentName = editingProperty?.agentName || currentUser?.displayName || '';
+      finalRequestedAgentId = editingProperty?.requestedAgentId || currentUser?.uid || '';
+      finalRequestedAgentName = editingProperty?.requestedAgentName || currentUser?.displayName || '';
     }
 
     setSaving(true);

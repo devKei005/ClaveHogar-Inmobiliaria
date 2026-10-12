@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   Plus,
   Edit3,
@@ -133,11 +133,15 @@ interface RoleWorkspaceViewProps {
 }
 
 export function isAgentConfirmedOnProperty(prop: PropertyItem, agentUid?: string): boolean {
-  const hasAgent = Boolean(prop.agentId && prop.agentId.trim().length > 0);
+  const agentId = (prop.agentId || '').trim();
+  const reqAgentId = (prop.requestedAgentId || '').trim();
+  const hasAgent = Boolean(agentId || (reqAgentId && prop.agentAssignmentStatus === 'asignado'));
   if (!hasAgent) return false;
   const statusOk = !prop.agentAssignmentStatus || prop.agentAssignmentStatus === 'asignado';
   if (!statusOk) return false;
-  if (agentUid) return prop.agentId === agentUid;
+  if (agentUid) {
+    return agentId === agentUid || (reqAgentId === agentUid && prop.agentAssignmentStatus === 'asignado');
+  }
   return true;
 }
 
@@ -268,7 +272,23 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
   const [newCatName, setNewCatName] = useState('');
   const [newCatKind, setNewCatKind] = useState<'tipo_inmueble' | 'caracteristica'>('caracteristica');
 
-  const agentsList = users.filter((u) => u.role === 'agente' && u.active);
+  const uniqueUsers = useMemo(() => {
+    const seenEmails = new Set<string>();
+    const seenUids = new Set<string>();
+    const list: UserProfile[] = [];
+    for (const u of users) {
+      const email = (u.email || '').trim().toLowerCase();
+      const uid = (u.uid || '').trim();
+      if (email && seenEmails.has(email)) continue;
+      if (uid && seenUids.has(uid)) continue;
+      if (email) seenEmails.add(email);
+      if (uid) seenUids.add(uid);
+      list.push(u);
+    }
+    return list;
+  }, [users]);
+
+  const agentsList = uniqueUsers.filter((u) => u.role === 'agente' && u.active);
   const favoriteProperties = allProperties.filter((p) => favoriteIds.includes(p.id));
   const pendingProperties = allProperties.filter((p) => p.publicationStatus === 'pendiente');
   const pendingAgentRequestProperties = allProperties.filter(
@@ -2409,7 +2429,7 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#D8C7AA]/60">
-                {users.map((u) => (
+                {uniqueUsers.map((u) => (
                   <tr key={u.uid}>
                     <td className="py-3.5 pr-4">
                       <div className="flex items-center gap-2.5">
