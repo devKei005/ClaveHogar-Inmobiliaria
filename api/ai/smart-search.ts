@@ -1,229 +1,8 @@
 import { GoogleGenAI, Type } from '@google/genai';
-
-interface PropertyInput {
-  id: string;
-  title: string;
-  description: string;
-  location: string;
-  address: string;
-  operationType: 'alquiler' | 'venta';
-  propertyType: string;
-  price: number;
-  currency: string;
-  surface: number;
-  rooms: number;
-  bedrooms: number;
-  bathrooms: number;
-  features: string[];
-  availability: string;
-}
-
-function buildFallbackSmartSearch(queryText: string, properties: PropertyInput[]) {
-  const q = queryText.toLowerCase();
-  const isRent = q.includes('alquil') || q.includes('renta') || q.includes('mes');
-  const isSale = q.includes('compr') || q.includes('venta') || q.includes('invertir') || q.includes('casa');
-  const detectedOperation = isRent && !isSale ? 'alquiler' : isSale && !isRent ? 'venta' : 'ambos';
-
-  const knownLocations = [
-    'Quilmes',
-    'Bernal',
-    'Palermo',
-    'Belgrano',
-    'Recoleta',
-    'Puerto Madero',
-    'Núñez',
-    'Colegiales',
-    'Caballito',
-    'San Isidro',
-    'Vicente López',
-    'Tigre',
-    'La Plata',
-  ];
-  const preferredLocations = knownLocations.filter((loc) =>
-    q
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .includes(loc.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, ''))
-  );
-
-  let minBedrooms = 0;
-  const bedMatch = q.match(/(\d+)\s*(habitaciones|dormitorios|dorm|cuartos)/);
-  if (bedMatch) {
-    minBedrooms = parseInt(bedMatch[1], 10);
-  }
-
-  let minRooms = 1;
-  const roomsMatch = q.match(/(\d+)\s*(ambientes|amb)/);
-  if (roomsMatch) {
-    minRooms = parseInt(roomsMatch[1], 10);
-  } else if (minBedrooms > 0) {
-    minRooms = minBedrooms + 1;
-  }
-
-  let maxPrice = 0;
-  const priceMatch = q.match(
-    /(?:hasta|maximo|máximo|presupuesto|menos de|\$|usd)\s*(?:de\s*)?(?:\$|usd\s*)?(\d[\d.,]*)/i
-  );
-  if (priceMatch) {
-    const clean = Number(priceMatch[1].replace(/[.,]/g, ''));
-    if (!Number.isNaN(clean) && clean > 0) maxPrice = clean;
-  }
-
-  const wantsCasa = q.includes('casa') || q.includes('chalet') || q.includes('villa');
-  const wantsDepto = q.includes('departamento') || q.includes('depto') || q.includes('piso');
-  const wantsPH = q.includes('ph');
-
-  const featureKeywords = [
-    { keys: ['pileta', 'piscina'], label: 'Piscina / Pileta' },
-    { keys: ['mascota', 'perro', 'gato'], label: 'Apto mascotas' },
-    { keys: ['balcón', 'balcon', 'terraza'], label: 'Balcón terraza' },
-    { keys: ['cochera', 'garage', 'estacionamiento'], label: 'Cochera cubierta' },
-    { keys: ['seguridad', 'vigilancia'], label: 'Seguridad 24h' },
-    { keys: ['jardín', 'jardin', 'parque', 'patio'], label: 'Jardín / Patio' },
-    { keys: ['luminoso', 'luz', 'sol', 'norte'], label: 'Luz natural / Orientación Norte' },
-    { keys: ['parrilla', 'quincho', 'asador'], label: 'Parrilla' },
-  ];
-
-  const keyFeatures = featureKeywords
-    .filter((fk) => fk.keys.some((k) => q.includes(k)))
-    .map((fk) => fk.label);
-
-  const scored = properties
-    .map((p) => {
-      let score = 50;
-      const matchedCriteria: string[] = [];
-      let hardMismatch = false;
-
-      if (detectedOperation !== 'ambos') {
-        if (p.operationType === detectedOperation) {
-          score += 12;
-          matchedCriteria.push(`Operación: ${p.operationType}`);
-        } else {
-          score -= 15;
-        }
-      }
-
-      if (wantsCasa && !wantsDepto) {
-        if (p.propertyType.toLowerCase().includes('casa')) {
-          score += 15;
-          matchedCriteria.push('Tipo: Casa');
-        } else {
-          score -= 15;
-        }
-      } else if (wantsDepto && !wantsCasa) {
-        if (
-          p.propertyType.toLowerCase().includes('departamento') ||
-          p.propertyType.toLowerCase().includes('loft')
-        ) {
-          score += 15;
-          matchedCriteria.push(`Tipo: ${p.propertyType}`);
-        } else {
-          score -= 15;
-        }
-      } else if (wantsPH) {
-        if (p.propertyType.toLowerCase().includes('ph')) {
-          score += 15;
-          matchedCriteria.push('Tipo: PH');
-        }
-      }
-
-      if (preferredLocations.length > 0) {
-        const propLocNorm = `${p.location} ${p.address}`
-          .toLowerCase()
-          .normalize('NFD')
-          .replace(/[\u0300-\u036f]/g, '');
-        const locMatched = preferredLocations.find((loc) =>
-          propLocNorm.includes(loc.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, ''))
-        );
-        if (locMatched) {
-          score += 22;
-          matchedCriteria.push(`Ubicación en ${p.location}`);
-        } else {
-          score -= 22;
-        }
-      }
-
-      if (minBedrooms > 0) {
-        if (p.bedrooms >= minBedrooms) {
-          score += 12;
-          matchedCriteria.push(`${p.bedrooms} dormitorios (${p.rooms} amb.)`);
-        } else {
-          score -= 15;
-        }
-      } else if (minRooms > 1) {
-        if (p.rooms >= minRooms) {
-          score += 10;
-          matchedCriteria.push(`${p.rooms} ambientes`);
-        } else {
-          score -= 10;
-        }
-      }
-
-      if (maxPrice > 0) {
-        if (p.price <= maxPrice) {
-          score += 15;
-          matchedCriteria.push(`Dentro de presupuesto (${p.currency} ${p.price.toLocaleString()})`);
-        } else if (p.price <= maxPrice * 1.15) {
-          score += 4;
-          matchedCriteria.push(
-            `Cercano al presupuesto (${p.currency} ${p.price.toLocaleString()})`
-          );
-        } else {
-          score -= 30;
-          hardMismatch = true;
-        }
-      }
-
-      const textPool = `${p.title} ${p.description} ${p.features.join(' ')}`.toLowerCase();
-      keyFeatures.forEach((feat) => {
-        const keywords = feat.includes('Piscina')
-          ? ['piscina', 'pileta']
-          : feat.includes('Jardín')
-          ? ['jardín', 'jardin', 'patio', 'parque']
-          : [feat.split(' ')[0].toLowerCase()];
-        if (keywords.some((kw) => textPool.includes(kw))) {
-          score += 10;
-          matchedCriteria.push(feat);
-        }
-      });
-
-      const clamped = Math.min(99, Math.max(0, score));
-      return {
-        propertyId: p.id,
-        matchScore: clamped,
-        hardMismatch,
-        matchedCriteria:
-          matchedCriteria.length > 0
-            ? matchedCriteria
-            : [
-                `${p.propertyType} en ${p.location}`,
-                `${p.bedrooms} dormitorios`,
-                `${p.surface} m²`,
-              ],
-        explanation: `Coincide con tu búsqueda porque ofrece ${
-          matchedCriteria.length > 0
-            ? matchedCriteria.join(', ')
-            : `${p.rooms} ambientes y ${p.surface} m² en ${p.location}`
-        }. Además cuenta con ${p.features.slice(0, 3).join(', ')}.`,
-      };
-    })
-    .filter((item) => item.matchScore >= 55 && !item.hardMismatch)
-    .sort((a, b) => b.matchScore - a.matchScore);
-
-  return {
-    interpretedPreferences: {
-      summary: `Búsqueda interpretada para: "${queryText}"`,
-      operationType: detectedOperation,
-      preferredLocations:
-        preferredLocations.length > 0 ? preferredLocations : ['Todas las zonas disponibles'],
-      maxPrice: maxPrice || 0,
-      minRooms: minRooms || 1,
-      minSurface: 45,
-      keyFeatures: keyFeatures.length > 0 ? keyFeatures : ['Confort y buena ubicación'],
-    },
-    recommendations: scored.map(({ hardMismatch, ...rest }) => rest),
-  };
-}
+import {
+  buildFlexibleSmartSearch,
+  SmartSearchPropertyInput,
+} from '../../src/utils/smartSearchEngine';
 
 export default async function handler(req: any, res: any) {
   if (req.method !== 'POST') {
@@ -234,7 +13,7 @@ export default async function handler(req: any, res: any) {
   const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : req.body || {};
   const { query, properties } = body as {
     query?: string;
-    properties?: PropertyInput[];
+    properties?: SmartSearchPropertyInput[];
   };
 
   if (!query || typeof query !== 'string' || !Array.isArray(properties)) {
@@ -244,14 +23,23 @@ export default async function handler(req: any, res: any) {
     return;
   }
 
+  const heuristicResult = buildFlexibleSmartSearch(query, properties);
+
   const apiKey = process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY;
   if (!apiKey || apiKey === 'MY_GEMINI_API_KEY') {
-    res.status(200).json(buildFallbackSmartSearch(query, properties));
+    res.status(200).json(heuristicResult);
     return;
   }
 
   try {
-    const ai = new GoogleGenAI({ apiKey });
+    const ai = new GoogleGenAI({
+      apiKey,
+      httpOptions: {
+        headers: {
+          'User-Agent': 'aistudio-build',
+        },
+      },
+    });
     const catalogContext = properties.map((p) => ({
       id: p.id,
       title: p.title,
@@ -271,16 +59,22 @@ export default async function handler(req: any, res: any) {
     }));
 
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
-      contents: `Analiza la siguiente búsqueda inmobiliaria en lenguaje natural de un cliente en ClaveHogar y compárala contra las propiedades reales almacenadas en Firestore.
+      model: 'gemini-3.8-flash',
+      contents: `Analiza la siguiente búsqueda inmobiliaria en lenguaje natural de un cliente en ClaveHogar y compárala de manera flexible e inteligente contra las propiedades reales almacenadas en Firestore.
 
 Consulta del cliente: "${query}"
 
 Propiedades reales en Firestore (JSON):
-${JSON.stringify(catalogContext, null, 2)}`,
+${JSON.stringify(catalogContext, null, 2)}
+
+Reglas de interpretación flexible:
+1. Sinónimos geográficos: "Ciudad de Buenos Aires", "Capital Federal", "Capital", "CABA" y todos sus barrios (Palermo, Belgrano, Recoleta, Puerto Madero, Núñez, Colegiales, Caballito, San Telmo, etc.) son equivalentes a CABA. Si el usuario dice "cerca de la ciudad de buenos aires" (incluso con errores de tipeo como "cera de"), incluye tanto propiedades en CABA como en el Gran Buenos Aires (Quilmes, Bernal, Avellaneda, San Isidro, Vicente López, Tigre, etc.).
+2. Rangos y montos abreviados: interpreta expresiones como "entre 10 a 15 mil dólares" como un rango de 10.000 a 15.000 (y permite un margen cercano de ±20%). "15 mil" = 15000, "200 mil" = 200000.
+3. Si el usuario pide genéricamente "un inmueble" o "una propiedad", acepta cualquier tipo (Casa, Departamento, PH, Loft, Terreno, etc.) que cumpla con la zona y el rango de precio.
+4. Recomienda todas las propiedades compatibles (matchScore >= 55) y explica en español por qué coinciden.`,
       config: {
         systemInstruction:
-          'Eres el motor de inteligencia inmobiliaria de ClaveHogar. Analizas propiedades reales de Firestore y devuelves JSON válido.',
+          'Eres el motor de inteligencia inmobiliaria de ClaveHogar. Comprendes sinónimos geográficos argentinos (CABA = Ciudad de Buenos Aires = Capital Federal), cercanías, errores de tipeo y rangos de precios abreviados ("10 a 15 mil"). Devuelves JSON válido.',
         responseMimeType: 'application/json',
         responseSchema: {
           type: Type.OBJECT,
@@ -336,13 +130,52 @@ ${JSON.stringify(catalogContext, null, 2)}`,
 
     const rawText = response.text;
     if (!rawText) {
-      res.status(200).json(buildFallbackSmartSearch(query, properties));
+      res.status(200).json(heuristicResult);
       return;
     }
 
-    res.status(200).json(JSON.parse(rawText.trim()));
+    const parsed = JSON.parse(rawText.trim());
+    const mergedMap = new Map<string, any>();
+    if (Array.isArray(parsed.recommendations)) {
+      for (const r of parsed.recommendations) {
+        if (r && r.propertyId) mergedMap.set(r.propertyId, r);
+      }
+    }
+    for (const hRec of heuristicResult.recommendations) {
+      const existing = mergedMap.get(hRec.propertyId);
+      if (!existing || (hRec.matchScore || 0) > (existing.matchScore || 0)) {
+        mergedMap.set(hRec.propertyId, hRec);
+      }
+    }
+    const mergedRecs = Array.from(mergedMap.values()).sort(
+      (a: any, b: any) => (b.matchScore || 0) - (a.matchScore || 0)
+    );
+
+    res.status(200).json({
+      interpretedPreferences: {
+        ...parsed.interpretedPreferences,
+        summary:
+          heuristicResult.interpretedPreferences.maxPrice > 0
+            ? heuristicResult.interpretedPreferences.summary
+            : parsed.interpretedPreferences?.summary ||
+              heuristicResult.interpretedPreferences.summary,
+        maxPrice:
+          heuristicResult.interpretedPreferences.maxPrice > 0
+            ? heuristicResult.interpretedPreferences.maxPrice
+            : parsed.interpretedPreferences?.maxPrice || 0,
+        preferredLocations:
+          heuristicResult.interpretedPreferences.preferredLocations.length > 0 &&
+          !heuristicResult.interpretedPreferences.preferredLocations[0]
+            .toLowerCase()
+            .includes('todas las zonas')
+            ? heuristicResult.interpretedPreferences.preferredLocations
+            : parsed.interpretedPreferences?.preferredLocations ||
+              heuristicResult.interpretedPreferences.preferredLocations,
+      },
+      recommendations: mergedRecs,
+    });
   } catch (err) {
     console.error('Fallback smart search triggered:', err);
-    res.status(200).json(buildFallbackSmartSearch(query, properties));
+    res.status(200).json(heuristicResult);
   }
 }
