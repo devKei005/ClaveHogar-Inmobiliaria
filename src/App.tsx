@@ -1848,8 +1848,222 @@ export default function App() {
   };
 
   // ============================================================================
-  // AI SMART SEARCH HANDLER
+  // AI SMART SEARCH HANDLER (Server API + Automatic Client Fallback for Vercel)
   // ============================================================================
+  const runClientSmartSearchFallback = (
+    queryText: string,
+    catalog: PropertyItem[]
+  ): AISmartSearchResponse => {
+    const q = queryText.toLowerCase();
+    const isRent = q.includes('alquil') || q.includes('renta') || q.includes('mes');
+    const isSale =
+      q.includes('compr') || q.includes('venta') || q.includes('invertir') || q.includes('casa');
+    const detectedOperation =
+      isRent && !isSale ? 'alquiler' : isSale && !isRent ? 'venta' : 'ambos';
+
+    const knownLocations = [
+      'Quilmes',
+      'Bernal',
+      'Palermo',
+      'Belgrano',
+      'Recoleta',
+      'Puerto Madero',
+      'Núñez',
+      'Colegiales',
+      'Caballito',
+      'San Isidro',
+      'Vicente López',
+      'Tigre',
+      'La Plata',
+    ];
+    const preferredLocations = knownLocations.filter((loc) =>
+      q
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .includes(loc.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, ''))
+    );
+
+    let minBedrooms = 0;
+    const bedMatch = q.match(/(\d+)\s*(habitaciones|dormitorios|dorm|cuartos)/);
+    if (bedMatch) {
+      minBedrooms = parseInt(bedMatch[1], 10);
+    }
+
+    let minRooms = 1;
+    const roomsMatch = q.match(/(\d+)\s*(ambientes|amb)/);
+    if (roomsMatch) {
+      minRooms = parseInt(roomsMatch[1], 10);
+    } else if (minBedrooms > 0) {
+      minRooms = minBedrooms + 1;
+    }
+
+    let maxPrice = 0;
+    const priceMatch = q.match(
+      /(?:hasta|maximo|máximo|presupuesto|menos de|\$|usd)\s*(?:de\s*)?(?:\$|usd\s*)?(\d[\d.,]*)/i
+    );
+    if (priceMatch) {
+      const clean = Number(priceMatch[1].replace(/[.,]/g, ''));
+      if (!Number.isNaN(clean) && clean > 0) maxPrice = clean;
+    }
+
+    const wantsCasa = q.includes('casa') || q.includes('chalet') || q.includes('villa');
+    const wantsDepto = q.includes('departamento') || q.includes('depto') || q.includes('piso');
+    const wantsPH = q.includes('ph');
+
+    const featureKeywords = [
+      { keys: ['pileta', 'piscina'], label: 'Piscina / Pileta' },
+      { keys: ['mascota', 'perro', 'gato'], label: 'Apto mascotas' },
+      { keys: ['balcón', 'balcon', 'terraza'], label: 'Balcón terraza' },
+      { keys: ['cochera', 'garage', 'estacionamiento'], label: 'Cochera cubierta' },
+      { keys: ['seguridad', 'vigilancia'], label: 'Seguridad 24h' },
+      { keys: ['jardín', 'jardin', 'parque', 'patio'], label: 'Jardín / Patio' },
+      { keys: ['luminoso', 'luz', 'sol', 'norte'], label: 'Luz natural / Orientación Norte' },
+      { keys: ['parrilla', 'quincho', 'asador'], label: 'Parrilla' },
+    ];
+
+    const keyFeatures = featureKeywords
+      .filter((fk) => fk.keys.some((k) => q.includes(k)))
+      .map((fk) => fk.label);
+
+    const scored = catalog
+      .map((p) => {
+        let score = 50;
+        const matchedCriteria: string[] = [];
+        let hardMismatch = false;
+
+        if (detectedOperation !== 'ambos') {
+          if (p.operationType === detectedOperation) {
+            score += 12;
+            matchedCriteria.push(`Operación: ${p.operationType}`);
+          } else {
+            score -= 15;
+          }
+        }
+
+        if (wantsCasa && !wantsDepto) {
+          if (p.propertyType.toLowerCase().includes('casa')) {
+            score += 15;
+            matchedCriteria.push('Tipo: Casa');
+          } else {
+            score -= 15;
+          }
+        } else if (wantsDepto && !wantsCasa) {
+          if (
+            p.propertyType.toLowerCase().includes('departamento') ||
+            p.propertyType.toLowerCase().includes('loft')
+          ) {
+            score += 15;
+            matchedCriteria.push(`Tipo: ${p.propertyType}`);
+          } else {
+            score -= 15;
+          }
+        } else if (wantsPH) {
+          if (p.propertyType.toLowerCase().includes('ph')) {
+            score += 15;
+            matchedCriteria.push('Tipo: PH');
+          }
+        }
+
+        if (preferredLocations.length > 0) {
+          const propLocNorm = `${p.location} ${p.address}`
+            .toLowerCase()
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '');
+          const locMatched = preferredLocations.find((loc) =>
+            propLocNorm.includes(loc.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, ''))
+          );
+          if (locMatched) {
+            score += 22;
+            matchedCriteria.push(`Ubicación en ${p.location}`);
+          } else {
+            score -= 22;
+          }
+        }
+
+        if (minBedrooms > 0) {
+          if (p.bedrooms >= minBedrooms) {
+            score += 12;
+            matchedCriteria.push(`${p.bedrooms} dormitorios (${p.rooms} amb.)`);
+          } else {
+            score -= 15;
+          }
+        } else if (minRooms > 1) {
+          if (p.rooms >= minRooms) {
+            score += 10;
+            matchedCriteria.push(`${p.rooms} ambientes`);
+          } else {
+            score -= 10;
+          }
+        }
+
+        if (maxPrice > 0) {
+          if (p.price <= maxPrice) {
+            score += 15;
+            matchedCriteria.push(
+              `Dentro de presupuesto (${p.currency} ${p.price.toLocaleString()})`
+            );
+          } else if (p.price <= maxPrice * 1.15) {
+            score += 4;
+            matchedCriteria.push(
+              `Cercano al presupuesto (${p.currency} ${p.price.toLocaleString()})`
+            );
+          } else {
+            score -= 30;
+            hardMismatch = true;
+          }
+        }
+
+        const textPool = `${p.title} ${p.description} ${p.features.join(' ')}`.toLowerCase();
+        keyFeatures.forEach((feat) => {
+          const keywords = feat.includes('Piscina')
+            ? ['piscina', 'pileta']
+            : feat.includes('Jardín')
+            ? ['jardín', 'jardin', 'patio', 'parque']
+            : [feat.split(' ')[0].toLowerCase()];
+          if (keywords.some((kw) => textPool.includes(kw))) {
+            score += 10;
+            matchedCriteria.push(feat);
+          }
+        });
+
+        const clamped = Math.min(99, Math.max(0, score));
+        return {
+          propertyId: p.id,
+          matchScore: clamped,
+          hardMismatch,
+          matchedCriteria:
+            matchedCriteria.length > 0
+              ? matchedCriteria
+              : [
+                  `${p.propertyType} en ${p.location}`,
+                  `${p.bedrooms} dormitorios`,
+                  `${p.surface} m²`,
+                ],
+          explanation: `Coincide con tu búsqueda porque ofrece ${
+            matchedCriteria.length > 0
+              ? matchedCriteria.join(', ')
+              : `${p.rooms} ambientes y ${p.surface} m² en ${p.location}`
+          }. Además cuenta con ${p.features.slice(0, 3).join(', ')}.`,
+        };
+      })
+      .filter((item) => item.matchScore >= 55 && !item.hardMismatch)
+      .sort((a, b) => b.matchScore - a.matchScore);
+
+    return {
+      interpretedPreferences: {
+        summary: `Búsqueda interpretada para: "${queryText}"`,
+        operationType: detectedOperation,
+        preferredLocations:
+          preferredLocations.length > 0 ? preferredLocations : ['Todas las zonas disponibles'],
+        maxPrice: maxPrice || 0,
+        minRooms: minRooms || 1,
+        minSurface: 45,
+        keyFeatures: keyFeatures.length > 0 ? keyFeatures : ['Confort y buena ubicación'],
+      },
+      recommendations: scored.map(({ hardMismatch, ...rest }) => rest),
+    };
+  };
+
   const handleRunAISearch = async (e?: React.FormEvent, customPrompt?: string) => {
     if (e) e.preventDefault();
     const promptToRun = (customPrompt ?? aiQuery).trim();
@@ -1861,18 +2075,29 @@ export default function App() {
     setAiLoading(true);
     setActiveSection('buscador_ia');
     try {
-      const response = await fetch('/api/ai/smart-search', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          query: promptToRun,
-          properties: approvedProperties,
-        }),
-      });
-      if (!response.ok) {
-        throw new Error('Error en la respuesta del buscador inteligente');
+      let data: AISmartSearchResponse | null = null;
+      try {
+        const response = await fetch('/api/ai/smart-search', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            query: promptToRun,
+            properties: approvedProperties,
+          }),
+        });
+        const contentType = response.headers.get('content-type') || '';
+        if (response.ok && contentType.includes('application/json')) {
+          data = (await response.json()) as AISmartSearchResponse;
+        }
+      } catch {
+        // Si en Vercel u otro hosting estático no está activo el servidor Express,
+        // ejecutamos automáticamente el motor inteligente en el navegador
       }
-      const data = (await response.json()) as AISmartSearchResponse;
+
+      if (!data || !data.interpretedPreferences || !Array.isArray(data.recommendations)) {
+        data = runClientSmartSearchFallback(promptToRun, approvedProperties);
+      }
+
       setAiResult(data);
       if (data.recommendations.length > 0) {
         notify(
@@ -1889,9 +2114,6 @@ export default function App() {
           'No se encontraron propiedades que cumplan todos esos criterios. Probá ajustando tu búsqueda.'
         );
       }
-    } catch (err) {
-      console.error(err);
-      notify('error', 'Error al ejecutar la búsqueda con IA', 'Intentá nuevamente en unos segundos.');
     } finally {
       setAiLoading(false);
     }
