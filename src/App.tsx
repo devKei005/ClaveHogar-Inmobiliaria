@@ -13,6 +13,7 @@ import {
   LogOut,
   User,
   Sparkles,
+  Edit3,
 } from 'lucide-react';
 import {
   onAuthStateChanged,
@@ -86,6 +87,7 @@ import {
   WorkspaceSubView,
   isAgentConfirmedOnProperty,
 } from './components/RoleWorkspaceView';
+import { canUserEditProperty } from './utils/propertyPermissions';
 import {
   buildFlexibleSmartSearch,
   normalizeSearchText,
@@ -2860,13 +2862,27 @@ export default function App() {
                           {heroFeaturedProperty.title}
                         </h3>
                       </div>
-                      <div className="sm:text-right shrink-0">
+                      <div className="sm:text-right shrink-0 flex flex-col items-start sm:items-end gap-1">
                         <span className="text-xl font-semibold font-tabular text-[#39483A] block">
                           {heroFeaturedProperty.currency} {heroFeaturedProperty.price.toLocaleString()}
                         </span>
                         <span className="text-xs text-[#39483A]/75 font-tabular">
                           {heroFeaturedProperty.bedrooms} dorm. · {heroFeaturedProperty.surface} m²
                         </span>
+                        {canUserEditProperty(heroFeaturedProperty, currentUser) && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setEditingProperty(heroFeaturedProperty);
+                              setIsPropertyFormOpen(true);
+                            }}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-bold bg-[#B86F52] text-[#FCFBF7] rounded-sm hover:bg-[#a35e42] transition-colors mt-1 cursor-pointer"
+                          >
+                            <Edit3 className="w-3 h-3" />
+                            Editar Ficha
+                          </button>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -3207,14 +3223,40 @@ export default function App() {
                             </span>
                           </div>
 
-                          <button
-                            type="button"
-                            onClick={() => setSelectedProperty(prop)}
-                            className="w-full py-2.5 px-4 text-xs uppercase tracking-widest font-semibold text-[#39483A] bg-[#F5F1E8] hover:bg-[#39483A] hover:text-[#FCFBF7] border border-[#D8C7AA] rounded-sm transition-colors flex items-center justify-center gap-2"
-                          >
-                            Ver Propiedad
-                            <ArrowRight className="w-3.5 h-3.5" />
-                          </button>
+                          {canUserEditProperty(prop, currentUser) ? (
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => setSelectedProperty(prop)}
+                                className="flex-1 py-2 px-3 text-xs uppercase tracking-wider font-semibold text-[#39483A] bg-[#F5F1E8] hover:bg-[#39483A] hover:text-[#FCFBF7] border border-[#D8C7AA] rounded-sm transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+                              >
+                                Ver
+                                <ArrowRight className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setEditingProperty(prop);
+                                  setIsPropertyFormOpen(true);
+                                }}
+                                className="flex-1 py-2 px-3 text-xs uppercase tracking-wider font-bold text-[#FCFBF7] bg-[#B86F52] hover:bg-[#a35e42] rounded-sm transition-colors flex items-center justify-center gap-1.5 cursor-pointer shadow-sm"
+                                title="Editar ficha de esta propiedad"
+                              >
+                                <Edit3 className="w-3.5 h-3.5" />
+                                Editar Ficha
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => setSelectedProperty(prop)}
+                              className="w-full py-2.5 px-4 text-xs uppercase tracking-widest font-semibold text-[#39483A] bg-[#F5F1E8] hover:bg-[#39483A] hover:text-[#FCFBF7] border border-[#D8C7AA] rounded-sm transition-colors flex items-center justify-center gap-2 cursor-pointer"
+                            >
+                              Ver Propiedad
+                              <ArrowRight className="w-3.5 h-3.5" />
+                            </button>
+                          )}
                         </div>
                       </article>
                     );
@@ -3521,6 +3563,11 @@ export default function App() {
           }
           inquiries={inquiries}
           onClose={() => setSelectedProperty(null)}
+          onOpenEditProperty={(prop) => {
+            setSelectedProperty(null);
+            setEditingProperty(prop);
+            setIsPropertyFormOpen(true);
+          }}
           onRequireLogin={() => openAuthModal('login')}
           onToggleFavorite={handleToggleFavorite}
           onToggleCompare={handleToggleCompare}

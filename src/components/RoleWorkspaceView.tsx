@@ -132,18 +132,17 @@ interface RoleWorkspaceViewProps {
   onToggleCategory: (categoryId: string, active: boolean) => Promise<void>;
 }
 
-export function isAgentConfirmedOnProperty(prop: PropertyItem, agentUid?: string): boolean {
-  const agentId = (prop.agentId || '').trim();
-  const reqAgentId = (prop.requestedAgentId || '').trim();
-  const hasAgent = Boolean(agentId || (reqAgentId && prop.agentAssignmentStatus === 'asignado'));
-  if (!hasAgent) return false;
-  const statusOk = !prop.agentAssignmentStatus || prop.agentAssignmentStatus === 'asignado';
-  if (!statusOk) return false;
-  if (agentUid) {
-    return agentId === agentUid || (reqAgentId === agentUid && prop.agentAssignmentStatus === 'asignado');
-  }
-  return true;
-}
+export {
+  isAgentConfirmedOnProperty,
+  isUserOwnerOfProperty,
+  isUserAssignedAgentOfProperty,
+  canUserEditProperty,
+} from '../utils/propertyPermissions';
+import {
+  isAgentConfirmedOnProperty,
+  isUserOwnerOfProperty,
+  isUserAssignedAgentOfProperty,
+} from '../utils/propertyPermissions';
 
 /**
  * Colores semánticos de alto contraste para diferenciar claramente los estados
@@ -322,20 +321,27 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
   );
 
   // Strictly scoped lists per role and subview:
-  // 1. Propietario: ONLY properties where ownerId === currentUser.uid
-  const myOwnedProperties = allProperties.filter((p) => p.ownerId === currentUser.uid);
+  // 1. Propietario: Properties where current user is the owner (by UID, demo link, or ownerName match)
+  const myOwnedProperties = allProperties.filter((p) =>
+    isUserOwnerOfProperty(p, currentUser)
+  );
 
-  // 2. Agente: ONLY properties where agentId === currentUser.uid AND assignment is confirmed ('asignado')
+  // 2. Agente: Properties where current user is the confirmed assigned agent
   const myAssignedProperties = allProperties.filter((p) =>
-    isAgentConfirmedOnProperty(p, currentUser.uid)
+    isUserAssignedAgentOfProperty(p, currentUser)
   );
 
   // Solicitudes donde un propietario eligió a este agente y están pendientes de aceptación
-  const myPendingAgentInvitations = allProperties.filter(
-    (p) =>
-      p.requestedAgentId === currentUser.uid &&
-      p.agentAssignmentStatus === 'pendiente_agente'
-  );
+  const myPendingAgentInvitations = allProperties.filter((p) => {
+    const isTargetAgent =
+      p.requestedAgentId === currentUser.uid ||
+      (currentUser.email?.toLowerCase() === 'agente@clavehogar.com' &&
+        p.requestedAgentId === 'SysykUHU5FVubQzrSHOBi3JnhQs2') ||
+      (currentUser.displayName &&
+        p.requestedAgentName &&
+        p.requestedAgentName.trim().toLowerCase() === currentUser.displayName.trim().toLowerCase());
+    return isTargetAgent && p.agentAssignmentStatus === 'pendiente_agente';
+  });
 
   // Visitas, Consultas y Operaciones estrictamente separadas según la pestaña activa
   const clientVisits = allVisits.filter((v) => v.clientId === currentUser.uid);
@@ -1663,18 +1669,20 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
                             <button
                               type="button"
                               onClick={() => onSelectProperty(prop)}
-                              className="p-2 text-[#39483A] border border-[#D8C7AA] rounded-sm hover:bg-[#F5F1E8]"
+                              className="px-2.5 py-1.5 text-xs font-semibold text-[#39483A] border border-[#D8C7AA] rounded-sm hover:bg-[#F5F1E8] inline-flex items-center gap-1"
                               title="Ver ficha"
                             >
                               <Eye className="w-3.5 h-3.5" />
+                              Ver
                             </button>
                             <button
                               type="button"
                               onClick={() => onOpenEditProperty(prop)}
-                              className="p-2 text-[#39483A] border border-[#D8C7AA] rounded-sm hover:bg-[#F5F1E8]"
-                              title="Gestionar ficha a mi cargo"
+                              className="px-2.5 py-1.5 text-xs font-semibold text-[#FCFBF7] bg-[#B86F52] hover:bg-[#a35e42] rounded-sm inline-flex items-center gap-1 transition-colors"
+                              title="Editar datos de esta propiedad a mi cargo"
                             >
                               <Edit3 className="w-3.5 h-3.5" />
+                              Editar ficha
                             </button>
                           </div>
                         </td>

@@ -8,6 +8,7 @@ import {
   ChevronRight,
   Send,
   ArrowLeft,
+  Edit3,
 } from 'lucide-react';
 import {
   PropertyItem,
@@ -18,6 +19,10 @@ import {
   truncateText,
 } from '../types';
 import { HERO_IMAGE, resolvePropertyImages } from '../data/initialData';
+import {
+  canUserEditProperty,
+  isUserAssignedAgentOfProperty,
+} from '../utils/propertyPermissions';
 
 interface PropertyDetailModalProps {
   property: PropertyItem;
@@ -28,6 +33,7 @@ interface PropertyDetailModalProps {
   aiScore?: number;
   inquiries: InquiryItem[];
   onClose: () => void;
+  onOpenEditProperty?: (property: PropertyItem) => void;
   onRequireLogin: () => void;
   onToggleFavorite: (propertyId: string) => void;
   onToggleCompare: (propertyId: string) => void;
@@ -59,6 +65,7 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
   aiScore,
   inquiries,
   onClose,
+  onOpenEditProperty,
   onRequireLogin,
   onToggleFavorite,
   onToggleCompare,
@@ -67,6 +74,7 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
   onRequestOperation,
   onNotify,
 }) => {
+  const canEdit = canUserEditProperty(property, currentUser);
   const [activeImageIdx, setActiveImageIdx] = useState(0);
   const [activeTab, setActiveTab] = useState<'visita' | 'consulta' | 'operacion'>('visita');
   const [selectedInquiryId, setSelectedInquiryId] = useState<string | null>(null);
@@ -196,6 +204,20 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
             <span>{property.availability}</span>
           </div>
           <div className="flex items-center gap-2.5">
+            {canEdit && onOpenEditProperty && (
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  onOpenEditProperty(property);
+                }}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-sm bg-[#B86F52] hover:bg-[#a35e42] text-[#FCFBF7] border border-[#B86F52] transition-colors whitespace-nowrap cursor-pointer shadow-sm"
+                title="Editar datos, fotos, precio o disponibilidad de esta propiedad"
+              >
+                <Edit3 className="w-3.5 h-3.5" />
+                <span>Editar Propiedad</span>
+              </button>
+            )}
             <button
               type="button"
               onClick={() => onToggleCompare(property.id)}
@@ -402,6 +424,35 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
                   )}
                 </div>
               </div>
+
+              {/* Banner de gestión para propietario / agente / admin */}
+              {canEdit && onOpenEditProperty && (
+                <div className="p-3.5 bg-[#39483A] text-[#FCFBF7] rounded-sm flex items-center justify-between gap-3 shadow-sm">
+                  <div className="space-y-0.5 min-w-0">
+                    <span className="font-bold text-[#D8C7AA] block uppercase tracking-wider text-[10px]">
+                      {currentUser?.role === 'administrador'
+                        ? 'Administración General'
+                        : isUserAssignedAgentOfProperty(property, currentUser)
+                        ? 'Agente Inmobiliario a Cargo'
+                        : 'Propietario Titular'}
+                    </span>
+                    <p className="text-xs text-[#FCFBF7]/90 truncate">
+                      Tenés permisos de edición sobre esta propiedad.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onClose();
+                      onOpenEditProperty(property);
+                    }}
+                    className="px-3.5 py-1.5 text-xs font-bold bg-[#B86F52] hover:bg-[#a35e42] text-[#FCFBF7] rounded-sm inline-flex items-center gap-1.5 shrink-0 transition-colors cursor-pointer shadow-sm"
+                  >
+                    <Edit3 className="w-3.5 h-3.5" />
+                    Editar Ficha
+                  </button>
+                </div>
+              )}
 
               {/* Action Selector Tabs */}
               <div className="grid grid-cols-3 gap-1 p-1 bg-[#D8C7AA]/40 rounded-sm">
