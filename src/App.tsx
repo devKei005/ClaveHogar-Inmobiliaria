@@ -2062,7 +2062,7 @@ export default function App() {
           `IA encontró ${data.recommendations.length} ${
             data.recommendations.length === 1 ? 'propiedad compatible' : 'propiedades compatibles'
           }`,
-          'Resultados obtenidos analizando las propiedades reales en Firestore.'
+          'Resultados obtenidos analizando las propiedades reales en el sistema.'
         );
       } else {
         notify(
@@ -2333,7 +2333,7 @@ export default function App() {
                 ClaveHogar
               </span>
               <span className="text-[10px] uppercase tracking-[0.22em] text-[#B86F52] block mt-1">
-                Arquitectura &amp; Propiedades
+                Alquileres &amp; Ventas
               </span>
             </button>
           </div>
@@ -2360,7 +2360,7 @@ export default function App() {
                   : 'border-transparent text-[#39483A]/70 hover:text-[#39483A]'
               }`}
             >
-              Buscador
+              Buscador IA
             </button>
             <button
               type="button"
@@ -2626,7 +2626,7 @@ export default function App() {
                       : 'text-[#1F241F] hover:bg-[#F5F1E8]'
                   }`}
                 >
-                  Buscador Inteligente con IA
+                  Buscador Inteligente 
                 </button>
                 <button
                   type="button"
@@ -2801,7 +2801,7 @@ export default function App() {
                         disabled={aiLoading}
                         className="px-6 py-3 text-xs uppercase tracking-widest font-semibold text-[#FCFBF7] bg-[#39483A] hover:bg-[#2c382d] rounded-sm transition-colors shrink-0 cursor-pointer"
                       >
-                        {aiLoading ? 'Analizando...' : 'Buscar con IA'}
+                        {aiLoading ? 'Analizando...' : 'Buscar'}
                       </button>
                     </div>
                     <div className="flex flex-wrap items-center gap-2 pt-1 text-[11px] text-[#39483A]/80">
@@ -3278,10 +3278,10 @@ export default function App() {
                   Asesoramiento Inteligente
                 </span>
                 <h1 className="text-3xl sm:text-4xl font-serif-display font-semibold text-[#39483A]">
-                  Buscador de Propiedades
+                  Buscador de Propiedades en Lenguaje Natural
                 </h1>
                 <p className="text-sm text-[#1F241F]/80 leading-relaxed">
-                  Describí qué tipo de propiedad buscás (ubicación, dormitorios, jardín o pileta, presupuesto máximo y operación). El sistema interpreta tu pedido y selecciona los inmuebles reales almacenados en Firestore.
+                  Describí qué tipo de propiedad buscás (ubicación, dormitorios, jardín o pileta, presupuesto máximo y operación). El sistema interpreta tu pedido y selecciona los inmuebles reales almacenados en el sistema.
                 </p>
               </div>
 
@@ -3324,7 +3324,7 @@ export default function App() {
             {aiLoading && (
               <div className="bg-[#FCFBF7] border border-[#D8C7AA] rounded-sm p-12 text-center space-y-2">
                 <div className="text-lg font-serif-display font-semibold text-[#39483A]">
-                  Evaluando inmuebles compatibles en Firestore...
+                  Evaluando inmuebles compatibles en el sistema...
                 </div>
               </div>
             )}
@@ -3416,7 +3416,7 @@ export default function App() {
                       No encontramos propiedades que coincidan con todos esos requisitos
                     </h3>
                     <p className="text-sm text-[#39483A]/80 max-w-lg mx-auto">
-                      Ninguna de las propiedades activas en Firestore cumple simultáneamente con la zona, presupuesto o comodidades solicitadas. Probá ampliando el rango de búsqueda o ajustando los filtros.
+                      Ninguna de las propiedades activas en el sistema cumple simultáneamente con la zona, presupuesto o comodidades solicitadas. Probá ampliando el rango de búsqueda o ajustando los filtros.
                     </p>
                   </div>
                 ) : null}
