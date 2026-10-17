@@ -137,11 +137,13 @@ export {
   isUserOwnerOfProperty,
   isUserAssignedAgentOfProperty,
   canUserEditProperty,
+  getMinVisitDate,
 } from '../utils/propertyPermissions';
 import {
   isAgentConfirmedOnProperty,
   isUserOwnerOfProperty,
   isUserAssignedAgentOfProperty,
+  getMinVisitDate,
 } from '../utils/propertyPermissions';
 
 /**
@@ -323,12 +325,12 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
   // Strictly scoped lists per role and subview:
   // 1. Propietario: Properties where current user is the owner (by UID, demo link, or ownerName match)
   const myOwnedProperties = allProperties.filter((p) =>
-    isUserOwnerOfProperty(p, currentUser)
+    isUserOwnerOfProperty(p, currentUser, users)
   );
 
   // 2. Agente: Properties where current user is the confirmed assigned agent
   const myAssignedProperties = allProperties.filter((p) =>
-    isUserAssignedAgentOfProperty(p, currentUser)
+    isUserAssignedAgentOfProperty(p, currentUser, users)
   );
 
   // Solicitudes donde un propietario eligió a este agente y están pendientes de aceptación
@@ -1754,6 +1756,7 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
                     <div className="flex items-center gap-1.5">
                       <input
                         type="date"
+                        min={getMinVisitDate()}
                         value={rescheduleDates[v.id] || v.date}
                         onChange={(e) =>
                           setRescheduleDates((prev) => ({ ...prev, [v.id]: e.target.value }))

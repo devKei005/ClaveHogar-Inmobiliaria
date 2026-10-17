@@ -9,6 +9,7 @@ import {
   Send,
   ArrowLeft,
   Edit3,
+  Clock,
 } from 'lucide-react';
 import {
   PropertyItem,
@@ -22,6 +23,7 @@ import { HERO_IMAGE, resolvePropertyImages } from '../data/initialData';
 import {
   canUserEditProperty,
   isUserAssignedAgentOfProperty,
+  getMinVisitDate,
 } from '../utils/propertyPermissions';
 
 interface PropertyDetailModalProps {
@@ -45,6 +47,7 @@ interface PropertyDetailModalProps {
     offeredAmount: number,
     message: string
   ) => Promise<void>;
+  users?: UserProfile[];
   onNotify: (type: 'success' | 'error' | 'info', title: string, description?: string) => void;
 }
 
@@ -59,6 +62,7 @@ const AVAILABLE_TIME_SLOTS = [
 export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
   property,
   currentUser,
+  users,
   isFavorite,
   isCompared,
   aiReason,
@@ -74,12 +78,13 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
   onRequestOperation,
   onNotify,
 }) => {
-  const canEdit = canUserEditProperty(property, currentUser);
+  const canEdit = canUserEditProperty(property, currentUser, users);
   const [activeImageIdx, setActiveImageIdx] = useState(0);
   const [activeTab, setActiveTab] = useState<'visita' | 'consulta' | 'operacion'>('visita');
   const [selectedInquiryId, setSelectedInquiryId] = useState<string | null>(null);
 
-  const [visitDate, setVisitDate] = useState('2026-10-16');
+  const minVisitDate = getMinVisitDate();
+  const [visitDate, setVisitDate] = useState(() => getMinVisitDate());
   const [visitSlot, setVisitSlot] = useState(AVAILABLE_TIME_SLOTS[1]);
   const [visitNotes, setVisitNotes] = useState('');
 
@@ -125,6 +130,15 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
     }
     if (!visitDate || !visitSlot) {
       onNotify('error', 'Error: faltan completar campos', 'Seleccioná fecha y horario para la visita.');
+      return;
+    }
+    const currentMin = getMinVisitDate();
+    if (visitDate < currentMin) {
+      onNotify(
+        'error',
+        'Fecha no permitida para visita',
+        'Las visitas deben solicitarse con un mínimo de 24 horas de anticipación (a partir de mañana) y no se admiten fechas anteriores ni del día actual.'
+      );
       return;
     }
     setSubmitting(true);
@@ -495,17 +509,26 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
               {activeTab === 'visita' && (
                 <form onSubmit={handleVisitSubmit} className="space-y-4">
                   <div className="space-y-1">
-                    <label className="block text-xs font-semibold text-[#39483A]">
-                      Fecha preferida de visita
-                    </label>
+                    <div className="flex items-center justify-between">
+                      <label className="block text-xs font-semibold text-[#39483A]">
+                        Fecha preferida de visita
+                      </label>
+                      <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 bg-amber-100 text-amber-900 border border-amber-300 rounded-xs">
+                        Mínimo 24 hs de anticipación
+                      </span>
+                    </div>
                     <input
                       type="date"
                       required
                       value={visitDate}
-                      min="2026-10-05"
+                      min={minVisitDate}
                       onChange={(e) => setVisitDate(e.target.value)}
                       className="w-full px-3.5 py-2.5 text-sm bg-[#FCFBF7] border border-[#D8C7AA] rounded-sm font-tabular focus:outline-none focus:border-[#39483A]"
                     />
+                    <p className="text-[11px] text-[#39483A]/80 font-medium flex items-center gap-1.5 pt-0.5">
+                      <Clock className="w-3.5 h-3.5 text-[#B86F52] shrink-0" />
+                      <span>Solo podés agendar a partir de mañana ({minVisitDate}). No se permiten fechas pasadas ni del día de hoy.</span>
+                    </p>
                   </div>
                   <div className="space-y-1">
                     <label className="block text-xs font-semibold text-[#39483A]">

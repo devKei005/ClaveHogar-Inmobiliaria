@@ -14,6 +14,9 @@ import {
   User,
   Sparkles,
   Edit3,
+  CheckCircle2,
+  XCircle,
+  Info,
 } from 'lucide-react';
 import {
   onAuthStateChanged,
@@ -87,7 +90,12 @@ import {
   WorkspaceSubView,
   isAgentConfirmedOnProperty,
 } from './components/RoleWorkspaceView';
-import { canUserEditProperty } from './utils/propertyPermissions';
+import {
+  canUserEditProperty,
+  isUserOwnerOfProperty,
+  isUserAssignedAgentOfProperty,
+  getMinVisitDate,
+} from './utils/propertyPermissions';
 import {
   buildFlexibleSmartSearch,
   normalizeSearchText,
@@ -1029,13 +1037,10 @@ export default function App() {
       properties.find((p) => p.id === propId || (existingId && p.id === existingId)) ||
       editingProperty;
 
-    // Verificar permisos estrictos de edición: solo el propietario dueño, el agente confirmado a cargo, o el administrador
+    // Verificar permisos de edición: propietario dueño, agente confirmado a cargo, o administrador
     if (isEdit && existingProp) {
-      const isOwner = existingProp.ownerId === currentUser.uid;
-      const isAssignedAgent =
-        currentUser.role === 'agente' && isAgentConfirmedOnProperty(existingProp, currentUser.uid);
-      const isAdmin = currentUser.role === 'administrador';
-      if (!isOwner && !isAssignedAgent && !isAdmin) {
+      const isAuthorized = canUserEditProperty(existingProp, currentUser, users);
+      if (!isAuthorized) {
         notify(
           'error',
           'Sin permisos sobre esta publicación',
@@ -1058,15 +1063,15 @@ export default function App() {
       id: propId,
       ownerId: existingProp?.ownerId || (editingProperty?.ownerId ?? currentUser.uid),
       ownerName: existingProp?.ownerName || (editingProperty?.ownerName ?? currentUser.displayName),
-      agentId: data.agentId || existingProp?.agentId || (editingProperty?.agentId ?? ''),
-      agentName: data.agentName || existingProp?.agentName || (editingProperty?.agentName ?? ''),
+      agentId: data.agentId !== undefined ? data.agentId : (existingProp?.agentId || (editingProperty?.agentId ?? '')),
+      agentName: data.agentName !== undefined ? data.agentName : (existingProp?.agentName || (editingProperty?.agentName ?? '')),
       managementMode: data.managementMode || existingProp?.managementMode || 'directa',
       agentRequestType: data.agentRequestType || existingProp?.agentRequestType || 'ninguna',
       agentAssignmentStatus:
         data.agentAssignmentStatus || existingProp?.agentAssignmentStatus || 'sin_agente',
-      requestedAgentId: data.requestedAgentId || existingProp?.requestedAgentId || '',
-      requestedAgentName: data.requestedAgentName || existingProp?.requestedAgentName || '',
-      agentRejectionReason: data.agentRejectionReason || existingProp?.agentRejectionReason || '',
+      requestedAgentId: data.requestedAgentId !== undefined ? data.requestedAgentId : (existingProp?.requestedAgentId || ''),
+      requestedAgentName: data.requestedAgentName !== undefined ? data.requestedAgentName : (existingProp?.requestedAgentName || ''),
+      agentRejectionReason: data.agentRejectionReason !== undefined ? data.agentRejectionReason : (existingProp?.agentRejectionReason || ''),
       publicationStatus,
       createdAtIso: existingProp?.createdAtIso || (editingProperty?.createdAtIso ?? new Date().toISOString()),
     };
@@ -1149,7 +1154,9 @@ export default function App() {
   const handleDeleteProperty = async (propertyId: string) => {
     const target = properties.find((p) => p.id === propertyId);
     if (!currentUser || !target) return;
-    if (currentUser.role !== 'administrador' && target.ownerId !== currentUser.uid) {
+    const canDelete =
+      currentUser.role === 'administrador' || isUserOwnerOfProperty(target, currentUser, users);
+    if (!canDelete) {
       notify('error', 'Sin permisos', 'Solo el propietario titular o el administrador pueden eliminar esta publicación.');
       return;
     }
@@ -1170,10 +1177,7 @@ export default function App() {
   const handleUpdateAvailability = async (propertyId: string, availability: AvailabilityStatus) => {
     const target = properties.find((p) => p.id === propertyId);
     if (!currentUser || !target) return;
-    const canModify =
-      currentUser.role === 'administrador' ||
-      target.ownerId === currentUser.uid ||
-      (currentUser.role === 'agente' && isAgentConfirmedOnProperty(target, currentUser.uid));
+    const canModify = canUserEditProperty(target, currentUser, users);
     if (!canModify) {
       notify('error', 'Sin permisos', 'No tenés permisos para modificar esta propiedad.');
       return;
@@ -1204,8 +1208,9 @@ export default function App() {
   ) => {
     const target = properties.find((p) => p.id === propertyId);
     if (!currentUser || !target) return;
-    if (currentUser.role !== 'administrador' && target.ownerId !== currentUser.uid) {
-      notify('error', 'Sin permisos', 'Solo el propietario titular puede cambiar la modalidad de gestión.');
+    const isOwner = isUserOwnerOfProperty(target, currentUser, users);
+    if (currentUser.role !== 'administrador' && !isOwner) {
+      notify('error', 'Sin permisos', 'Solo el propietario titular o el administrador pueden cambiar la modalidad de gestión.');
       return;
     }
 
@@ -1312,7 +1317,12 @@ export default function App() {
   ) => {
     const target = properties.find((p) => p.id === propertyId);
     if (!currentUser || !target) return;
-    if (currentUser.role !== 'agente' || target.requestedAgentId !== currentUser.uid) {
+    const isAssignedAgent =
+      currentUser.role === 'agente' &&
+      (target.requestedAgentId === currentUser.uid ||
+        target.agentId === currentUser.uid ||
+        isUserAssignedAgentOfProperty(target, currentUser, users));
+    if (!isAssignedAgent && currentUser.role !== 'administrador') {
       notify('error', 'Sin permisos', 'Esta solicitud no corresponde a tu perfil de agente.');
       return;
     }
@@ -1469,6 +1479,15 @@ export default function App() {
     notes: string
   ) => {
     if (!currentUser) return;
+    const minDate = getMinVisitDate();
+    if (date < minDate) {
+      notify(
+        'error',
+        'Fecha no permitida para visita',
+        'Las visitas deben programarse con al menos 24 horas de anticipación (a partir de mañana).'
+      );
+      return;
+    }
     const visitId = sanitizeId(`vis_${Date.now()}`);
     const confirmedAgentId = isAgentConfirmedOnProperty(property) ? property.agentId || '' : '';
 
@@ -2062,7 +2081,7 @@ export default function App() {
           `IA encontró ${data.recommendations.length} ${
             data.recommendations.length === 1 ? 'propiedad compatible' : 'propiedades compatibles'
           }`,
-          'Resultados obtenidos analizando las propiedades reales en el sistema.'
+          'Resultados obtenidos analizando las propiedades reales en Firestore.'
         );
       } else {
         notify(
@@ -2275,29 +2294,50 @@ export default function App() {
   return (
     <div className="min-h-screen flex flex-col bg-[#FCFBF7] text-[#1F241F]">
       {/* =====================================================================
-          TOAST NOTIFICATIONS
+          TOAST NOTIFICATIONS (Capa principal superior sobre cualquier modal)
          ===================================================================== */}
-      <div className="fixed bottom-5 right-5 z-50 flex flex-col gap-2.5 max-w-sm w-full pointer-events-none px-4 sm:px-0">
+      <div className="fixed bottom-5 right-4 sm:bottom-6 sm:right-6 z-[99999] flex flex-col gap-2.5 max-w-md w-full pointer-events-none px-2 sm:px-0">
         {toasts.map((t) => (
           <div
             key={t.id}
-            className={`pointer-events-auto flex items-start justify-between gap-3 p-4 rounded-sm border-2 shadow-lg animate-fade-slide ${
+            className={`pointer-events-auto flex items-start gap-3 p-4 rounded-sm border-2 shadow-2xl backdrop-blur-md animate-fade-slide ${
               t.type === 'success'
-                ? 'bg-emerald-900 text-white border-emerald-400'
+                ? 'bg-[#EBF9ED] text-[#0F4A1E] border-emerald-500 shadow-emerald-950/15 ring-2 ring-emerald-500/20'
                 : t.type === 'error'
-                ? 'bg-red-700 text-white border-red-300'
-                : 'bg-amber-50 text-amber-950 border-amber-400'
+                ? 'bg-[#FDF2F2] text-[#691C1C] border-red-500 shadow-red-950/15 ring-2 ring-red-500/20'
+                : 'bg-[#FEF9EE] text-[#5C3B00] border-amber-500 shadow-amber-950/15 ring-2 ring-amber-500/20'
             }`}
           >
-            <div className="flex-1 text-xs">
-              <div className="font-semibold text-sm">{t.title}</div>
-              {t.description && <p className="opacity-95 mt-0.5 leading-relaxed">{t.description}</p>}
+            <div className="shrink-0 mt-0.5">
+              {t.type === 'success' && (
+                <div className="w-7 h-7 rounded-full bg-emerald-500 text-white flex items-center justify-center shadow-xs">
+                  <CheckCircle2 className="w-4 h-4 stroke-[2.5]" />
+                </div>
+              )}
+              {t.type === 'error' && (
+                <div className="w-7 h-7 rounded-full bg-red-600 text-white flex items-center justify-center shadow-xs">
+                  <XCircle className="w-4 h-4 stroke-[2.5]" />
+                </div>
+              )}
+              {t.type === 'info' && (
+                <div className="w-7 h-7 rounded-full bg-amber-500 text-white flex items-center justify-center shadow-xs">
+                  <Info className="w-4 h-4 stroke-[2.5]" />
+                </div>
+              )}
             </div>
+
+            <div className="flex-1 text-xs">
+              <div className="font-bold text-sm leading-snug">{t.title}</div>
+              {t.description && (
+                <p className="opacity-90 mt-1 leading-relaxed text-[12px]">{t.description}</p>
+              )}
+            </div>
+
             <button
               type="button"
               onClick={() => setToasts((prev) => prev.filter((item) => item.id !== t.id))}
               title="Cerrar aviso"
-              className="p-1 rounded-sm bg-white/90 text-red-600 hover:text-red-700 hover:bg-white transition-colors shrink-0 cursor-pointer"
+              className="p-1 rounded-sm text-current/60 hover:text-current hover:bg-black/5 transition-colors shrink-0 cursor-pointer"
             >
               <X className="w-4 h-4 stroke-[2.5]" />
             </button>
@@ -2360,7 +2400,7 @@ export default function App() {
                   : 'border-transparent text-[#39483A]/70 hover:text-[#39483A]'
               }`}
             >
-              Buscador IA
+              Buscador
             </button>
             <button
               type="button"
@@ -2626,7 +2666,7 @@ export default function App() {
                       : 'text-[#1F241F] hover:bg-[#F5F1E8]'
                   }`}
                 >
-                  Buscador Inteligente 
+                  Buscador Inteligente con IA
                 </button>
                 <button
                   type="button"
@@ -2801,7 +2841,7 @@ export default function App() {
                         disabled={aiLoading}
                         className="px-6 py-3 text-xs uppercase tracking-widest font-semibold text-[#FCFBF7] bg-[#39483A] hover:bg-[#2c382d] rounded-sm transition-colors shrink-0 cursor-pointer"
                       >
-                        {aiLoading ? 'Analizando...' : 'Buscar'}
+                        {aiLoading ? 'Analizando...' : 'Buscar con IA'}
                       </button>
                     </div>
                     <div className="flex flex-wrap items-center gap-2 pt-1 text-[11px] text-[#39483A]/80">
@@ -2869,7 +2909,7 @@ export default function App() {
                         <span className="text-xs text-[#39483A]/75 font-tabular">
                           {heroFeaturedProperty.bedrooms} dorm. · {heroFeaturedProperty.surface} m²
                         </span>
-                        {canUserEditProperty(heroFeaturedProperty, currentUser) && (
+                        {canUserEditProperty(heroFeaturedProperty, currentUser, users) && (
                           <button
                             type="button"
                             onClick={(e) => {
@@ -3223,7 +3263,7 @@ export default function App() {
                             </span>
                           </div>
 
-                          {canUserEditProperty(prop, currentUser) ? (
+                          {canUserEditProperty(prop, currentUser, users) ? (
                             <div className="flex items-center gap-2">
                               <button
                                 type="button"
@@ -3278,10 +3318,10 @@ export default function App() {
                   Asesoramiento Inteligente
                 </span>
                 <h1 className="text-3xl sm:text-4xl font-serif-display font-semibold text-[#39483A]">
-                  Buscador de Propiedades en Lenguaje Natural
+                  Buscador de Propiedades 
                 </h1>
                 <p className="text-sm text-[#1F241F]/80 leading-relaxed">
-                  Describí qué tipo de propiedad buscás (ubicación, dormitorios, jardín o pileta, presupuesto máximo y operación). El sistema interpreta tu pedido y selecciona los inmuebles reales almacenados en el sistema.
+                  Describí qué tipo de propiedad buscás (ubicación, dormitorios, jardín o pileta, presupuesto máximo y operación). El sistema interpreta tu pedido y selecciona los inmuebles reales almacenados en Firestore.
                 </p>
               </div>
 
@@ -3324,7 +3364,7 @@ export default function App() {
             {aiLoading && (
               <div className="bg-[#FCFBF7] border border-[#D8C7AA] rounded-sm p-12 text-center space-y-2">
                 <div className="text-lg font-serif-display font-semibold text-[#39483A]">
-                  Evaluando inmuebles compatibles en el sistema...
+                  Evaluando inmuebles compatibles en Firestore...
                 </div>
               </div>
             )}
@@ -3416,7 +3456,7 @@ export default function App() {
                       No encontramos propiedades que coincidan con todos esos requisitos
                     </h3>
                     <p className="text-sm text-[#39483A]/80 max-w-lg mx-auto">
-                      Ninguna de las propiedades activas en el sistema cumple simultáneamente con la zona, presupuesto o comodidades solicitadas. Probá ampliando el rango de búsqueda o ajustando los filtros.
+                      Ninguna de las propiedades activas en Firestore cumple simultáneamente con la zona, presupuesto o comodidades solicitadas. Probá ampliando el rango de búsqueda o ajustando los filtros.
                     </p>
                   </div>
                 ) : null}
@@ -3553,6 +3593,7 @@ export default function App() {
         <PropertyDetailModal
           property={selectedProperty}
           currentUser={currentUser}
+          users={users}
           isFavorite={favoriteIds.includes(selectedProperty.id)}
           isCompared={comparedIds.includes(selectedProperty.id)}
           aiReason={

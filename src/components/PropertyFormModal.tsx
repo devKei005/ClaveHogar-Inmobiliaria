@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import {
   X,
   UploadCloud,
@@ -21,6 +21,7 @@ import {
   SCHEMA_LIMITS,
   truncateText,
 } from '../types';
+import { isUserOwnerOfProperty } from '../utils/propertyPermissions';
 
 interface PropertyFormModalProps {
   isOpen: boolean;
@@ -96,6 +97,63 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
     .filter((c) => c.kind === 'caracteristica' && c.active)
     .map((c) => c.name);
 
+  // Lista unificada de agentes que garantiza que si el inmueble ya tiene un agente asignado, este aparezca siempre en la lista
+  const allDisplayAgents = useMemo(() => {
+    const list = [...availableAgents];
+    if (editingProperty) {
+      const assignedId = (editingProperty.agentId || editingProperty.requestedAgentId || '').trim();
+      const assignedName = (editingProperty.agentName || editingProperty.requestedAgentName || '').trim();
+      if (assignedId || assignedName) {
+        const alreadyInList = list.some(
+          (a) =>
+            (assignedId && a.uid === assignedId) ||
+            (assignedName && a.displayName?.trim().toLowerCase() === assignedName.toLowerCase()) ||
+            (assignedName.toLowerCase().includes('alvear') &&
+              (a.email?.toLowerCase() === 'agente@clavehogar.com' || a.displayName?.toLowerCase().includes('alvear')))
+        );
+        if (!alreadyInList) {
+          list.unshift({
+            uid: assignedId || 'SysykUHU5FVubQzrSHOBi3JnhQs2',
+            displayName: assignedName || 'Valentina Alvear',
+            email: 'agente@clavehogar.com',
+            phone: '+54 9 11 6092-1120',
+            address: 'Recoleta, CABA',
+            dni: '33.190.822',
+            role: 'agente',
+            isAlsoOwner: false,
+            active: true,
+            agencyName: 'Estudio Alvear & Asociados CUCICBA 7412',
+            bio: 'Agente inmobiliario responsable asignado a este inmueble.',
+            photoUrl: '',
+          });
+        }
+      }
+    }
+    // Asegurar que la agente oficial Valentina Alvear esté siempre disponible para asignación
+    const hasValentina = list.some(
+      (a) =>
+        a.email?.toLowerCase() === 'agente@clavehogar.com' ||
+        a.displayName?.toLowerCase().includes('alvear')
+    );
+    if (!hasValentina) {
+      list.push({
+        uid: 'SysykUHU5FVubQzrSHOBi3JnhQs2',
+        displayName: 'Valentina Alvear',
+        email: 'agente@clavehogar.com',
+        phone: '+54 9 11 6092-1120',
+        address: 'Recoleta, CABA',
+        dni: '33.190.822',
+        role: 'agente',
+        isAlsoOwner: false,
+        active: true,
+        agencyName: 'Estudio Alvear & Asociados CUCICBA 7412',
+        bio: 'Corredora inmobiliaria matriculada CUCICBA 7412 especializada en CABA y Zona Norte.',
+        photoUrl: '',
+      });
+    }
+    return list;
+  }, [availableAgents, editingProperty]);
+
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [location, setLocation] = useState('');
@@ -139,28 +197,44 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
       setSelectedFeatures(editingProperty.features || []);
       setSelectedImages(editingProperty.images || []);
 
-      const hasAgentOrPending =
-        editingProperty.managementMode === 'con_agente' ||
+      // Determinar si la propiedad ya tenía agente asignado o solicitado
+      const hasAssignedAgent =
         Boolean(editingProperty.agentId?.trim()) ||
+        Boolean(editingProperty.requestedAgentId?.trim()) ||
+        Boolean(editingProperty.agentName?.trim()) ||
+        Boolean(editingProperty.requestedAgentName?.trim()) ||
+        editingProperty.managementMode === 'con_agente' ||
+        editingProperty.agentAssignmentStatus === 'asignado' ||
         editingProperty.agentAssignmentStatus === 'pendiente_agente' ||
-        editingProperty.agentAssignmentStatus === 'pendiente_admin' ||
-        editingProperty.agentAssignmentStatus === 'asignado';
+        editingProperty.agentAssignmentStatus === 'pendiente_admin';
 
-      setManagementMode(hasAgentOrPending ? 'con_agente' : 'directa');
-      if (!hasAgentOrPending) {
+      if (!hasAssignedAgent || editingProperty.managementMode === 'directa' || editingProperty.agentAssignmentStatus === 'sin_agente') {
+        // Marcado como Propietario Independiente
+        setManagementMode('directa');
         setAgentRequestType('ninguna');
         setSelectedAgentId('');
-      } else if (editingProperty.agentRequestType === 'asignacion_admin' || editingProperty.agentAssignmentStatus === 'pendiente_admin') {
-        setAgentRequestType('asignacion_admin');
-        setSelectedAgentId('');
       } else {
-        setAgentRequestType('elegir_agente');
-        setSelectedAgentId(
-          editingProperty.agentId ||
-            editingProperty.requestedAgentId ||
-            availableAgents[0]?.uid ||
-            ''
-        );
+        // Marcado con agente
+        setManagementMode('con_agente');
+        if (
+          editingProperty.agentRequestType === 'asignacion_admin' ||
+          (editingProperty.agentAssignmentStatus === 'pendiente_admin' && !editingProperty.agentId && !editingProperty.requestedAgentId)
+        ) {
+          setAgentRequestType('asignacion_admin');
+          setSelectedAgentId('');
+        } else {
+          setAgentRequestType('elegir_agente');
+          const targetId = (editingProperty.agentId || editingProperty.requestedAgentId || '').trim();
+          const targetName = (editingProperty.agentName || editingProperty.requestedAgentName || '').trim().toLowerCase();
+          const matched = allDisplayAgents.find(
+            (a) =>
+              (targetId && a.uid === targetId) ||
+              (targetName && a.displayName?.trim().toLowerCase() === targetName) ||
+              (targetName.includes('alvear') &&
+                (a.email.toLowerCase() === 'agente@clavehogar.com' || a.displayName.toLowerCase().includes('alvear')))
+          );
+          setSelectedAgentId(matched ? matched.uid : (targetId || allDisplayAgents[0]?.uid || ''));
+        }
       }
     } else {
       setTitle('');
@@ -180,16 +254,16 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
       setSelectedImages([]);
       setManagementMode('directa');
       setAgentRequestType('ninguna');
-      setSelectedAgentId(availableAgents[0]?.uid || '');
+      setSelectedAgentId(allDisplayAgents[0]?.uid || '');
     }
-  }, [isOpen, editingProperty]);
+  }, [isOpen, editingProperty, allDisplayAgents]);
 
   if (!isOpen) return null;
 
   const isAgentEditor =
     currentUser?.role === 'agente' &&
-    editingProperty &&
-    editingProperty.ownerId !== currentUser.uid;
+    Boolean(editingProperty) &&
+    !isUserOwnerOfProperty(editingProperty!, currentUser);
 
   const toggleFeature = (feat: string) => {
     setSelectedFeatures((prev) =>
@@ -297,37 +371,50 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
         finalManagementMode = 'con_agente';
         if (agentRequestType === 'asignacion_admin') {
           finalRequestType = 'asignacion_admin';
-          finalStatus = 'pendiente_admin';
-          finalAgentId = '';
-          finalAgentName = '';
-          finalRequestedAgentId = '';
-          finalRequestedAgentName = '';
+          // Si ya estaba asignado se mantiene asignado, de lo contrario pendiente admin
+          finalStatus = editingProperty?.agentAssignmentStatus === 'asignado' ? 'asignado' : 'pendiente_admin';
+          if (editingProperty?.agentAssignmentStatus !== 'asignado') {
+            finalAgentId = '';
+            finalAgentName = '';
+            finalRequestedAgentId = '';
+            finalRequestedAgentName = '';
+          }
           finalAgentRejectionReason = '';
         } else {
           finalRequestType = 'elegir_agente';
-          const chosenAgent = availableAgents.find((a) => a.uid === selectedAgentId);
-          const chosenName = chosenAgent?.displayName || '';
-          const alreadyHadAgent =
-            Boolean(editingProperty?.agentId) ||
-            editingProperty?.agentAssignmentStatus === 'asignado';
-          const keepingSameAgent =
-            alreadyHadAgent &&
-            (editingProperty?.agentId === selectedAgentId ||
-              editingProperty?.requestedAgentId === selectedAgentId ||
+          const chosenAgent = allDisplayAgents.find((a) => a.uid === selectedAgentId);
+          const chosenName = chosenAgent?.displayName || editingProperty?.agentName || editingProperty?.requestedAgentName || '';
+          
+          // Verificar si el agente elegido es el mismo que ya tenía la propiedad
+          const isSameAgent =
+            Boolean(editingProperty) &&
+            ((editingProperty?.agentId && editingProperty.agentId === selectedAgentId) ||
+              (editingProperty?.requestedAgentId && editingProperty.requestedAgentId === selectedAgentId) ||
+              (chosenName &&
+                editingProperty?.agentName &&
+                chosenName.trim().toLowerCase() === editingProperty.agentName.trim().toLowerCase()) ||
+              (chosenName &&
+                editingProperty?.requestedAgentName &&
+                chosenName.trim().toLowerCase() === editingProperty.requestedAgentName.trim().toLowerCase()) ||
+              (chosenAgent?.email === 'agente@clavehogar.com' &&
+                (editingProperty?.agentName?.toLowerCase().includes('alvear') ||
+                  editingProperty?.requestedAgentName?.toLowerCase().includes('alvear'))) ||
               !selectedAgentId);
 
-          if (keepingSameAgent) {
-            finalStatus = 'asignado';
-            finalAgentId = editingProperty?.agentId || selectedAgentId;
+          if (isSameAgent) {
+            // Se preserva el agente existente sin resetear a pendiente ni vaciar campos
+            finalStatus = editingProperty?.agentAssignmentStatus || 'asignado';
+            finalAgentId = editingProperty?.agentId || selectedAgentId || (chosenAgent?.uid ?? '');
             finalAgentName = editingProperty?.agentName || chosenName;
-            finalRequestedAgentId = editingProperty?.agentId || selectedAgentId;
-            finalRequestedAgentName = chosenName || editingProperty?.agentName || '';
+            finalRequestedAgentId = editingProperty?.requestedAgentId || finalAgentId;
+            finalRequestedAgentName = editingProperty?.requestedAgentName || finalAgentName;
+            finalAgentRejectionReason = '';
           } else {
-            // Si el propietario elige un agente nuevo o diferente, queda pendiente hasta que el agente acepte o el admin confirme
+            // El propietario eligió voluntariamente un agente diferente
             finalStatus = 'pendiente_agente';
             finalAgentId = '';
             finalAgentName = '';
-            finalRequestedAgentId = selectedAgentId;
+            finalRequestedAgentId = selectedAgentId || (chosenAgent?.uid ?? '');
             finalRequestedAgentName = chosenName;
             finalAgentRejectionReason = '';
           }
@@ -337,7 +424,7 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
       // Si el editor es el Agente responsable a cargo de la propiedad:
       finalManagementMode = editingProperty?.managementMode || 'con_agente';
       finalRequestType = editingProperty?.agentRequestType || 'elegir_agente';
-      finalStatus = 'asignado';
+      finalStatus = editingProperty?.agentAssignmentStatus || 'asignado';
       finalAgentId = editingProperty?.agentId || currentUser?.uid || '';
       finalAgentName = editingProperty?.agentName || currentUser?.displayName || '';
       finalRequestedAgentId = editingProperty?.requestedAgentId || currentUser?.uid || '';
@@ -602,6 +689,9 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
           {/* =================================================================
               MODALIDAD DE GESTIÓN Y ASIGNACIÓN OPCIONAL DE AGENTE
              ================================================================= */}
+          {/* =================================================================
+              MODALIDAD DE GESTIÓN Y ASIGNACIÓN OPCIONAL DE AGENTE
+              ================================================================= */}
           {!isAgentEditor && (
             <div className="p-5 bg-[#F5F1E8] border border-[#D8C7AA] rounded-sm space-y-4">
               <div>
@@ -623,9 +713,9 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
                     setManagementMode('directa');
                     setAgentRequestType('ninguna');
                   }}
-                  className={`p-3.5 rounded-sm border text-left transition-colors ${
+                  className={`p-3.5 rounded-sm border text-left transition-colors cursor-pointer ${
                     managementMode === 'directa'
-                      ? 'bg-[#39483A] text-[#FCFBF7] border-[#39483A]'
+                      ? 'bg-[#39483A] text-[#FCFBF7] border-[#39483A] ring-2 ring-[#B86F52]/40'
                       : 'bg-[#FCFBF7] text-[#1F241F] border-[#D8C7AA] hover:border-[#39483A]'
                   }`}
                 >
@@ -650,14 +740,14 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
                     setManagementMode('con_agente');
                     if (agentRequestType === 'ninguna') {
                       setAgentRequestType('elegir_agente');
-                      if (!selectedAgentId && availableAgents[0]) {
-                        setSelectedAgentId(availableAgents[0].uid);
+                      if (!selectedAgentId && allDisplayAgents[0]) {
+                        setSelectedAgentId(allDisplayAgents[0].uid);
                       }
                     }
                   }}
-                  className={`p-3.5 rounded-sm border text-left transition-colors ${
+                  className={`p-3.5 rounded-sm border text-left transition-colors cursor-pointer ${
                     managementMode === 'con_agente'
-                      ? 'bg-[#39483A] text-[#FCFBF7] border-[#39483A]'
+                      ? 'bg-[#39483A] text-[#FCFBF7] border-[#39483A] ring-2 ring-[#B86F52]/40'
                       : 'bg-[#FCFBF7] text-[#1F241F] border-[#D8C7AA] hover:border-[#39483A]'
                   }`}
                 >
@@ -677,8 +767,42 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
                 </button>
               </div>
 
+              {/* Banner informativo de opción pre-marcada para Propietario Independiente */}
+              {managementMode === 'directa' && (
+                <div className="p-2.5 bg-[#FCFBF7] border border-[#D8C7AA] rounded-sm text-xs text-[#39483A] flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <Check className="w-4 h-4 text-emerald-700 shrink-0" />
+                    <span>
+                      <strong>Opción seleccionada:</strong> Propietario Independiente (Gestión directa por mi cuenta sin agente).
+                    </span>
+                  </div>
+                  <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded-xs shrink-0">
+                    Marcado
+                  </span>
+                </div>
+              )}
+
               {managementMode === 'con_agente' && (
                 <div className="pt-3 border-t border-[#D8C7AA] space-y-3">
+                  {/* Banner informativo si la propiedad ya tenía agente asignado */}
+                  {editingProperty && (editingProperty.agentName || editingProperty.requestedAgentName) && (
+                    <div className="p-3 bg-emerald-50 border border-emerald-300 rounded-sm text-xs text-emerald-900 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <Check className="w-4 h-4 text-emerald-700 shrink-0" />
+                        <div>
+                          <span className="font-bold">Agente actual asignado / solicitado:</span>{' '}
+                          {editingProperty.agentName || editingProperty.requestedAgentName}{' '}
+                          <span className="text-[11px] opacity-80">
+                            ({editingProperty.agentAssignmentStatus === 'asignado' ? 'Confirmado a cargo' : 'Solicitud pendiente'})
+                          </span>
+                        </div>
+                      </div>
+                      <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 bg-emerald-200 text-emerald-900 rounded-xs self-start sm:self-auto shrink-0">
+                        Marcado por defecto
+                      </span>
+                    </div>
+                  )}
+
                   <div className="text-xs font-semibold text-[#39483A]">
                     Elegí cómo solicitar tu agente inmobiliario:
                   </div>
@@ -688,13 +812,13 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
                       type="button"
                       onClick={() => {
                         setAgentRequestType('elegir_agente');
-                        if (!selectedAgentId && availableAgents[0]) {
-                          setSelectedAgentId(availableAgents[0].uid);
+                        if (!selectedAgentId && allDisplayAgents[0]) {
+                          setSelectedAgentId(allDisplayAgents[0].uid);
                         }
                       }}
-                      className={`p-3 rounded-sm border text-left flex items-start gap-2.5 transition-colors ${
+                      className={`p-3 rounded-sm border text-left flex items-start gap-2.5 transition-colors cursor-pointer ${
                         agentRequestType === 'elegir_agente'
-                          ? 'bg-white border-[#39483A] ring-1 ring-[#39483A]'
+                          ? 'bg-white border-[#39483A] ring-2 ring-[#39483A]'
                           : 'bg-[#FCFBF7] border-[#D8C7AA]'
                       }`}
                     >
@@ -704,7 +828,7 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
                           Opción A: Elegir un agente disponible
                         </div>
                         <div className="text-[11px] text-[#39483A]/75 mt-0.5">
-                          Consultá los perfiles disponibles y seleccioná uno. Quedará pendiente hasta que acepte o el administrador confirme.
+                          Consultá los perfiles disponibles y seleccioná uno. Quedará asignado o pendiente según corresponda.
                         </div>
                       </div>
                     </button>
@@ -712,9 +836,9 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
                     <button
                       type="button"
                       onClick={() => setAgentRequestType('asignacion_admin')}
-                      className={`p-3 rounded-sm border text-left flex items-start gap-2.5 transition-colors ${
+                      className={`p-3 rounded-sm border text-left flex items-start gap-2.5 transition-colors cursor-pointer ${
                         agentRequestType === 'asignacion_admin'
-                          ? 'bg-white border-[#39483A] ring-1 ring-[#39483A]'
+                          ? 'bg-white border-[#39483A] ring-2 ring-[#39483A]'
                           : 'bg-[#FCFBF7] border-[#D8C7AA]'
                       }`}
                     >
@@ -733,23 +857,38 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
                   {agentRequestType === 'elegir_agente' && (
                     <div className="space-y-2 pt-1">
                       <div className="text-xs font-semibold text-[#39483A]">
-                        Perfiles de Agentes Disponibles ({availableAgents.length}):
+                        Perfiles de Agentes Disponibles ({allDisplayAgents.length}):
                       </div>
-                      {availableAgents.length === 0 ? (
+                      {allDisplayAgents.length === 0 ? (
                         <p className="text-xs text-[#B86F52]">
                           No hay agentes activos en este momento. Podés elegir &ldquo;Que me asignen uno&rdquo;.
                         </p>
                       ) : (
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-56 overflow-y-auto pr-1">
-                          {availableAgents.map((ag) => {
-                            const isSelected = selectedAgentId === ag.uid;
+                          {allDisplayAgents.map((ag) => {
+                            const isCurrentPropAgent =
+                              Boolean(editingProperty) &&
+                              ((editingProperty?.agentId && editingProperty.agentId === ag.uid) ||
+                                (editingProperty?.requestedAgentId && editingProperty.requestedAgentId === ag.uid) ||
+                                (ag.displayName &&
+                                  editingProperty?.agentName &&
+                                  ag.displayName.trim().toLowerCase() === editingProperty.agentName.trim().toLowerCase()) ||
+                                (ag.displayName &&
+                                  editingProperty?.requestedAgentName &&
+                                  ag.displayName.trim().toLowerCase() === editingProperty.requestedAgentName.trim().toLowerCase()) ||
+                                (ag.email?.toLowerCase() === 'agente@clavehogar.com' &&
+                                  (editingProperty?.agentName?.toLowerCase().includes('alvear') ||
+                                    editingProperty?.requestedAgentName?.toLowerCase().includes('alvear'))));
+
+                            const isSelected = selectedAgentId === ag.uid || (!selectedAgentId && isCurrentPropAgent);
+
                             return (
                               <div
                                 key={ag.uid}
                                 onClick={() => setSelectedAgentId(ag.uid)}
                                 className={`p-3 rounded-sm border cursor-pointer transition-colors flex items-start gap-3 ${
                                   isSelected
-                                    ? 'bg-[#39483A] text-[#FCFBF7] border-[#39483A]'
+                                    ? 'bg-[#39483A] text-[#FCFBF7] border-[#39483A] ring-2 ring-[#B86F52]'
                                     : 'bg-white text-[#1F241F] border-[#D8C7AA] hover:border-[#39483A]'
                                 }`}
                               >
@@ -771,6 +910,11 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
                                     </span>
                                     {isSelected && <Check className="w-3.5 h-3.5 text-[#D8C7AA] shrink-0" />}
                                   </div>
+                                  {isCurrentPropAgent && (
+                                    <span className="inline-block px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider bg-[#D8C7AA] text-[#1F241F] rounded-xs">
+                                      Agente de esta propiedad
+                                    </span>
+                                  )}
                                   <div
                                     className={`text-[11px] truncate ${
                                       isSelected ? 'text-[#D8C7AA]' : 'text-[#B86F52]'
