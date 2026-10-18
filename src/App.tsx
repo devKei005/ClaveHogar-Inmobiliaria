@@ -1053,7 +1053,9 @@ export default function App() {
     // Las nuevas publicaciones de propietarios quedan pendientes de revisión del administrador.
     // Si es edición de una publicación ya aprobada, se mantiene aprobada para reflejar los cambios en el catálogo de inmediato.
     const publicationStatus: PublicationStatus = isEdit
-      ? existingProp?.publicationStatus || 'aprobada'
+      ? existingProp?.publicationStatus === 'rechazada' || existingProp?.publicationStatus === 'suspendida'
+        ? 'pendiente'
+        : existingProp?.publicationStatus || 'aprobada'
       : currentUser.role === 'administrador'
       ? 'aprobada'
       : 'pendiente';
@@ -1073,6 +1075,7 @@ export default function App() {
       requestedAgentName: data.requestedAgentName !== undefined ? data.requestedAgentName : (existingProp?.requestedAgentName || ''),
       agentRejectionReason: data.agentRejectionReason !== undefined ? data.agentRejectionReason : (existingProp?.agentRejectionReason || ''),
       publicationStatus,
+      rejectionReason: publicationStatus === 'pendiente' ? '' : existingProp?.rejectionReason || '',
       createdAtIso: existingProp?.createdAtIso || (editingProperty?.createdAtIso ?? new Date().toISOString()),
     };
 
@@ -1108,6 +1111,21 @@ export default function App() {
             'info'
           );
         }
+      }
+
+      if (
+        isEdit &&
+        existingProp &&
+        publicationStatus === 'pendiente' &&
+        existingProp.publicationStatus !== 'pendiente' &&
+        adminUser
+      ) {
+        await pushUserNotification(
+          adminUser.uid,
+          'Publicación corregida para revisión',
+          `${newProp.ownerName} actualizó "${newProp.title}" y la envió nuevamente a revisión.`,
+          'info'
+        );
       }
 
       if (
@@ -1158,6 +1176,9 @@ export default function App() {
       currentUser.role === 'administrador' || isUserOwnerOfProperty(target, currentUser, users);
     if (!canDelete) {
       notify('error', 'Sin permisos', 'Solo el propietario titular o el administrador pueden eliminar esta publicación.');
+      return;
+    }
+    if (!window.confirm(`¿Eliminar la publicación "${target.title}"? Esta acción no se puede deshacer.`)) {
       return;
     }
 
@@ -1436,28 +1457,48 @@ export default function App() {
     publicationStatus: PublicationStatus,
     rejectionReason?: string
   ) => {
+    if (currentUser?.role !== 'administrador') return;
+    if (publicationStatus === 'rechazada' && !rejectionReason?.trim()) {
+      notify('error', 'Falta el motivo', 'Escribí el motivo antes de rechazar la publicación.');
+      return;
+    }
     const target = properties.find((p) => p.id === propertyId);
+    const reason = rejectionReason?.trim() || '';
     try {
       await updateDoc(doc(db, 'properties', propertyId), {
         publicationStatus,
-        rejectionReason: rejectionReason || '',
+        rejectionReason: reason,
       });
       setProperties((prev) =>
         prev.map((p) =>
           p.id === propertyId
-            ? { ...p, publicationStatus, rejectionReason: rejectionReason || '' }
+            ? { ...p, publicationStatus, rejectionReason: reason }
             : p
         )
       );
       if (target) {
         await pushUserNotification(
           target.ownerId,
-          publicationStatus === 'aprobada' ? 'Publicación aprobada' : 'Publicación rechazada',
+          publicationStatus === 'aprobada'
+            ? 'Publicación aprobada'
+            : 'Publicación rechazada',
           publicationStatus === 'aprobada'
             ? `Tu propiedad "${target.title}" fue aprobada y está visible en el catálogo público.`
-            : `Tu propiedad "${target.title}" fue rechazada: ${rejectionReason || 'Revisar datos'}`,
+            : `Tu propiedad "${target.title}" fue rechazada. Motivo: ${reason}`,
           publicationStatus === 'aprobada' ? 'success' : 'warning'
         );
+        if (target.agentId && target.agentId !== target.ownerId) {
+          await pushUserNotification(
+            target.agentId,
+            publicationStatus === 'aprobada'
+              ? 'Publicación aprobada'
+              : 'Publicación rechazada',
+            publicationStatus === 'aprobada'
+              ? `La propiedad "${target.title}" fue aprobada.`
+              : `La propiedad "${target.title}" fue rechazada. Motivo: ${reason}`,
+            publicationStatus === 'aprobada' ? 'success' : 'warning'
+          );
+        }
       }
       notify(
         'success',
@@ -2920,7 +2961,7 @@ export default function App() {
                             className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-bold bg-[#B86F52] text-[#FCFBF7] rounded-sm hover:bg-[#a35e42] transition-colors mt-1 cursor-pointer"
                           >
                             <Edit3 className="w-3 h-3" />
-                            Editar Ficha
+                            Editar ficha
                           </button>
                         )}
                       </div>
@@ -3284,7 +3325,7 @@ export default function App() {
                                 title="Editar ficha de esta propiedad"
                               >
                                 <Edit3 className="w-3.5 h-3.5" />
-                                Editar Ficha
+                                Editar ficha
                               </button>
                             </div>
                           ) : (

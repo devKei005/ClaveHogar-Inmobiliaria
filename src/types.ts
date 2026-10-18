@@ -2,7 +2,7 @@ export type UserRole = 'cliente' | 'propietario' | 'agente' | 'administrador';
 
 export type OperationTypeChoice = 'alquiler' | 'venta';
 export type AvailabilityStatus = 'disponible' | 'reservada' | 'alquilada' | 'vendida';
-export type PublicationStatus = 'pendiente' | 'aprobada' | 'rechazada';
+export type PublicationStatus = 'pendiente' | 'aprobada' | 'rechazada' | 'suspendida'; // Estado legado, tratado como rechazo en la interfaz.
 export type VisitStatus = 'pendiente' | 'confirmada' | 'reprogramada' | 'rechazada' | 'cancelada' | 'realizada';
 export type InquiryStatus = 'pendiente' | 'respondida';
 export type DealStatus = 'solicitada' | 'en_revision' | 'aprobada' | 'rechazada' | 'concretada';

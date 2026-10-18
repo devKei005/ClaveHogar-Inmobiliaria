@@ -45,9 +45,6 @@ export function isUserOwnerOfProperty(
 ): boolean {
   if (!user) return false;
 
-  // 1. Administrador siempre tiene autorización completa
-  if (user.role === 'administrador') return true;
-
   const userUid = (user.uid || '').trim();
   const propOwnerId = (prop.ownerId || '').trim();
   const userEmail = (user.email || '').trim().toLowerCase();
@@ -111,9 +108,8 @@ export function isUserOwnerOfProperty(
 }
 
 /**
- * Determina si el usuario actual es el agente a cargo de la propiedad.
- * Contempla agente asignado confirmado, solicitud pendiente de agente, cuenta demo de Valentina Alvear,
- * y coincidencia por UID, email o nombre.
+ * Determina si el usuario actual es el agente asignado a la propiedad.
+ * Las solicitudes pendientes no habilitan la edición.
  */
 export function isUserAssignedAgentOfProperty(
   prop: PropertyItem,
@@ -121,54 +117,31 @@ export function isUserAssignedAgentOfProperty(
   allUsers?: UserProfile[]
 ): boolean {
   if (!user) return false;
-  if (user.role === 'administrador') return true;
   if (user.role !== 'agente') return false;
 
   const userUid = (user.uid || '').trim();
   const userEmail = (user.email || '').trim().toLowerCase();
   const userName = (user.displayName || '').trim().toLowerCase();
   const propAgentName = (prop.agentName || '').trim().toLowerCase();
-  const propReqAgentName = (prop.requestedAgentName || '').trim().toLowerCase();
   const propAgentId = (prop.agentId || '').trim();
-  const propReqAgentId = (prop.requestedAgentId || '').trim();
 
-  // 1. Verificación por UID directo del agente (tanto en agentId como en requestedAgentId)
-  if (userUid && (propAgentId === userUid || propReqAgentId === userUid)) {
+  // Solo el agente confirmado en agentId puede editar la publicación.
+  if (userUid && propAgentId === userUid) {
     return true;
   }
 
-  // 2. Verificación si el usuario es la cuenta oficial de agente Valentina Alvear
+  // La cuenta demo se vincula únicamente con su UID asignado.
   if (
     userEmail === 'agente@clavehogar.com' &&
-    (propAgentId === 'SysykUHU5FVubQzrSHOBi3JnhQs2' ||
-      propReqAgentId === 'SysykUHU5FVubQzrSHOBi3JnhQs2' ||
-      propAgentName.includes('alvear') ||
-      propReqAgentName.includes('alvear') ||
-      propAgentName.includes('valentina') ||
-      propReqAgentName.includes('valentina') ||
-      prop.managementMode === 'con_agente')
+    propAgentId === 'SysykUHU5FVubQzrSHOBi3JnhQs2'
   ) {
     return true;
   }
 
-  // 3. Si la propiedad tiene asignada a Valentina Alvear ('SysykUHU5FVubQzrSHOBi3JnhQs2')
-  // y el usuario actual tiene rol de agente (p. ej. en sesión demo o agente activo probando la cartera)
-  if (
-    user.role === 'agente' &&
-    (propAgentId === 'SysykUHU5FVubQzrSHOBi3JnhQs2' ||
-      propReqAgentId === 'SysykUHU5FVubQzrSHOBi3JnhQs2' ||
-      propAgentName.includes('alvear') ||
-      propReqAgentName.includes('alvear'))
-  ) {
-    return true;
-  }
-
-  // 4. Coincidencia por correo en la lista de usuarios
+  // Coincidencia por correo en la lista de usuarios.
   if (userEmail && allUsers && allUsers.length > 0) {
     const assignedAgentUser = allUsers.find(
-      (u) =>
-        (propAgentId && u.uid === propAgentId) ||
-        (propReqAgentId && u.uid === propReqAgentId)
+      (u) => propAgentId && u.uid === propAgentId
     );
     if (
       assignedAgentUser &&
@@ -178,11 +151,13 @@ export function isUserAssignedAgentOfProperty(
     }
   }
 
-  // 5. Coincidencia por nombre del agente
+  // Compatibilidad con asignaciones antiguas sin UID, por nombre completo exacto.
   if (
+    !propAgentId &&
+    prop.agentAssignmentStatus === 'asignado' &&
     userName &&
-    ((propAgentName && (propAgentName === userName || propAgentName.includes(userName) || userName.includes(propAgentName))) ||
-      (propReqAgentName && (propReqAgentName === userName || propReqAgentName.includes(userName) || userName.includes(propReqAgentName))))
+    propAgentName &&
+    propAgentName === userName
   ) {
     return true;
   }
@@ -192,9 +167,8 @@ export function isUserAssignedAgentOfProperty(
 
 /**
  * Determina si un usuario tiene permisos para editar la propiedad:
- * - Administrador
  * - Propietario titular
- * - Agente asignado o solicitado a cargo
+ * - Agente confirmado a cargo
  */
 export function canUserEditProperty(
   prop: PropertyItem,
@@ -202,7 +176,7 @@ export function canUserEditProperty(
   allUsers?: UserProfile[]
 ): boolean {
   if (!user) return false;
-  if (user.role === 'administrador') return true;
+  if (user.role === 'administrador') return false;
   if (isUserOwnerOfProperty(prop, user, allUsers)) return true;
   if (isUserAssignedAgentOfProperty(prop, user, allUsers)) return true;
   return false;

@@ -440,7 +440,7 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
               </div>
 
               {/* Banner de gestión para propietario / agente / admin */}
-              {canEdit && onOpenEditProperty && (
+              {/* {canEdit && onOpenEditProperty && (
                 <div className="p-3.5 bg-[#39483A] text-[#FCFBF7] rounded-sm flex items-center justify-between gap-3 shadow-sm">
                   <div className="space-y-0.5 min-w-0">
                     <span className="font-bold text-[#D8C7AA] block uppercase tracking-wider text-[10px]">
@@ -466,7 +466,7 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
                     Editar Ficha
                   </button>
                 </div>
-              )}
+              )} */}
 
               {/* Action Selector Tabs */}
               <div className="grid grid-cols-3 gap-1 p-1 bg-[#D8C7AA]/40 rounded-sm">
