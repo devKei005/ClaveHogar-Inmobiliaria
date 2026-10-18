@@ -33,78 +33,14 @@ export function getMinVisitDate(): string {
   return `${yyyy}-${mm}-${dd}`;
 }
 
-/**
- * Determina si el usuario actual es el propietario titular del inmueble.
- * Contempla coincidencias por UID, cuenta demo oficial de propietario,
- * coincidencia por email o coincidencia de nombre.
- */
+/** Determina si el usuario actual es el propietario titular por UID exacto. */
 export function isUserOwnerOfProperty(
   prop: PropertyItem,
   user: UserProfile | null,
   allUsers?: UserProfile[]
 ): boolean {
   if (!user) return false;
-
-  const userUid = (user.uid || '').trim();
-  const propOwnerId = (prop.ownerId || '').trim();
-  const userEmail = (user.email || '').trim().toLowerCase();
-  const userName = (user.displayName || '').trim().toLowerCase();
-  const propOwnerName = (prop.ownerName || '').trim().toLowerCase();
-  const isOwnerRole = user.role === 'propietario' || Boolean(user.isAlsoOwner);
-
-  // 2. Coincidencia directa por UID
-  if (userUid && propOwnerId && userUid === propOwnerId) {
-    return true;
-  }
-
-  // 3. Coincidencia por cuenta oficial demo de propietario (propietario@clavehogar.com)
-  if (
-    userEmail === 'propietario@clavehogar.com' &&
-    (propOwnerId === 'kKqp7VS3xhPYfy6RvCh0SWJIqi12' ||
-      propOwnerName.includes('santamarina') ||
-      propOwnerName.includes('alejandro') ||
-      !propOwnerId)
-  ) {
-    return true;
-  }
-
-  // 4. Si la propiedad pertenece a la cuenta demo de Alejandro Santamarina ('kKqp7VS3xhPYfy6RvCh0SWJIqi12')
-  // y el usuario actual está operando en rol de propietario (p. ej. explorando o probando en modo propietario)
-  if (
-    isOwnerRole &&
-    (propOwnerId === 'kKqp7VS3xhPYfy6RvCh0SWJIqi12' ||
-      propOwnerName.includes('santamarina') ||
-      propOwnerName.includes('alejandro'))
-  ) {
-    return true;
-  }
-
-  // 5. Coincidencia por correo electrónico buscando en la lista de usuarios de Firestore
-  if (userEmail && allUsers && allUsers.length > 0) {
-    const ownerUser = allUsers.find((u) => (u.uid || '').trim() === propOwnerId);
-    if (ownerUser && (ownerUser.email || '').trim().toLowerCase() === userEmail) {
-      return true;
-    }
-  }
-
-  // 6. Coincidencia por nombre completo del titular
-  if (
-    isOwnerRole &&
-    propOwnerName &&
-    userName &&
-    (propOwnerName === userName ||
-      userName.includes(propOwnerName) ||
-      propOwnerName.includes(userName))
-  ) {
-    return true;
-  }
-
-  // 7. Si el usuario tiene rol de propietario y la propiedad no tiene ownerId asignado
-  if (isOwnerRole && !propOwnerId) {
-    return true;
-  }
-
-  return false;
+  return Boolean(user.uid?.trim() && prop.ownerId?.trim() && user.uid.trim() === prop.ownerId.trim());
 }
 
 /**
