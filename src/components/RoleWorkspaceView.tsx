@@ -36,7 +36,7 @@ import {
   SCHEMA_LIMITS,
   truncateText,
 } from '../types';
-import { HERO_IMAGE, resolvePropertyImageUrl } from '../data/initialData';
+import { HERO_IMAGE, INITIAL_USERS, resolvePropertyImageUrl } from '../data/initialData';
 
 export type WorkspaceSubView =
   | 'cliente_favoritos'
@@ -279,11 +279,14 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
     const seenEmails = new Set<string>();
     const seenUids = new Set<string>();
     const list: UserProfile[] = [];
-    for (const u of users) {
+    for (const u of [...users, ...INITIAL_USERS]) {
       const email = (u.email || '').trim().toLowerCase();
       const uid = (u.uid || '').trim();
+      const isDemoProfile = INITIAL_USERS.some(
+        (demoUser) => demoUser.email.trim().toLowerCase() === email
+      );
       if (email && seenEmails.has(email)) continue;
-      if (uid && seenUids.has(uid)) continue;
+      if (uid && seenUids.has(uid) && !isDemoProfile) continue;
       if (email) seenEmails.add(email);
       if (uid) seenUids.add(uid);
       list.push(u);
@@ -2049,27 +2052,28 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
                   Usuarios Registrados
                 </span>
                 <span className="text-lg font-bold font-tabular text-[#1F241F]">
-                  {users.length}
+                  {uniqueUsers.length}
                 </span>
               </div>
-              <div className="space-y-1.5 text-xs text-[#39483A]/85 border-t border-[#D8C7AA]/60 pt-2">
-                <div className="flex justify-between">
-                  <span>Clientes particulares:</span>
-                  <strong className="font-tabular">{users.filter((u) => u.role === 'cliente').length}</strong>
-                </div>
-                <div className="flex justify-between">
-                  <span>Propietarios (titulares):</span>
-                  <strong className="font-tabular">{users.filter((u) => u.role === 'propietario' || u.isAlsoOwner).length}</strong>
-                </div>
-                <div className="flex justify-between">
-                  <span>Agentes Inmobiliarios:</span>
-                  <strong className="font-tabular">{users.filter((u) => u.role === 'agente').length}</strong>
-                </div>
-                <div className="flex justify-between">
-                  <span>Administradores:</span>
-                  <strong className="font-tabular">{users.filter((u) => u.role === 'administrador').length}</strong>
-                </div>
-              </div>
+            <div className="space-y-1.5 text-xs text-[#39483A]/85 border-t border-[#D8C7AA]/60 pt-2">
+  <div className="flex justify-between">
+    {/* Suma clientes y propietarios sin duplicar */}
+    <span>Clientes y Propietarios:</span>
+    <strong className="font-tabular">
+      {uniqueUsers.filter((u) => u.role === 'cliente' || u.role === 'propietario' || u.isAlsoOwner).length}
+    </strong>
+  </div>
+
+  <div className="flex justify-between">
+    <span>Agentes Inmobiliarios:</span>
+    <strong className="font-tabular">{uniqueUsers.filter((u) => u.role === 'agente').length}</strong>
+  </div>
+
+  <div className="flex justify-between">
+    <span>Administradores:</span>
+    <strong className="font-tabular">{uniqueUsers.filter((u) => u.role === 'administrador').length}</strong>
+  </div>
+</div>
             </div>
 
             {/* Operaciones y Contratos Reales */}

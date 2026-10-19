@@ -424,17 +424,6 @@ export default function App() {
 
         setUsers(uniqueList);
         saveCachedUsers(uniqueList);
-        setCurrentUser((prev) => {
-          if (!prev) return null;
-          const updated =
-            uniqueList.find((u) => u.uid === prev.uid) ||
-            uniqueList.find((u) => u.email.toLowerCase() === prev.email.toLowerCase());
-          if (!updated) return prev;
-          return {
-            ...updated,
-            photoUrl: updated.photoUrl || prev.photoUrl || '',
-          };
-        });
       },
       (err) => handleFirestoreError(err, OperationType.GET, 'app_users')
     );
@@ -2156,6 +2145,13 @@ export default function App() {
   const handleUpdateUserAdmin = async (uid: string, role: UserRole, active: boolean) => {
     const target = users.find((u) => u.uid === uid);
     if (!target) return;
+    if (
+      currentUser?.uid === uid ||
+      currentUser?.email.toLowerCase() === target.email.toLowerCase()
+    ) {
+      notify('error', 'Acción no permitida', 'No podés cambiar tu propio rol o estado desde esta sesión.');
+      return;
+    }
     const updated: UserProfile = {
       ...target,
       role,
@@ -2169,12 +2165,6 @@ export default function App() {
         saveCachedUsers(next);
         return next;
       });
-      if (
-        currentUser?.uid === uid ||
-        (currentUser?.email && currentUser.email.toLowerCase() === target.email.toLowerCase())
-      ) {
-        setCurrentUser(updated);
-      }
       await pushUserNotification(
         uid,
         'Actualización de rol / cuenta',
@@ -2183,7 +2173,7 @@ export default function App() {
       );
       notify(
         'success',
-        'Usuario actualizado correctamente',
+        'Rol cambiado exitosamente',
         `${updated.displayName}: Rol ${role.toUpperCase()} (${active ? 'Activa' : 'Inactiva'}).`
       );
     } catch (err) {
