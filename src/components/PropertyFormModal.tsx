@@ -263,7 +263,7 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
   const isAgentEditor =
     currentUser?.role === 'agente' &&
     Boolean(editingProperty) &&
-    !isUserOwnerOfProperty(editingProperty!, currentUser);
+    !isUserOwnerOfProperty(editingProperty!, currentUser, availableAgents);
 
   const toggleFeature = (feat: string) => {
     setSelectedFeatures((prev) =>

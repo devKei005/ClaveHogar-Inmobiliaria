@@ -268,7 +268,6 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
   const [adminSelectedAgentByProp, setAdminSelectedAgentByProp] = useState<Record<string, string>>({});
 
   const [claimTargetType, setClaimTargetType] = useState<ClaimTargetType>('publicacion');
-  const [claimRef, setClaimRef] = useState('');
   const [claimSubject, setClaimSubject] = useState('');
   const [claimDesc, setClaimDesc] = useState('');
   const [claimResolutionDrafts, setClaimResolutionDrafts] = useState<Record<string, string>>({});
@@ -373,21 +372,24 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
       myAssignedProperties.some((p) => p.id === o.propertyId)
   );
 
-  const canActAsClient = currentUser.role === 'cliente' || currentUser.role === 'propietario';
+  const canActAsClient =
+    currentUser.role !== 'administrador' &&
+    (currentUser.role === 'cliente' || currentUser.role === 'propietario');
   const canActAsOwner =
-    currentUser.role === 'propietario' ||
-    (currentUser.role === 'cliente' && Boolean(currentUser.isAlsoOwner));
+    currentUser.role !== 'administrador' &&
+    (currentUser.role === 'propietario' ||
+      Boolean(currentUser.isAlsoOwner) ||
+      myOwnedProperties.length > 0);
 
   const handleClaimSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!claimSubject.trim() || !claimDesc.trim()) return;
     await onCreateClaim(
       claimTargetType,
-      truncateText(claimRef || 'General', 140),
+      'General',
       truncateText(claimSubject, SCHEMA_LIMITS.CLAIM_SUBJECT_MAX),
       truncateText(claimDesc, SCHEMA_LIMITS.CLAIM_DESC_MAX)
     );
-    setClaimRef('');
     setClaimSubject('');
     setClaimDesc('');
   };
@@ -771,7 +773,7 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#D8C7AA]">
                 Mi Espacio ·{' '}
-                {currentUser.role === 'cliente' && currentUser.isAlsoOwner
+                {currentUser.role === 'cliente' && canActAsOwner
                   ? 'Cliente y Propietario'
                   : currentUser.role.toUpperCase()}
               </span>
@@ -791,7 +793,7 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
             </h1>
             <p className="text-xs sm:text-sm text-[#F5F1E8]/85 max-w-2xl leading-relaxed">
               {currentUser.role === 'cliente' &&
-                !currentUser.isAlsoOwner &&
+                !canActAsOwner &&
                 'Gestioná tus inmuebles favoritos, tus visitas programadas, tus solicitudes de alquiler o compra y tus conversaciones.'}
               {canActAsOwner &&
                 'Administrá tanto tus búsquedas y reservas como Cliente, como la publicación y gestión de tus inmuebles desde "Mis propiedades" (de forma independiente o con agente inmobiliario).'}
@@ -803,7 +805,7 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
           </div>
         </div>
 
-        {currentUser.role === 'cliente' && !currentUser.isAlsoOwner && (
+        {currentUser.role === 'cliente' && !canActAsOwner && (
           <div className="bg-[#FCFBF7]/10 border border-[#D8C7AA]/30 rounded-sm p-4 max-w-xs space-y-2.5 shrink-0">
             <div className="text-xs font-semibold text-[#D8C7AA]">
               ¿Querés vender o alquilar tu casa?
@@ -1959,58 +1961,181 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
          ===================================================================== */}
       {activeSubView === 'admin_dashboard' && currentUser.role === 'administrador' && (
         <div className="bg-[#FCFBF7] border border-[#D8C7AA] rounded-sm p-6 space-y-6">
-          <h2 className="text-2xl font-serif-display font-semibold text-[#39483A]">
-            Reportes Ejecutivos y Supervisión de Plataforma
-          </h2>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="p-5 bg-[#F5F1E8] border border-[#D8C7AA] rounded-sm">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-2 border-b border-[#D8C7AA] pb-4">
+            <div>
+              <h2 className="text-2xl font-serif-display font-semibold text-[#39483A]">
+                Reportes y Métricas de la Plataforma
+              </h2>
+              <p className="text-xs text-[#39483A]/75 mt-0.5">
+                Datos calculados en tiempo real directamente desde Firestore a partir de las publicaciones, usuarios y operaciones registradas.
+              </p>
+            </div>
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 text-xs font-semibold bg-[#39483A]/10 text-[#39483A] rounded-sm self-start md:self-center">
+              Supervisión Administrativa
+            </span>
+          </div>
+
+          {/* Métricas Principales */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {/* 1. Total de Inmuebles */}
+            <div className="p-5 bg-[#F5F1E8] border border-[#D8C7AA] rounded-sm space-y-2">
               <div className="text-xs uppercase tracking-wider font-semibold text-[#39483A]/75">
-                Propiedades en Firestore
+                Total de Inmuebles
               </div>
-              <div className="text-3xl font-semibold font-tabular text-[#1F241F] mt-1">
+              <div className="text-3xl font-bold font-tabular text-[#1F241F]">
                 {allProperties.length}
               </div>
-              <div className="text-xs text-[#39483A]/70 mt-1">
+              <div className="text-xs text-[#39483A]/70 flex flex-wrap gap-2 pt-1">
                 <span className="text-emerald-800 font-semibold">
-                  {allProperties.filter((p) => p.publicationStatus === 'aprobada').length} aprobadas
-                </span>{' '}
-                ·{' '}
+                  {allProperties.filter((p) => p.publicationStatus === 'aprobada').length} activas
+                </span>
+                <span>·</span>
                 <span className="text-amber-800 font-semibold">
-                  {pendingProperties.length} en revisión
+                  {allProperties.filter((p) => p.publicationStatus === 'pendiente').length} pend.
+                </span>
+                <span>·</span>
+                <span className="text-rose-800 font-semibold">
+                  {allProperties.filter((p) => p.publicationStatus === 'rechazada').length} rech.
                 </span>
               </div>
             </div>
-            <div className="p-5 bg-[#F5F1E8] border border-[#D8C7AA] rounded-sm">
-              <div className="text-xs uppercase tracking-wider font-semibold text-[#39483A]/75">
-                Usuarios Registrados
+
+            {/* 2. Inmuebles Aprobados */}
+            <div className="p-5 bg-emerald-50 border border-emerald-300 rounded-sm space-y-2">
+              <div className="text-xs uppercase tracking-wider font-semibold text-emerald-900">
+                Inmuebles Aprobados
               </div>
-              <div className="text-3xl font-semibold font-tabular text-[#1F241F] mt-1">
-                {users.filter((u) => u.active).length} / {users.length}
+              <div className="text-3xl font-bold font-tabular text-emerald-900">
+                {allProperties.filter((p) => p.publicationStatus === 'aprobada').length}
               </div>
-              <div className="text-xs text-[#39483A]/70 mt-1">
-                Clientes, Propietarios y Agentes
+              <div className="text-xs text-emerald-800">
+                Publicaciones validadas y visibles en el catálogo general.
               </div>
             </div>
-            <div className="p-5 bg-amber-50 border border-amber-300 rounded-sm">
-              <div className="text-xs uppercase tracking-wider font-semibold text-amber-900">
-                Solicitudes Pendientes Admin
+
+            {/* 3. Inmuebles Rechazados */}
+            <div className="p-5 bg-rose-50 border border-rose-300 rounded-sm space-y-2">
+              <div className="text-xs uppercase tracking-wider font-semibold text-rose-900">
+                Inmuebles Rechazados
               </div>
-              <div className="text-3xl font-semibold font-tabular text-amber-900 mt-1">
+              <div className="text-3xl font-bold font-tabular text-rose-900">
+                {allProperties.filter((p) => p.publicationStatus === 'rechazada').length}
+              </div>
+              <div className="text-xs text-rose-800">
+                Devueltos con motivo de rechazo para corrección del propietario/agente.
+              </div>
+            </div>
+
+            {/* 4. Solicitudes Pendientes Admin */}
+            <div className="p-5 bg-amber-50 border border-amber-300 rounded-sm space-y-2">
+              <div className="text-xs uppercase tracking-wider font-semibold text-amber-900">
+                Pendientes de Moderación
+              </div>
+              <div className="text-3xl font-bold font-tabular text-amber-900">
                 {adminPendingActionProperties.length}
               </div>
-              <div className="text-xs text-amber-800 mt-1">
-                Publicaciones o asignaciones por responder
+              <div className="text-xs text-amber-800">
+                Publicaciones en revisión o asignaciones que requieren tu acción.
               </div>
             </div>
-            <div className="p-5 bg-[#F5F1E8] border border-[#D8C7AA] rounded-sm">
-              <div className="text-xs uppercase tracking-wider font-semibold text-[#39483A]/75">
-                Volumen de Operaciones
+          </div>
+
+          {/* Segunda Fila: Usuarios, Transacciones y Reclamos */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
+            {/* Usuarios y Roles */}
+            <div className="p-5 bg-[#FCFBF7] border border-[#D8C7AA] rounded-sm space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs uppercase tracking-wider font-semibold text-[#39483A]">
+                  Usuarios Registrados
+                </span>
+                <span className="text-lg font-bold font-tabular text-[#1F241F]">
+                  {users.length}
+                </span>
               </div>
-              <div className="text-2xl font-semibold font-tabular text-[#39483A] mt-1">
-                USD {totalSalesVolume.toLocaleString()}
+              <div className="space-y-1.5 text-xs text-[#39483A]/85 border-t border-[#D8C7AA]/60 pt-2">
+                <div className="flex justify-between">
+                  <span>Clientes particulares:</span>
+                  <strong className="font-tabular">{users.filter((u) => u.role === 'cliente').length}</strong>
+                </div>
+                <div className="flex justify-between">
+                  <span>Propietarios (titulares):</span>
+                  <strong className="font-tabular">{users.filter((u) => u.role === 'propietario' || u.isAlsoOwner).length}</strong>
+                </div>
+                <div className="flex justify-between">
+                  <span>Agentes Inmobiliarios:</span>
+                  <strong className="font-tabular">{users.filter((u) => u.role === 'agente').length}</strong>
+                </div>
+                <div className="flex justify-between">
+                  <span>Administradores:</span>
+                  <strong className="font-tabular">{users.filter((u) => u.role === 'administrador').length}</strong>
+                </div>
               </div>
-              <div className="text-xs text-[#39483A]/70 mt-1">
-                {allOperations.length} operaciones registradas
+            </div>
+
+            {/* Operaciones y Contratos Reales */}
+            <div className="p-5 bg-[#FCFBF7] border border-[#D8C7AA] rounded-sm space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs uppercase tracking-wider font-semibold text-[#39483A]">
+                  Operaciones y Contratos
+                </span>
+                <span className="text-lg font-bold font-tabular text-[#1F241F]">
+                  {allOperations.length}
+                </span>
+              </div>
+              <div className="space-y-1.5 text-xs text-[#39483A]/85 border-t border-[#D8C7AA]/60 pt-2">
+                <div className="flex justify-between">
+                  <span>Concretadas / Cerradas:</span>
+                  <strong className="font-tabular text-emerald-800">
+                    {allOperations.filter((o) => o.status === 'concretada').length}
+                  </strong>
+                </div>
+                <div className="flex justify-between">
+                  <span>Aprobadas (en proceso):</span>
+                  <strong className="font-tabular text-amber-800">
+                    {allOperations.filter((o) => o.status === 'aprobada').length}
+                  </strong>
+                </div>
+                <div className="flex justify-between">
+                  <span>Monto transaccionado (cerradas):</span>
+                  <strong className="font-tabular text-[#39483A]">
+                    USD {allOperations.filter((o) => o.status === 'concretada').reduce((acc, o) => acc + (Number(o.offeredAmount) || 0), 0).toLocaleString()}
+                  </strong>
+                </div>
+                <div className="flex justify-between text-[11px] text-[#39483A]/60 pt-1">
+                  <span>Valor total cartera venta activa:</span>
+                  <strong className="font-tabular">
+                    USD {allProperties.filter((p) => p.publicationStatus === 'aprobada' && p.operationType === 'venta').reduce((acc, p) => acc + (Number(p.price) || 0), 0).toLocaleString()}
+                  </strong>
+                </div>
+              </div>
+            </div>
+
+            {/* Reclamos y Soporte */}
+            <div className="p-5 bg-[#FCFBF7] border border-[#D8C7AA] rounded-sm space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs uppercase tracking-wider font-semibold text-[#39483A]">
+                  Centro de Reclamos
+                </span>
+                <span className="text-lg font-bold font-tabular text-[#1F241F]">
+                  {claims.length}
+                </span>
+              </div>
+              <div className="space-y-1.5 text-xs text-[#39483A]/85 border-t border-[#D8C7AA]/60 pt-2">
+                <div className="flex justify-between">
+                  <span>Pendientes por responder:</span>
+                  <strong className="font-tabular text-amber-800">
+                    {adminPendingClaims.length}
+                  </strong>
+                </div>
+                <div className="flex justify-between">
+                  <span>Reclamos resueltos:</span>
+                  <strong className="font-tabular text-emerald-800">
+                    {adminRespondedClaims.length}
+                  </strong>
+                </div>
+                <p className="text-[11px] text-[#39483A]/65 pt-2">
+                  Podés resolver o dictaminar sobre reclamos desde la pestaña &quot;Gestión de Reclamos&quot;.
+                </p>
               </div>
             </div>
           </div>
@@ -2625,25 +2750,20 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
                 <div className="text-xs font-semibold uppercase tracking-wider text-[#39483A]">
                   Enviar Nuevo Reclamo
                 </div>
-                <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-[11px] font-semibold text-[#39483A] mb-1">
+                    Categoría del reclamo
+                  </label>
                   <select
                     value={claimTargetType}
                     onChange={(e) => setClaimTargetType(e.target.value as ClaimTargetType)}
-                    className="px-3 py-2 text-xs bg-white border border-[#D8C7AA] rounded-sm"
+                    className="w-full px-3 py-2 text-xs bg-white border border-[#D8C7AA] rounded-sm"
                   >
-                    <option value="publicacion">Sobre Publicación</option>
-                    <option value="visita">Sobre Visita</option>
-                    <option value="operacion">Sobre Operación</option>
-                    <option value="usuario">Sobre Usuario</option>
+                    <option value="publicacion">Sobre una Publicación de inmueble</option>
+                    <option value="visita">Sobre una Visita programada</option>
+                    <option value="operacion">Sobre una Oferta / Contrato</option>
+                    <option value="usuario">Atención al Usuario / General</option>
                   </select>
-                  <input
-                    type="text"
-                    required
-                    value={claimRef}
-                    onChange={(e) => setClaimRef(e.target.value)}
-                    placeholder="Referencia / ID"
-                    className="px-3 py-2 text-xs bg-white border border-[#D8C7AA] rounded-sm"
-                  />
                 </div>
                 <input
                   type="text"
@@ -2702,7 +2822,7 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
                     <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-[#39483A]/75">
                       <span>
                         Reportado por <strong className="text-[#1F241F]">{clm.reporterName}</strong> ·
-                        Categoría: <span className="uppercase">{clm.targetType}</span> ({clm.targetReference})
+                        Categoría: <span className="uppercase font-semibold">{clm.targetType}</span>
                       </span>
                       <span
                         className={`inline-block text-[10px] uppercase tracking-wider font-bold px-2.5 py-0.5 rounded-sm border ${getClaimStatusBadgeClass(

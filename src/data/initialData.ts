@@ -136,7 +136,7 @@ export const INITIAL_USERS: UserProfile[] = [
     address: 'Av. Figueroa Alcorta 3400, CABA',
     dni: '30.554.129',
     role: 'administrador',
-    isAlsoOwner: true,
+    isAlsoOwner: false,
     active: true,
     agencyName: 'ClaveHogar Plataforma Central',
     bio: 'Supervisión total de la plataforma, moderación de publicaciones y control de roles.',
