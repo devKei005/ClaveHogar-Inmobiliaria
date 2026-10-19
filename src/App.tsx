@@ -181,8 +181,21 @@ export default function App() {
     usersRef.current = users;
   }, [users]);
 
-  const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
-  const isDemoSessionRef = useRef<boolean>(false);
+  const [currentUser, setCurrentUser] = useState<UserProfile | null>(() => {
+    try {
+      const saved = localStorage.getItem('clavehogar_active_session');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed && (parsed.email || parsed.uid)) {
+          return parsed as UserProfile;
+        }
+      }
+    } catch {}
+    return null;
+  });
+  const isDemoSessionRef = useRef<boolean>(
+    Boolean(typeof window !== 'undefined' && localStorage.getItem('clavehogar_active_session'))
+  );
 
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [authModalMode, setAuthModalMode] = useState<AuthModalMode>('login');
@@ -309,10 +322,15 @@ export default function App() {
 
     async function bootstrapFirestore() {
       try {
-        const usersSnap = await getDocs(collection(db, 'app_users'));
-        if (usersSnap.empty) {
-          for (const u of INITIAL_USERS) {
-            await setDoc(doc(db, 'app_users', u.uid), u);
+        for (const u of INITIAL_USERS) {
+          try {
+            const userDocRef = doc(db, 'app_users', u.uid);
+            const userSnap = await getDoc(userDocRef);
+            if (!userSnap.exists()) {
+              await setDoc(userDocRef, u);
+            }
+          } catch (e) {
+            console.warn('Seed demo user error:', e);
           }
         }
 
@@ -556,13 +574,13 @@ export default function App() {
   // Sync Firebase Auth without wiping out quick-access demo sessions
   useEffect(() => {
     const unsubAuth = onAuthStateChanged(auth, async (user) => {
-      if (!user) {
-        if (!isDemoSessionRef.current) {
-          setCurrentUser(null);
-        }
+      if (isDemoSessionRef.current) {
         return;
       }
-      isDemoSessionRef.current = false;
+      if (!user) {
+        setCurrentUser(null);
+        return;
+      }
       const uid = sanitizeId(user.uid);
       const email = truncateText(user.email || 'usuario@clavehogar.com', SCHEMA_LIMITS.EMAIL_MAX);
 
@@ -903,23 +921,28 @@ export default function App() {
       notify('success', `¡Bienvenido/a, ${profile.displayName}!`, `Ingresaste con tu cuenta de ${profile.role}.`);
       return true;
     } catch (err: any) {
-      // Si el usuario ingresó manualmente una de las 4 cuentas oficiales @clavehogar.com con su clave demo (123456)
-      if (officialDemoProfile && password === '123456') {
-        const targetDemo =
-          users.find((u) => u.email.toLowerCase() === emailClean) ||
-          officialDemoProfile;
+      const cleanPassword = password.trim();
+      const targetUser =
+        users.find((u) => u.email.toLowerCase() === emailClean) ||
+        INITIAL_USERS.find((u) => u.email.toLowerCase() === emailClean);
 
-        if (!targetDemo.active) {
+      // Si es una cuenta oficial demo o usuario registrado en la base con clave 123456
+      if (targetUser && cleanPassword === '123456') {
+        if (!targetUser.active) {
           notify('error', 'Cuenta suspendida', 'Esta cuenta está desactivada por el administrador.');
           return false;
         }
+        await signOut(auth).catch(() => {});
         isDemoSessionRef.current = true;
-        setCurrentUser(targetDemo);
-        setActiveSubView(getDefaultSubViewForRole(targetDemo.role));
+        try {
+          localStorage.setItem('clavehogar_active_session', JSON.stringify(targetUser));
+        } catch {}
+        setCurrentUser(targetUser);
+        setActiveSubView(getDefaultSubViewForRole(targetUser.role));
         notify(
           'success',
-          `¡Bienvenido/a, ${targetDemo.displayName}!`,
-          `Ingresaste con la cuenta oficial ${targetDemo.email} (${targetDemo.role}).`
+          `¡Bienvenido/a, ${targetUser.displayName}!`,
+          `Ingresaste con la cuenta ${targetUser.email} (${targetUser.role}).`
         );
         return true;
       }
@@ -931,7 +954,7 @@ export default function App() {
           ? 'No existe una cuenta con ese correo.'
           : err?.code === 'auth/too-many-requests'
           ? 'Demasiados intentos. Probá más tarde.'
-          : 'No se pudo iniciar sesión.';
+          : 'No se pudo iniciar sesión. Verificá tu correo y contraseña.';
       notify('error', 'Error al iniciar sesión', msg);
       return false;
     }
@@ -1062,6 +1085,11 @@ export default function App() {
 
   const handleLogout = async () => {
     isDemoSessionRef.current = false;
+    try {
+      localStorage.removeItem('clavehogar_active_session');
+    } catch {
+      // ignore
+    }
     try {
       await signOut(auth);
     } catch {
@@ -2621,13 +2649,10 @@ export default function App() {
             <button
               type="button"
               onClick={() => setIsSideMenuOpen((prev) => !prev)}
-              className="p-2.5 text-[#39483A] hover:bg-[#F5F1E8] border border-[#D8C7AA] rounded-sm transition-colors flex items-center gap-2"
+              className="p-2.5 text-[#39483A] hover:bg-[#F5F1E8] border border-[#D8C7AA] rounded-sm transition-colors flex items-center justify-center cursor-pointer"
               aria-label="Abrir menú de navegación"
             >
               <Menu className="w-5 h-5" />
-              <span className="hidden sm:inline text-xs uppercase tracking-widest font-semibold">
-                Menú
-              </span>
             </button>
 
             <button

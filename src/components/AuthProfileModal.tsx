@@ -352,85 +352,12 @@ export const AuthProfileModal: React.FC<AuthProfileModalProps> = ({
                 </button>
               </form>
 
-              <div className="relative flex py-1 items-center">
-                <div className="flex-grow border-t border-[#D8C7AA]"></div>
-                <span className="flex-shrink mx-3 text-xs text-[#39483A]/60">
-                  O acceso rápido oficial (@clavehogar.com):
-                </span>
-                <div className="flex-grow border-t border-[#D8C7AA]"></div>
-              </div>
-
-              {/* Quick Demo Credentials helper strictly for the 4 @clavehogar.com accounts */}
-              <div className="p-4 bg-[#F5F1E8] border border-[#D8C7AA] rounded-sm space-y-2.5">
-                <div className="text-[11px] font-semibold text-[#39483A]">
-                  Cuentas de demostración (@clavehogar.com · clave: <span className="font-tabular">123456</span>):
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      clearAuthForms();
-                      onQuickRoleLogin('cliente');
-                      onClose();
-                    }}
-                    className="px-3 py-2 text-xs font-medium bg-[#FCFBF7] hover:bg-[#39483A] hover:text-[#FCFBF7] text-[#39483A] border border-[#D8C7AA] rounded-sm transition-colors text-left"
-                  >
-                    <span className="font-semibold block">Cliente</span>
-                    <span className="text-[10px] opacity-75 block truncate">
-                      {DEMO_ROLE_EMAILS.cliente}
-                    </span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      clearAuthForms();
-                      onQuickRoleLogin('propietario');
-                      onClose();
-                    }}
-                    className="px-3 py-2 text-xs font-medium bg-[#FCFBF7] hover:bg-[#39483A] hover:text-[#FCFBF7] text-[#39483A] border border-[#D8C7AA] rounded-sm transition-colors text-left"
-                  >
-                    <span className="font-semibold block">Propietario</span>
-                    <span className="text-[10px] opacity-75 block truncate">
-                      {DEMO_ROLE_EMAILS.propietario}
-                    </span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      clearAuthForms();
-                      onQuickRoleLogin('agente');
-                      onClose();
-                    }}
-                    className="px-3 py-2 text-xs font-medium bg-[#FCFBF7] hover:bg-[#39483A] hover:text-[#FCFBF7] text-[#39483A] border border-[#D8C7AA] rounded-sm transition-colors text-left"
-                  >
-                    <span className="font-semibold block">Agente Inmobiliario</span>
-                    <span className="text-[10px] opacity-75 block truncate">
-                      {DEMO_ROLE_EMAILS.agente}
-                    </span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      clearAuthForms();
-                      onQuickRoleLogin('administrador');
-                      onClose();
-                    }}
-                    className="px-3 py-2 text-xs font-medium bg-[#FCFBF7] hover:bg-[#39483A] hover:text-[#FCFBF7] text-[#39483A] border border-[#D8C7AA] rounded-sm transition-colors text-left"
-                  >
-                    <span className="font-semibold block">Administrador</span>
-                    <span className="text-[10px] opacity-75 block truncate">
-                      {DEMO_ROLE_EMAILS.administrador}
-                    </span>
-                  </button>
-                </div>
-              </div>
-
-              <div className="text-center text-xs text-[#39483A]/80 pt-1">
+              <div className="text-center text-xs text-[#39483A]/80 pt-2 border-t border-[#D8C7AA]">
                 ¿No tenés una cuenta?{' '}
                 <button
                   type="button"
                   onClick={() => switchMode('register')}
-                  className="font-semibold text-[#B86F52] hover:underline"
+                  className="font-semibold text-[#B86F52] hover:underline cursor-pointer"
                 >
                   Registrate aquí
                 </button>
