@@ -88,6 +88,7 @@ import { PropertyDetailModal } from './components/PropertyDetailModal';
 import { ComparatorView } from './components/ComparatorView';
 import { AuthProfileModal, AuthModalMode } from './components/AuthProfileModal';
 import { PropertyFormModal } from './components/PropertyFormModal';
+import { AIChatAssistant } from './components/AIChatAssistant';
 import {
   RoleWorkspaceView,
   WorkspaceSubView,
@@ -2685,13 +2686,14 @@ export default function App() {
             <button
               type="button"
               onClick={() => setActiveSection('buscador_ia')}
-              className={`text-xs uppercase tracking-[0.16em] font-semibold pb-1 border-b-2 transition-colors ${
+              className={`text-xs uppercase tracking-[0.16em] font-semibold pb-1 border-b-2 transition-colors flex items-center gap-1.5 ${
                 activeSection === 'buscador_ia'
                   ? 'border-[#B86F52] text-[#B86F52]'
                   : 'border-transparent text-[#39483A]/70 hover:text-[#39483A]'
               }`}
             >
-              Buscador
+              <Sparkles className="w-3.5 h-3.5 text-[#B86F52]" />
+              Asistente IA
             </button>
             <button
               type="button"
@@ -3093,7 +3095,13 @@ export default function App() {
       {/* =====================================================================
           MAIN VIEWPORT CONTENT
          ===================================================================== */}
-      <main className="flex-1">
+      <main
+        className={
+          activeSection === 'buscador_ia'
+            ? 'flex-1 flex flex-col h-[calc(100vh-73px)] overflow-hidden'
+            : 'flex-1'
+        }
+      >
         {/* ===================================================================
             VIEW 1: CATÁLOGO PRINCIPAL + HERO EDITORIAL ARQUITECTÓNICO
            =================================================================== */}
@@ -3608,217 +3616,12 @@ export default function App() {
             VIEW 2: BUSCADOR INTELIGENTE CON IA
            =================================================================== */}
         {activeSection === 'buscador_ia' && (
-          <section className="max-w-7xl mx-auto px-6 py-12 space-y-10">
-            <div className="bg-[#F5F1E8] border border-[#D8C7AA] rounded-sm p-8 sm:p-10 space-y-6">
-              <div className="max-w-3xl space-y-2">
-                <span className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#B86F52] block">
-                  Asesoramiento Inteligente
-                </span>
-                <h1 className="text-3xl sm:text-4xl font-serif-display font-semibold text-[#39483A]">
-                  Buscador de Propiedades 
-                </h1>
-                <p className="text-sm text-[#1F241F]/80 leading-relaxed">
-                  Describí qué tipo de propiedad buscás (ubicación, dormitorios, jardín o pileta, presupuesto máximo y operación). El sistema interpreta tu pedido y selecciona los inmuebles reales almacenados en Firestore.
-                </p>
-              </div>
-
-              <form onSubmit={(e) => handleRunAISearch(e)} className="space-y-4">
-                <div className="flex flex-col sm:flex-row gap-3">
-                  <input
-                    type="text"
-                    value={aiQuery}
-                    onChange={(e) => setAiQuery(e.target.value)}
-                    placeholder="Ej: Busco una casa de 3 habitaciones, con pileta, cerca de Quilmes y con un presupuesto máximo de $200.000."
-                    className="flex-1 px-4 py-3.5 text-sm bg-[#FCFBF7] text-[#1F241F] rounded-sm border border-[#D8C7AA] focus:outline-none focus:border-[#39483A]"
-                  />
-                  <button
-                    type="submit"
-                    disabled={aiLoading}
-                    className="px-7 py-3.5 text-xs uppercase tracking-widest font-semibold text-[#FCFBF7] bg-[#39483A] hover:bg-[#2c382d] rounded-sm transition-colors shrink-0 disabled:opacity-50"
-                  >
-                    {aiLoading ? 'Analizando catálogo...' : 'Analizar y Recomendar'}
-                  </button>
-                </div>
-
-                <div className="flex flex-wrap gap-2 pt-1">
-                  {AI_PROMPT_SUGGESTIONS.map((sug, i) => (
-                    <button
-                      key={i}
-                      type="button"
-                      onClick={() => {
-                        setAiQuery(sug);
-                        handleRunAISearch(undefined, sug);
-                      }}
-                      className="text-xs bg-[#FCFBF7] hover:bg-[#39483A] hover:text-[#FCFBF7] text-[#39483A] px-3 py-1.5 rounded-sm border border-[#D8C7AA] transition-colors text-left"
-                    >
-                      “{sug}”
-                    </button>
-                  ))}
-                </div>
-              </form>
-            </div>
-
-            {aiLoading && (
-              <div className="bg-[#FCFBF7] border border-[#D8C7AA] rounded-sm p-12 text-center space-y-2">
-                <div className="text-lg font-serif-display font-semibold text-[#39483A]">
-                  Evaluando inmuebles compatibles en Firestore...
-                </div>
-              </div>
-            )}
-
-            {!aiLoading && aiResult && (
-              <div className="space-y-8 animate-fade-slide">
-                {/* Cuadro de Respuesta del Asistente Virtual ClaveHogar */}
-                {aiResult.assistantMessage && (
-                  <div
-                    className={`rounded-sm p-6 border-2 flex items-start gap-4 transition-all ${
-                      aiResult.isOffTopic
-                        ? 'bg-amber-50/90 border-amber-400'
-                        : aiResult.needsClarification
-                        ? 'bg-blue-50/90 border-blue-400'
-                        : 'bg-[#F5F1E8] border-[#39483A]'
-                    }`}
-                  >
-                    <div className="w-10 h-10 rounded-full bg-[#39483A] text-[#FCFBF7] flex items-center justify-center shrink-0 mt-0.5 shadow-xs">
-                      <Sparkles className="w-5 h-5 text-[#D8C7AA]" />
-                    </div>
-                    <div className="space-y-1.5 flex-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="text-[11px] uppercase tracking-wider font-bold text-[#39483A]">
-                          Asistente Virtual de Búsqueda Inmobiliaria
-                        </span>
-                        {aiResult.isOffTopic && (
-                          <span className="text-[10px] uppercase font-bold bg-amber-200 text-amber-900 px-2 py-0.5 rounded-sm border border-amber-400">
-                            Consulta fuera del catálogo
-                          </span>
-                        )}
-                        {aiResult.needsClarification && (
-                          <span className="text-[10px] uppercase font-bold bg-blue-200 text-blue-900 px-2 py-0.5 rounded-sm border border-blue-400">
-                            Aclaración requerida
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-base text-[#1F241F] font-medium leading-relaxed">
-                        {aiResult.assistantMessage}
-                      </p>
-                    </div>
-                  </div>
-                )}
-
-                {!aiResult.isOffTopic && !aiResult.needsClarification && (
-                  <div className="bg-[#FCFBF7] border border-[#D8C7AA] rounded-sm p-6 space-y-4">
-                    <div className="flex items-center justify-between border-b border-[#D8C7AA] pb-3">
-                      <h2 className="text-xl font-serif-display font-semibold text-[#39483A]">
-                        Síntesis de Búsqueda
-                      </h2>
-                      <span className="text-xs font-semibold text-[#B86F52]">
-                        {aiResult.recommendations.length} coincidencias encontradas
-                      </span>
-                    </div>
-                    <p className="text-sm text-[#1F241F]/85">{aiResult.interpretedPreferences.summary}</p>
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-                      <div className="p-3 rounded-sm bg-[#F5F1E8] border border-[#D8C7AA]">
-                        <span className="text-[#39483A]/70 block">Operación</span>
-                        <strong className="text-[#1F241F] capitalize">
-                          {aiResult.interpretedPreferences.operationType}
-                        </strong>
-                      </div>
-                      <div className="p-3 rounded-sm bg-[#F5F1E8] border border-[#D8C7AA]">
-                        <span className="text-[#39483A]/70 block">Zonas</span>
-                        <strong className="text-[#1F241F]">
-                          {aiResult.interpretedPreferences.preferredLocations.join(', ')}
-                        </strong>
-                      </div>
-                      <div className="p-3 rounded-sm bg-[#F5F1E8] border border-[#D8C7AA]">
-                        <span className="text-[#39483A]/70 block">Presupuesto máximo</span>
-                        <strong className="text-[#1F241F] font-tabular">
-                          {aiResult.interpretedPreferences.maxPrice > 0
-                            ? `USD ${aiResult.interpretedPreferences.maxPrice.toLocaleString()}`
-                            : 'Flexible'}
-                        </strong>
-                      </div>
-                      <div className="p-3 rounded-sm bg-[#F5F1E8] border border-[#D8C7AA]">
-                        <span className="text-[#39483A]/70 block">Atributos buscados</span>
-                        <strong className="text-[#1F241F]">
-                          {aiResult.interpretedPreferences.keyFeatures.join(', ')}
-                        </strong>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {aiResult.recommendations.length === 0 && !aiResult.isOffTopic && !aiResult.needsClarification ? (
-                  <div className="bg-[#F5F1E8] border border-[#D8C7AA] rounded-sm p-10 text-center space-y-3">
-                    <h3 className="text-2xl font-serif-display font-semibold text-[#39483A]">
-                      No encontramos propiedades que coincidan con todos esos requisitos
-                    </h3>
-                    <p className="text-sm text-[#39483A]/80 max-w-lg mx-auto">
-                      Ninguna de las propiedades activas en Firestore cumple simultáneamente con la zona, presupuesto o comodidades solicitadas. Probá ampliando el rango de búsqueda o ajustando los filtros.
-                    </p>
-                  </div>
-                ) : null}
-
-                {aiResult.recommendations.length > 0 && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                    {aiResult.recommendations.map((rec) => {
-                      const prop = properties.find((p) => p.id === rec.propertyId);
-                      if (!prop) return null;
-                      return (
-                        <div
-                          key={rec.propertyId}
-                          className="bg-[#FCFBF7] border border-[#D8C7AA] hover:border-[#39483A] rounded-sm overflow-hidden flex flex-col justify-between transition-colors"
-                        >
-                          <div>
-                            <div className="relative aspect-[4/3] bg-[#F5F1E8]">
-                              <img
-                                src={prop.images[0] || HERO_IMAGE}
-                                alt={prop.title}
-                                referrerPolicy="no-referrer"
-                                onError={(e) => {
-                                  if (e.currentTarget.src !== HERO_IMAGE) {
-                                    e.currentTarget.src = HERO_IMAGE;
-                                  }
-                                }}
-                                className="w-full h-full object-cover"
-                              />
-                              <div className="absolute top-3 left-3 px-3 py-1 bg-[#39483A] text-[#FCFBF7] text-xs font-semibold font-tabular">
-                                {rec.matchScore}% Compatibilidad
-                              </div>
-                            </div>
-
-                            <div className="p-6 space-y-3">
-                              <div className="text-xs uppercase tracking-wider font-semibold text-[#B86F52]">
-                                {prop.location} · {prop.currency} {prop.price.toLocaleString()}
-                              </div>
-                              <h3 className="text-2xl font-serif-display font-semibold text-[#1F241F]">
-                                {prop.title}
-                              </h3>
-                              <div className="p-3.5 bg-[#F5F1E8] border-l-2 border-[#B86F52] text-xs text-[#1F241F]/85 leading-relaxed">
-                                {rec.explanation}
-                              </div>
-                              <div className="text-xs text-[#39483A]/80 font-tabular">
-                                {prop.bedrooms} dormitorios · {prop.bathrooms} baños · {prop.surface} m²
-                              </div>
-                            </div>
-                          </div>
-
-                          <div className="p-6 pt-0">
-                            <button
-                              type="button"
-                              onClick={() => setSelectedProperty(prop)}
-                              className="w-full py-2.5 px-4 text-xs uppercase tracking-widest font-semibold text-[#FCFBF7] bg-[#39483A] hover:bg-[#2c382d] rounded-sm transition-colors"
-                            >
-                              Ver Ficha Completa
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            )}
-          </section>
+          <AIChatAssistant
+            properties={approvedProperties}
+            onSelectProperty={(prop) => setSelectedProperty(prop)}
+            onGoToCatalog={() => setActiveSection('catalogo')}
+            initialPrompt={aiQuery}
+          />
         )}
 
         {/* ===================================================================
