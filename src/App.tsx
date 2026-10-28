@@ -3621,6 +3621,7 @@ export default function App() {
             onSelectProperty={(prop) => setSelectedProperty(prop)}
             onGoToCatalog={() => setActiveSection('catalogo')}
             initialPrompt={aiQuery}
+            currentUser={currentUser}
           />
         )}
 

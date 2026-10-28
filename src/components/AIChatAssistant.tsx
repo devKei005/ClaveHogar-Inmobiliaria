@@ -8,7 +8,7 @@ import {
   MapPin,
   Info,
 } from 'lucide-react';
-import { PropertyItem } from '../types';
+import { PropertyItem, UserProfile } from '../types';
 import { HERO_IMAGE } from '../data/initialData';
 import {
   ExtractedSearchCriteria,
@@ -17,6 +17,12 @@ import {
   extractCriteriaLocally,
   verifyPropertiesAgainstCriteria,
   buildAgentConversationReply,
+  hasSufficientCriteriaToSearch,
+  mergeConversationalCriteria,
+  isGreetingOrNonPropertyMessage,
+  analyzeOffTopicIntent,
+  shouldSuppressPropertyCards,
+  setKnownCatalogProperties,
 } from '../utils/aiConversationalAgent';
 
 interface AIChatAssistantProps {
@@ -24,13 +30,14 @@ interface AIChatAssistantProps {
   onSelectProperty: (property: PropertyItem) => void;
   onGoToCatalog: () => void;
   initialPrompt?: string;
+  currentUser?: UserProfile | null;
 }
 
 const INITIAL_GREETING: ChatMessageItem = {
   id: 'msg_welcome',
   role: 'assistant',
   content:
-    '¡Hola! Soy Clara, tu asesora inmobiliaria personal en ClaveHogar. Estoy para acompañarte como un agente de confianza.\n\nContame con tus propias palabras qué tipo de propiedad estás buscando (por ejemplo: si buscás comprar o alquilar, en qué localidad o barrio, qué presupuesto estimás y qué comodidades como pileta, jardín o cochera te interesan).',
+    '¡Hola! Soy Clara, tu asesora inmobiliaria personal en ClaveHogar. Estoy para recomendar propiedades que se ajusten a tus necesidades.\n\nContame qué tipo de propiedad estás buscando (por ejemplo: si buscás comprar o alquilar, en qué localidad o barrio, qué presupuesto estimás y qué comodidades como pileta, jardín o cochera te interesan).',
   timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
 };
 
@@ -39,15 +46,98 @@ export const AIChatAssistant: React.FC<AIChatAssistantProps> = ({
   onSelectProperty,
   onGoToCatalog,
   initialPrompt,
+  currentUser,
 }) => {
-  const [messages, setMessages] = useState<ChatMessageItem[]>([INITIAL_GREETING]);
+  const userKey = currentUser?.uid ? `user_${currentUser.uid}` : 'guest';
+  const storageKeyHistory = `clavehogar_ai_chat_history_${userKey}`;
+  const storageKeyCriteria = `clavehogar_ai_chat_criteria_${userKey}`;
+
+  const [messages, setMessages] = useState<ChatMessageItem[]>(() => {
+    try {
+      const saved = localStorage.getItem(storageKeyHistory);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {}
+    return [INITIAL_GREETING];
+  });
+
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [currentCriteria, setCurrentCriteria] = useState<ExtractedSearchCriteria>({});
+  const [currentCriteria, setCurrentCriteria] = useState<ExtractedSearchCriteria>(() => {
+    try {
+      const saved = localStorage.getItem(storageKeyCriteria);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed && typeof parsed === 'object') return parsed;
+      }
+    } catch {}
+    return {};
+  });
   const initialPromptRanRef = useRef(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Al cambiar el usuario logueado o pasar a invitado, recargar su historial correspondiente
+  const prevUserKeyRef = useRef(userKey);
+  useEffect(() => {
+    if (prevUserKeyRef.current !== userKey) {
+      prevUserKeyRef.current = userKey;
+      try {
+        const savedHistory = localStorage.getItem(storageKeyHistory);
+        if (savedHistory) {
+          const parsed = JSON.parse(savedHistory);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setMessages(parsed);
+          } else {
+            setMessages([INITIAL_GREETING]);
+          }
+        } else {
+          setMessages([INITIAL_GREETING]);
+        }
+
+        const savedCriteria = localStorage.getItem(storageKeyCriteria);
+        if (savedCriteria) {
+          const parsed = JSON.parse(savedCriteria);
+          if (parsed && typeof parsed === 'object') {
+            setCurrentCriteria(parsed);
+          } else {
+            setCurrentCriteria({});
+          }
+        } else {
+          setCurrentCriteria({});
+        }
+      } catch {
+        setMessages([INITIAL_GREETING]);
+        setCurrentCriteria({});
+      }
+    }
+  }, [userKey, storageKeyHistory, storageKeyCriteria]);
+
+  // Persistir automáticamente el historial del usuario activo
+  useEffect(() => {
+    try {
+      if (messages.length > 0) {
+        localStorage.setItem(storageKeyHistory, JSON.stringify(messages));
+      }
+    } catch {}
+  }, [messages, storageKeyHistory]);
+
+  // Sincronizar catálogo real de Firestore en memoria para respuestas dinámicas de zonas
+  useEffect(() => {
+    if (Array.isArray(properties) && properties.length > 0) {
+      setKnownCatalogProperties(properties);
+    }
+  }, [properties]);
+
+  // Persistir criterios acumulados del usuario activo
+  useEffect(() => {
+    try {
+      localStorage.setItem(storageKeyCriteria, JSON.stringify(currentCriteria));
+    } catch {}
+  }, [currentCriteria, storageKeyCriteria]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -125,19 +215,61 @@ export const AIChatAssistant: React.FC<AIChatAssistantProps> = ({
 
       // Si el servidor no respondió a tiempo o falló, procesar con el motor determinístico local
       if (!serverResponseData) {
-        const localCriteria = extractCriteriaLocally(text, currentCriteria);
-        const verification = verifyPropertiesAgainstCriteria(properties, localCriteria);
-        const reply = buildAgentConversationReply(text, localCriteria, verification);
+        const offTopic = analyzeOffTopicIntent(text, currentCriteria);
+        if (offTopic.isOffTopic) {
+          serverResponseData = {
+            assistantMessage:
+              offTopic.reply ||
+              'Disculpá, no sé de qué estás hablando ya que solo me especializo en temas inmobiliarios. ¿Te interesa buscar alguna propiedad para comprar o alquilar?',
+            criteria: { resetTriggered: true },
+            exactMatches: [],
+            alternativeMatches: [],
+          };
+        } else {
+          const isGreetingOrOffTopic = isGreetingOrNonPropertyMessage(text);
+          const isPureGreeting = isGreetingOrOffTopic && !offTopic.isOffTopic;
+          const localCriteria = extractCriteriaLocally(text, currentCriteria);
+          const mergedCriteria = mergeConversationalCriteria(currentCriteria, text, localCriteria);
+          const hasSufficient = hasSufficientCriteriaToSearch(mergedCriteria);
 
-        serverResponseData = {
-          assistantMessage: reply.message,
-          criteria: localCriteria,
-          exactMatches: localCriteria.isGeneralInquiry ? [] : verification.exactMatches,
-          alternativeMatches: localCriteria.isGeneralInquiry ? [] : verification.alternativeMatches,
-        };
+          const suppressCards = shouldSuppressPropertyCards(text, mergedCriteria);
+          const canReturnProps =
+            !isPureGreeting &&
+            hasSufficient &&
+            !suppressCards &&
+            !mergedCriteria.isExploringOtherZones &&
+            !mergedCriteria.resetTriggered &&
+            !mergedCriteria.isAmbiguousOrUnrealisticBudget;
+
+          const verification =
+            canReturnProps
+              ? verifyPropertiesAgainstCriteria(properties, mergedCriteria)
+              : { exactMatches: [], alternativeMatches: [], criteria: mergedCriteria };
+          const reply = buildAgentConversationReply(text, currentCriteria, mergedCriteria, verification, properties);
+
+          serverResponseData = {
+            assistantMessage: reply.message,
+            criteria: mergedCriteria.resetTriggered || isPureGreeting ? { resetTriggered: true } : mergedCriteria,
+            exactMatches: canReturnProps ? verification.exactMatches : [],
+            alternativeMatches:
+              canReturnProps && verification.exactMatches.length === 0
+                ? verification.alternativeMatches
+                : [],
+          };
+        }
       }
 
-      setCurrentCriteria(serverResponseData.criteria);
+      if (serverResponseData.criteria?.resetTriggered || !serverResponseData.criteria || Object.keys(serverResponseData.criteria).length === 0) {
+        setCurrentCriteria({});
+        try {
+          localStorage.removeItem(storageKeyCriteria);
+        } catch {}
+      } else {
+        setCurrentCriteria(serverResponseData.criteria);
+        try {
+          localStorage.setItem(storageKeyCriteria, JSON.stringify(serverResponseData.criteria));
+        } catch {}
+      }
 
       const assistantMessageItem: ChatMessageItem = {
         id: `msg_assistant_${Date.now()}`,
@@ -177,6 +309,10 @@ export const AIChatAssistant: React.FC<AIChatAssistantProps> = ({
       },
     ]);
     setInputValue('');
+    try {
+      localStorage.removeItem(storageKeyHistory);
+      localStorage.removeItem(storageKeyCriteria);
+    } catch {}
   };
 
   const hasActiveCriteria =
@@ -536,7 +672,7 @@ export const AIChatAssistant: React.FC<AIChatAssistantProps> = ({
       </div>
 
       {/* 4. Barra de Entrada Pinned en la Parte Inferior (Full-Width) */}
-      <footer className="w-full bg-[#F5F1E8] border-t border-[#D8C7AA] p-4 sm:p-5 shrink-0">
+      <footer className="w-full bg-[#F5F1E8] border-t border-[#D8C7AA] p-4 sm:p-5 shrink-0 sticky bottom-0 z-10">
         <div className="max-w-4xl mx-auto space-y-2">
           <form
             onSubmit={(e) => {
