@@ -37,7 +37,7 @@ const INITIAL_GREETING: ChatMessageItem = {
   id: 'msg_welcome',
   role: 'assistant',
   content:
-    '¡Hola! Soy Clara, tu asesora inmobiliaria personal en ClaveHogar. Estoy para recomendar propiedades que se ajusten a tus necesidades.\n\nContame qué tipo de propiedad estás buscando (por ejemplo: si buscás comprar o alquilar, en qué localidad o barrio, qué presupuesto estimás y qué comodidades como pileta, jardín o cochera te interesan).',
+    '¡Hola! Soy Clara, tu asesora inmobiliaria personal en ClaveHogar. Estoy para acompañarte como un agente de confianza.\n\nContame con tus propias palabras qué tipo de propiedad estás buscando (por ejemplo: si buscás comprar o alquilar, en qué localidad o barrio, qué presupuesto estimás y qué comodidades como pileta, jardín o cochera te interesan).',
   timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
 };
 
@@ -238,8 +238,7 @@ export const AIChatAssistant: React.FC<AIChatAssistantProps> = ({
             hasSufficient &&
             !suppressCards &&
             !mergedCriteria.isExploringOtherZones &&
-            !mergedCriteria.resetTriggered &&
-            !mergedCriteria.isAmbiguousOrUnrealisticBudget;
+            !mergedCriteria.resetTriggered;
 
           const verification =
             canReturnProps
@@ -323,28 +322,28 @@ export const AIChatAssistant: React.FC<AIChatAssistantProps> = ({
 
   return (
     <div className="w-full h-full flex flex-col bg-[#FCFBF7] overflow-hidden">
-      {/* 1. Header Superior Full-Width */}
-      <header className="bg-[#F5F1E8] border-b border-[#D8C7AA] px-4 sm:px-8 py-3.5 flex items-center justify-between gap-4 shrink-0 shadow-xs">
+      {/* 1. Header Superior Full-Width Diferenciado del Nav */}
+      <header className="bg-[#2c382d] text-[#FCFBF7] border-b border-[#D8C7AA]/50 px-4 sm:px-8 py-3.5 flex items-center justify-between gap-4 shrink-0 shadow-md">
         <div className="flex items-center gap-3.5">
           <div className="relative">
-            <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-full bg-[#39483A] text-[#FCFBF7] flex items-center justify-center font-serif-display text-xl font-bold shadow-sm">
+            <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-full bg-[#FCFBF7] text-[#39483A] flex items-center justify-center font-serif-display text-xl font-bold shadow-sm">
               C
             </div>
             <span
-              className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-emerald-500 border-2 border-[#F5F1E8] rounded-full"
+              className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-emerald-400 border-2 border-[#2c382d] rounded-full"
               title="En línea · Asesoramiento en tiempo real"
             />
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-lg sm:text-2xl font-serif-display font-semibold text-[#39483A]">
+              <h1 className="text-lg sm:text-2xl font-serif-display font-semibold text-[#FCFBF7]">
                 Clara · Asesora Inmobiliaria
               </h1>
-              <span className="text-[10px] bg-emerald-100 text-emerald-800 border border-emerald-300 px-2 py-0.5 rounded-full font-medium hidden sm:inline">
+              <span className="text-[10px] bg-emerald-900/80 text-emerald-200 border border-emerald-500/50 px-2 py-0.5 rounded-full font-medium hidden sm:inline">
                 En línea
               </span>
             </div>
-            <p className="text-xs text-[#1F241F]/75 line-clamp-1">
+            <p className="text-xs text-[#FCFBF7]/80 line-clamp-1">
               Asesoramiento personalizado en tiempo real · Consultá propiedades, zonas, requisitos y visitas
             </p>
           </div>
@@ -354,7 +353,7 @@ export const AIChatAssistant: React.FC<AIChatAssistantProps> = ({
           <button
             type="button"
             onClick={handleResetConversation}
-            className="px-3 py-2 text-xs uppercase tracking-wider font-semibold text-[#39483A] bg-[#FCFBF7] hover:bg-[#39483A] hover:text-[#FCFBF7] border border-[#D8C7AA] rounded-sm transition-colors flex items-center gap-1.5 cursor-pointer"
+            className="px-3 py-2 text-xs uppercase tracking-wider font-semibold text-[#FCFBF7] bg-[#39483A] hover:bg-[#475748] border border-[#D8C7AA]/60 rounded-sm transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs"
             title="Reiniciar diálogo"
           >
             <RotateCcw className="w-3.5 h-3.5" />
@@ -363,7 +362,7 @@ export const AIChatAssistant: React.FC<AIChatAssistantProps> = ({
           <button
             type="button"
             onClick={onGoToCatalog}
-            className="px-3.5 py-2 text-xs uppercase tracking-wider font-semibold text-[#FCFBF7] bg-[#39483A] hover:bg-[#2c382d] rounded-sm transition-colors cursor-pointer"
+            className="px-3.5 py-2 text-xs uppercase tracking-wider font-semibold text-[#39483A] bg-[#F5F1E8] hover:bg-[#FCFBF7] rounded-sm transition-colors cursor-pointer shadow-xs"
           >
             Catálogo
           </button>

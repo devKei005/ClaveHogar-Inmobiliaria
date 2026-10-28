@@ -163,8 +163,7 @@ async function startServer() {
         hasSufficient &&
         !suppressCards &&
         !preliminaryCriteria.isExploringOtherZones &&
-        !preliminaryCriteria.resetTriggered &&
-        !preliminaryCriteria.isAmbiguousOrUnrealisticBudget;
+        !preliminaryCriteria.resetTriggered;
 
       res.json({
         assistantMessage: localFallbackReply.message,
@@ -300,7 +299,7 @@ REGLAS OBLIGATORIAS:
 8. Coincidencias exactas vs alternativas: Si no hay coincidencias exactas, concluye en 1 o 2 oraciones por qué pueden servirle las opciones sugeridas.
 9. Nueva ubicación: Si el cliente elige o menciona una nueva ubicación tras no haber hallado en la anterior, borra los filtros anteriores restrictivos, actualiza a la nueva zona y presenta las alternativas reales de esa zona de inmediato, sin repetir que no hay propiedades en la anterior ni volver a preguntar lo mismo. Conserva el contexto previo cuando el cliente no esté pidiendo una nueva necesidad.
 10. Lugares o direcciones inexistentes: Si el cliente busca una dirección o localidad donde no tenemos propiedades, dile que no disponemos de propiedades en esa dirección que busca, pero preséntale las alternativas seleccionadas diciéndole de forma amable que «aunque no coincidió con los requisitos que querés en cuanto a la ubicación, te puedo dar algunas opciones que cumplen con algunas de las necesidades que fuiste mencionando» y explica un motivo concreto.
-11. Moneda y presupuesto: Si el importe no es realista, pídele con amabilidad que te aclare el valor o la moneda.
+11. Moneda y presupuesto: En ClaveHogar todas las propiedades y valores se gestionan en USD (dólares estadounidenses). Si el cliente indica su presupuesto en otra moneda (ej. pesos, euros), dile amablemente que el sistema trabaja en USD/DÓLARES y que tomas como referencia ese monto en USD para buscar y dar recomendaciones.
 12. Siempre termina con una pregunta abierta para mantener la conversación activa.`,
           responseMimeType: 'application/json',
           responseSchema: {
@@ -354,14 +353,17 @@ REGLAS OBLIGATORIAS:
 
       let finalAssistantMessage = parsed.assistantMessage || localFallbackReply.message;
 
-      if (finalCriteria.isAmbiguousOrUnrealisticBudget) {
-        finalAssistantMessage = `Veo que mencionaste un presupuesto de ${
-          finalCriteria.maxPrice ? `${finalCriteria.maxPrice} pesos` : 'ese monto'
-        }. En el mercado inmobiliario actual las propiedades se publican en dólares (USD) o en valores más altos en moneda local para alquileres.\n\n¿Te referías a USD ${finalCriteria.maxPrice || ''} o quisiste indicar otro importe? Contame así puedo orientarte con opciones acordes.`;
+      if (
+        finalCriteria.mentionedOtherCurrency &&
+        finalCriteria.maxPrice &&
+        !finalAssistantMessage.toLowerCase().includes('dolar') &&
+        !finalAssistantMessage.toLowerCase().includes('usd')
+      ) {
+        finalAssistantMessage = `Te comento que en ClaveHogar todas las propiedades y valores se gestionan en USD (dólares). Entendido que querés buscar propiedades con ese monto de USD ${finalCriteria.maxPrice.toLocaleString()}.\n\n${finalAssistantMessage}`;
       }
 
       const hasExacts = finalVerification.exactMatches.length > 0;
-      const canReturnFinalProps = !suppressCards && !finalCriteria.isAmbiguousOrUnrealisticBudget;
+      const canReturnFinalProps = !suppressCards;
 
       res.json({
         assistantMessage: finalAssistantMessage,
@@ -377,7 +379,7 @@ REGLAS OBLIGATORIAS:
         console.error('Error en /api/ai/conversational-search, usando fallback local:', err);
       }
       const hasExacts = preliminaryVerification.exactMatches.length > 0;
-      const canReturnFallbackProps = !suppressCards && !preliminaryCriteria.isAmbiguousOrUnrealisticBudget;
+      const canReturnFallbackProps = !suppressCards;
       res.json({
         assistantMessage: localFallbackReply.message,
         criteria: preliminaryCriteria,

@@ -2587,7 +2587,7 @@ export default function App() {
   }, [claims, currentUser]);
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#FCFBF7] text-[#1F241F]">
+    <div className={activeSection === 'buscador_ia' ? "h-screen flex flex-col bg-[#FCFBF7] text-[#1F241F] overflow-hidden" : "min-h-screen flex flex-col bg-[#FCFBF7] text-[#1F241F]"}>
       {/* =====================================================================
           TOAST NOTIFICATIONS (Capa principal superior sobre cualquier modal)
          ===================================================================== */}
@@ -3098,7 +3098,7 @@ export default function App() {
       <main
         className={
           activeSection === 'buscador_ia'
-            ? 'flex-1 flex flex-col h-[calc(100vh-73px)] overflow-hidden'
+            ? 'flex-1 flex flex-col h-[calc(100vh-80px)] overflow-hidden'
             : 'flex-1'
         }
       >
