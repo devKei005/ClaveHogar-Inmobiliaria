@@ -75,14 +75,23 @@ service cloud.firestore {
       allow delete: if isValidId(inquiryId);
     }
 
-    // Operations & Contracts collection
+    // Operations collection
     match /operations/{operationId} {
       allow get, list: if true;
       allow create, update: if isValidId(operationId)
         && incoming().propertyId is string && incoming().propertyId.size() <= 128
         && incoming().clientId is string && incoming().clientId.size() <= 128
-        && incoming().status in ['solicitada', 'en_revision', 'aprobada', 'rechazada', 'concretada'];
+        && incoming().status in ['pendiente', 'en_negociacion', 'aceptada', 'rechazada', 'concretada', 'solicitada', 'en_revision', 'aprobada'];
       allow delete: if isValidId(operationId);
+    }
+
+    // Contracts collection
+    match /contracts/{contractId} {
+      allow get, list: if true;
+      allow create, update: if isValidId(contractId)
+        && incoming().propertyId is string && incoming().propertyId.size() <= 128
+        && incoming().contractCode is string;
+      allow delete: if isValidId(contractId);
     }
 
     // Claims / Reclamos collection

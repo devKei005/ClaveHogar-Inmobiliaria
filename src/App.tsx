@@ -3,7 +3,7 @@ import {
   Search,
   SlidersHorizontal,
   Heart,
-  Scale,
+  ArrowLeftRight,
   RotateCcw,
   Check,
   Bell,
@@ -14,6 +14,7 @@ import {
   User,
   Sparkles,
   Edit3,
+  Trash2,
   CheckCircle2,
   XCircle,
   Info,
@@ -57,9 +58,13 @@ import {
   InquiryItem,
   ChatMessage,
   OperationItem,
+  CounterOfferItem,
+  ContractItem,
   OperationTypeChoice,
   DealStatus,
   ClaimItem,
+  ClaimMessage,
+  ClaimStatusHistoryItem,
   ClaimTargetType,
   ClaimStatus,
   CategoryConfigItem,
@@ -171,6 +176,7 @@ function saveCachedUsers(userList: UserProfile[]) {
 export default function App() {
   const [activeSection, setActiveSection] = useState<MainSection>('catalogo');
   const [activeSubView, setActiveSubView] = useState<WorkspaceSubView>('cliente_favoritos');
+  const [selectedClaimId, setSelectedClaimId] = useState<string | null>(null);
 
   // Hamburger Side Drawer state
   const [isSideMenuOpen, setIsSideMenuOpen] = useState(false);
@@ -212,6 +218,7 @@ export default function App() {
   const [claims, setClaims] = useState<ClaimItem[]>(INITIAL_CLAIMS);
   const [categories, setCategories] = useState<CategoryConfigItem[]>(INITIAL_CATEGORIES);
   const [notifications, setNotifications] = useState<NotificationItem[]>(INITIAL_NOTIFICATIONS);
+  const [contracts, setContracts] = useState<ContractItem[]>([]);
 
   // Toast Notification Queue
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
@@ -219,8 +226,10 @@ export default function App() {
   // Hero Carousel state
   const [heroShowcaseIdx, setHeroShowcaseIdx] = useState(0);
 
-  // Selected property detail & form modals
+  // Selected property detail, deletion & form modals
   const [selectedProperty, setSelectedProperty] = useState<PropertyItem | null>(null);
+  const [propertyToDelete, setPropertyToDelete] = useState<PropertyItem | null>(null);
+  const [isDeletingProperty, setIsDeletingProperty] = useState(false);
   const [isPropertyFormOpen, setIsPropertyFormOpen] = useState(false);
   const [editingProperty, setEditingProperty] = useState<PropertyItem | null>(null);
 
@@ -276,7 +285,14 @@ export default function App() {
     targetUserId: string,
     title: string,
     message: string,
-    type: 'success' | 'info' | 'warning' = 'info'
+    type: 'success' | 'info' | 'warning' = 'info',
+    extra?: {
+      targetSubView?: string;
+      targetClaimId?: string;
+      claimCode?: string;
+      targetPropertyId?: string;
+      targetInquiryId?: string;
+    }
   ) => {
     if (!targetUserId || !targetUserId.trim()) return;
     const id = sanitizeId(`notif_${Date.now()}_${Math.random().toString(36).slice(2, 5)}`);
@@ -284,9 +300,14 @@ export default function App() {
       id,
       userId: targetUserId,
       title: truncateText(title, 150),
-      message: truncateText(message, 450),
+      message: truncateText(message, 700),
       type,
       read: false,
+      targetSubView: extra?.targetSubView,
+      targetClaimId: extra?.targetClaimId,
+      claimCode: extra?.claimCode,
+      targetPropertyId: extra?.targetPropertyId,
+      targetInquiryId: extra?.targetInquiryId,
       createdAtIso: new Date().toISOString(),
     };
     setNotifications((prev) =>
@@ -300,7 +321,7 @@ export default function App() {
   };
 
   const approvedProperties = useMemo(
-    () => properties.filter((p) => p.publicationStatus === 'aprobada'),
+    () => properties.filter((p) => p.publicationStatus === 'aprobada' && p.availability !== 'alquilada' && p.availability !== 'vendida'),
     [properties]
   );
 
@@ -309,13 +330,7 @@ export default function App() {
     [users]
   );
 
-  useEffect(() => {
-    if (approvedProperties.length <= 1) return;
-    const interval = setInterval(() => {
-      setHeroShowcaseIdx((prev) => (prev + 1) % Math.min(5, approvedProperties.length));
-    }, 6000);
-    return () => clearInterval(interval);
-  }, [approvedProperties.length]);
+
 
   // Seed initial data into Firestore if collections are empty & attach real-time listeners
   useEffect(() => {
@@ -558,6 +573,17 @@ export default function App() {
       (err) => handleFirestoreError(err, OperationType.GET, 'favorites')
     );
 
+    const unsubContracts = onSnapshot(
+      collection(db, 'contracts'),
+      (snap) => {
+        if (!mounted) return;
+        if (!snap.empty) {
+          setContracts(snap.docs.map((d) => d.data() as ContractItem));
+        }
+      },
+      (err) => handleFirestoreError(err, OperationType.GET, 'contracts')
+    );
+
     return () => {
       mounted = false;
       unsubUsers();
@@ -569,6 +595,7 @@ export default function App() {
       unsubCategories();
       unsubNotifs();
       unsubFavs();
+      unsubContracts();
     };
   }, []);
 
@@ -748,8 +775,7 @@ export default function App() {
   );
 
   const filteredProperties = useMemo(() => {
-    return properties
-      .filter((p) => p.publicationStatus === 'aprobada')
+    return approvedProperties
       .filter((p) => {
         if (filterOperation !== 'todos' && p.operationType !== filterOperation) return false;
         if (filterPropertyType !== 'todos' && p.propertyType !== filterPropertyType) return false;
@@ -1416,9 +1442,14 @@ export default function App() {
       notify('error', 'Sin permisos', 'Solo el propietario titular o el administrador pueden eliminar esta publicación.');
       return;
     }
-    if (!window.confirm(`¿Eliminar la publicación "${target.title}"? Esta acción no se puede deshacer.`)) {
-      return;
-    }
+    setPropertyToDelete(target);
+  };
+
+  const handleConfirmDeleteProperty = async () => {
+    if (!propertyToDelete || !currentUser) return;
+    const propertyId = propertyToDelete.id;
+    const title = propertyToDelete.title;
+    setIsDeletingProperty(true);
 
     try {
       await deleteDoc(doc(db, 'properties', propertyId));
@@ -1426,10 +1457,17 @@ export default function App() {
       if (selectedProperty?.id === propertyId) {
         setSelectedProperty(null);
       }
-      notify('success', 'Propiedad eliminada correctamente', 'El inmueble fue eliminado de Firebase Firestore.');
+      setPropertyToDelete(null);
+      notify(
+        'success',
+        'Propiedad eliminada correctamente',
+        `La publicación "${title}" fue eliminada de la base de datos Firestore.`
+      );
     } catch (err) {
       notify('error', 'Error al eliminar la propiedad', 'No se pudo eliminar el documento de Firestore.');
       handleFirestoreError(err, OperationType.DELETE, `properties/${propertyId}`);
+    } finally {
+      setIsDeletingProperty(false);
     }
   };
 
@@ -1999,11 +2037,20 @@ export default function App() {
     property: PropertyItem,
     operationType: OperationTypeChoice,
     offeredAmount: number,
-    message: string
+    message: string,
+    extraData?: {
+      currency?: 'USD' | 'ARS';
+      guaranteeType?: string;
+      desiredTerm?: string;
+      declaredIncome?: string;
+      paymentMethod?: string;
+      conditions?: string;
+    }
   ) => {
     if (!currentUser) return;
     const opId = sanitizeId(`op_${Date.now()}`);
     const confirmedAgentId = isAgentConfirmedOnProperty(property) ? property.agentId || '' : '';
+    const currency = extraData?.currency || property.currency || 'USD';
 
     const newOp: OperationItem = {
       id: opId,
@@ -2011,13 +2058,19 @@ export default function App() {
       propertyTitle: property.title,
       operationType,
       offeredAmount,
-      currency: property.currency,
+      currency,
       clientId: currentUser.uid,
       clientName: currentUser.displayName,
       ownerId: property.ownerId,
-      agentId: confirmedAgentId,
-      status: 'solicitada',
-      message,
+      agentId: confirmedAgentId || '',
+      status: 'pendiente',
+      message: message || extraData?.conditions || 'Propuesta enviada',
+      guaranteeType: extraData?.guaranteeType || '',
+      desiredTerm: extraData?.desiredTerm || '',
+      declaredIncome: extraData?.declaredIncome || '',
+      paymentMethod: extraData?.paymentMethod || '',
+      conditions: extraData?.conditions || '',
+      publishedPriceReference: property.price || 0,
       createdAtIso: new Date().toISOString(),
     };
 
@@ -2028,26 +2081,126 @@ export default function App() {
       );
       await pushUserNotification(
         property.ownerId,
-        `Nueva oferta de ${operationType} — ${property.title}`,
-        `${currentUser.displayName} presentó una propuesta por ${property.currency} ${offeredAmount.toLocaleString()}.`,
+        `Nueva propuesta de ${operationType} — ${property.title}`,
+        `${currentUser.displayName} presentó una propuesta por ${currency} ${offeredAmount.toLocaleString()}.`,
         'info'
       );
       if (confirmedAgentId) {
         await pushUserNotification(
           confirmedAgentId,
-          `Nueva oferta de ${operationType} — ${property.title}`,
-          `${currentUser.displayName} presentó una propuesta por ${property.currency} ${offeredAmount.toLocaleString()}.`,
+          `Nueva propuesta de ${operationType} — ${property.title}`,
+          `${currentUser.displayName} presentó una propuesta por ${currency} ${offeredAmount.toLocaleString()}.`,
           'info'
         );
       }
       notify(
         'success',
-        'Solicitud enviada correctamente',
-        `Tu propuesta de ${operationType} por ${property.currency} ${offeredAmount.toLocaleString()} fue registrada.`
+        'Propuesta enviada correctamente',
+        `Tu propuesta de ${operationType} por ${currency} ${offeredAmount.toLocaleString()} fue registrada.`
       );
     } catch (err) {
-      notify('error', 'Error al guardar los datos', 'No se pudo registrar la solicitud.');
+      notify('error', 'Error al guardar los datos', 'No se pudo registrar la propuesta.');
       handleFirestoreError(err, OperationType.CREATE, `operations/${opId}`);
+    }
+  };
+
+  const handleCounterOffer = async (
+    operationId: string,
+    counterData: CounterOfferItem
+  ) => {
+    const existing = operations.find((o) => o.id === operationId);
+    if (!existing) return;
+
+    const updated: OperationItem = {
+      ...existing,
+      status: 'en_negociacion',
+      counterOffer: counterData,
+    };
+
+    try {
+      await setDoc(doc(db, 'operations', operationId), updated);
+      setOperations((prev) => prev.map((o) => (o.id === operationId ? updated : o)));
+
+      await pushUserNotification(
+        existing.clientId,
+        `Nueva contrapropuesta — ${existing.propertyTitle}`,
+        `Se propusieron nuevos términos: ${counterData.currency} ${counterData.amount.toLocaleString()}.`,
+        'info'
+      );
+
+      notify(
+        'success',
+        'Contrapropuesta enviada',
+        'Se enviaron los nuevos términos al cliente.'
+      );
+    } catch (err) {
+      notify('error', 'Error al guardar los datos', 'No se pudo registrar la contrapropuesta.');
+      handleFirestoreError(err, OperationType.UPDATE, `operations/${operationId}`);
+    }
+  };
+
+  const handleConfirmContract = async (
+    operationId: string,
+    contractDataPayload: Omit<ContractItem, 'id' | 'createdAtIso'>
+  ) => {
+    const existingOp = operations.find((o) => o.id === operationId);
+    if (!existingOp) return;
+
+    const contractId = sanitizeId(`ctr_${Date.now()}`);
+    const newContract: ContractItem = {
+      ...contractDataPayload,
+      id: contractId,
+      createdAtIso: new Date().toISOString(),
+    };
+
+    try {
+      await setDoc(doc(db, 'contracts', contractId), newContract);
+      setContracts((prev) => [newContract, ...prev.filter((c) => c.id !== contractId)]);
+
+      const updatedOp: OperationItem = {
+        ...existingOp,
+        status: 'concretada',
+        contractCode: contractDataPayload.contractCode,
+        contractTerms: contractDataPayload.contractTerms,
+        contractStartDate: contractDataPayload.startDate,
+        contractEndDate: contractDataPayload.endDate,
+      };
+      await setDoc(doc(db, 'operations', operationId), updatedOp);
+      setOperations((prev) => prev.map((o) => (o.id === operationId ? updatedOp : o)));
+
+      const newAvailability: AvailabilityStatus =
+        existingOp.operationType === 'alquiler' ? 'alquilada' : 'vendida';
+      await handleUpdateAvailability(existingOp.propertyId, newAvailability);
+
+      await pushUserNotification(
+        existingOp.clientId,
+        `¡Operación Concretada! — ${existingOp.propertyTitle}`,
+        `Se registró el contrato #${contractDataPayload.contractCode} por ${contractDataPayload.finalCurrency} ${contractDataPayload.finalPrice.toLocaleString()}.`,
+        'success'
+      );
+      await pushUserNotification(
+        existingOp.ownerId,
+        `Contrato Registrado — ${existingOp.propertyTitle}`,
+        `Operación concretada con éxito. Código de contrato: ${contractDataPayload.contractCode}.`,
+        'success'
+      );
+      if (existingOp.agentId) {
+        await pushUserNotification(
+          existingOp.agentId,
+          `Contrato Registrado — ${existingOp.propertyTitle}`,
+          `Operación concretada con éxito. Código de contrato: ${contractDataPayload.contractCode}.`,
+          'success'
+        );
+      }
+
+      notify(
+        'success',
+        'Contrato registrado y operación concretada',
+        `Se guardó el contrato #${contractDataPayload.contractCode} y la propiedad quedó marcada como ${newAvailability}.`
+      );
+    } catch (err) {
+      notify('error', 'Error al concretar operación', 'No se pudo registrar el contrato.');
+      handleFirestoreError(err, OperationType.CREATE, `contracts/${contractId}`);
     }
   };
 
@@ -2074,9 +2227,7 @@ export default function App() {
       await setDoc(doc(db, 'operations', operationId), updated);
       setOperations((prev) => prev.map((o) => (o.id === operationId ? updated : o)));
 
-      if (status === 'aprobada') {
-        await handleUpdateAvailability(existing.propertyId, 'reservada');
-      } else if (status === 'concretada') {
+      if (status === 'concretada') {
         await handleUpdateAvailability(
           existing.propertyId,
           existing.operationType === 'alquiler' ? 'alquilada' : 'vendida'
@@ -2086,12 +2237,12 @@ export default function App() {
       await pushUserNotification(
         existing.clientId,
         `Solicitud ${status.toUpperCase()} — ${existing.propertyTitle}`,
-        status === 'aprobada'
-          ? `Tu solicitud para "${existing.propertyTitle}" fue ACEPTADA.`
+        status === 'aceptada'
+          ? `Tu propuesta para "${existing.propertyTitle}" fue ACEPTADA.`
           : status === 'rechazada'
-          ? `Tu solicitud para "${existing.propertyTitle}" fue RECHAZADA.`
+          ? `Tu propuesta para "${existing.propertyTitle}" fue RECHAZADA.`
           : `Tu operación cambió al estado: ${status.toUpperCase()}.`,
-        status === 'aprobada' || status === 'concretada'
+        status === 'aceptada' || status === 'concretada'
           ? 'success'
           : status === 'rechazada'
           ? 'warning'
@@ -2100,10 +2251,10 @@ export default function App() {
 
       notify(
         'success',
-        status === 'aprobada'
-          ? 'Solicitud aprobada correctamente'
+        status === 'aceptada'
+          ? 'Propuesta aceptada correctamente'
           : status === 'rechazada'
-          ? 'Solicitud rechazada'
+          ? 'Propuesta rechazada'
           : 'Operación actualizada correctamente',
         'Los cambios y notificaciones se guardaron en Firestore.'
       );
@@ -2121,17 +2272,33 @@ export default function App() {
   ) => {
     if (!currentUser) return;
     const clmId = sanitizeId(`clm_${Date.now()}`);
+    const claimCode = `REC-${new Date().getFullYear()}-${Math.floor(100 + Math.random() * 900)}`;
+    const nowIso = new Date().toISOString();
     const newClaim: ClaimItem = {
       id: clmId,
+      claimCode,
       reporterId: currentUser.uid,
       reporterName: currentUser.displayName,
+      reporterEmail: currentUser.email,
       targetType,
       targetReference,
       subject,
       description,
-      status: 'abierto',
-      adminResolution: '',
-      createdAtIso: new Date().toISOString(),
+      status: 'pendiente',
+      messages: [],
+      statusHistory: [
+        {
+          id: `csh_${Date.now()}`,
+          timestamp: nowIso.slice(0, 16).replace('T', ' '),
+          changedBy: currentUser.displayName,
+          changedByRole: currentUser.role,
+          fromStatus: 'pendiente',
+          toStatus: 'pendiente',
+          note: 'Reclamo generado por el cliente',
+        },
+      ],
+      createdAtIso: nowIso,
+      updatedAtIso: nowIso,
     };
 
     try {
@@ -2139,10 +2306,181 @@ export default function App() {
       setClaims((prev) =>
         prev.some((c) => c.id === clmId) ? prev : [newClaim, ...prev]
       );
-      notify('success', 'Reclamo enviado correctamente', 'Administración revisará tu caso a la brevedad.');
+      // Notificar al Administrador
+      const adminUser =
+        users.find((u) => u.email.toLowerCase() === DEMO_ROLE_EMAILS.administrador) ||
+        INITIAL_USERS.find((u) => u.role === 'administrador');
+      if (adminUser) {
+        await pushUserNotification(
+          adminUser.uid,
+          `Nuevo reclamo ${claimCode}: ${truncateText(subject, 50)}`,
+          `${currentUser.displayName} ingresó un reclamo sobre "${truncateText(subject, 80)}": "${truncateText(description, 180)}"`,
+          'warning',
+          { targetSubView: 'admin_reclamos', targetClaimId: clmId, claimCode }
+        );
+      }
+      notify(
+        'success',
+        `Reclamo ${claimCode} enviado correctamente`,
+        'Administración revisará tu caso y responderá en el chat del reclamo a la brevedad.'
+      );
     } catch (err) {
       notify('error', 'Error al guardar los datos', 'No se pudo registrar el reclamo.');
       handleFirestoreError(err, OperationType.CREATE, `claims/${clmId}`);
+    }
+  };
+
+  const handleUpdateClaimStatus = async (
+    claimId: string,
+    newStatus: ClaimStatus,
+    note?: string,
+    extraFields?: {
+      solutionDescription?: string;
+      dismissalReason?: string;
+      reopenReason?: string;
+    }
+  ) => {
+    const existing = claims.find((c) => c.id === claimId);
+    if (!existing || !currentUser) return;
+    const nowIso = new Date().toISOString();
+    const claimCode = existing.claimCode || `#REC-${existing.id.replace('clm_', '').slice(-5).toUpperCase()}`;
+
+    const historyEntry: ClaimStatusHistoryItem = {
+      id: `csh_${Date.now()}`,
+      timestamp: nowIso.slice(0, 16).replace('T', ' '),
+      changedBy: currentUser.displayName,
+      changedByRole: currentUser.role,
+      fromStatus: existing.status,
+      toStatus: newStatus,
+      note:
+        note ||
+        extraFields?.solutionDescription ||
+        extraFields?.dismissalReason ||
+        extraFields?.reopenReason ||
+        `Estado actualizado a ${newStatus}`,
+    };
+
+    const updated: ClaimItem = {
+      ...existing,
+      status: newStatus,
+      updatedAtIso: nowIso,
+      solutionDescription:
+        extraFields?.solutionDescription !== undefined
+          ? extraFields.solutionDescription
+          : existing.solutionDescription,
+      dismissalReason:
+        extraFields?.dismissalReason !== undefined
+          ? extraFields.dismissalReason
+          : existing.dismissalReason,
+      reopenReason:
+        extraFields?.reopenReason !== undefined
+          ? extraFields.reopenReason
+          : existing.reopenReason,
+      adminResolution:
+        extraFields?.solutionDescription ||
+        extraFields?.dismissalReason ||
+        note ||
+        existing.adminResolution ||
+        '',
+      resolvedAtIso: newStatus === 'solucionado' ? nowIso : existing.resolvedAtIso,
+      statusHistory: [...(existing.statusHistory || []), historyEntry],
+    };
+
+    try {
+      await setDoc(doc(db, 'claims', claimId), updated);
+      setClaims((prev) => prev.map((c) => (c.id === claimId ? updated : c)));
+
+      // Notificaciones automáticas obligatorias con número, confirmación y descripción/motivo
+      if (newStatus === 'solucionado') {
+        const solDesc = extraFields?.solutionDescription || note || 'Reclamo verificado y solucionado por Administración.';
+        await pushUserNotification(
+          existing.reporterId,
+          `Reclamo #${claimCode} — ¡Solucionado!`,
+          `Confirmación: Tu reclamo sobre "${existing.subject}" fue marcado como SOLUCIONADO por la Administración.\n\nDescripción de la solución:\n"${solDesc}"`,
+          'success',
+          { targetSubView: 'reclamos_usuario', targetClaimId: claimId, claimCode }
+        );
+      } else if (newStatus === 'en_revision') {
+        await pushUserNotification(
+          existing.reporterId,
+          `Reclamo #${claimCode} — En Revisión`,
+          `Tu reclamo sobre "${existing.subject}" fue puesto EN REVISIÓN por la Administración para coordinar su resolución.`,
+          'info',
+          { targetSubView: 'reclamos_usuario', targetClaimId: claimId, claimCode }
+        );
+      } else if (newStatus === 'pendiente') {
+        await pushUserNotification(
+          existing.reporterId,
+          `Reclamo #${claimCode} — Reabierto`,
+          `Tu reclamo sobre "${existing.subject}" fue reabierto por la Administración para seguimiento adicional.\n\nMotivo: "${extraFields?.reopenReason || note || 'En seguimiento'}"`,
+          'info',
+          { targetSubView: 'reclamos_usuario', targetClaimId: claimId, claimCode }
+        );
+      }
+
+      notify(
+        'success',
+        `Reclamo ${claimCode} actualizado`,
+        `El estado cambió a ${newStatus.toUpperCase().replace('_', ' ')} y se notificó al cliente.`
+      );
+    } catch (err) {
+      notify('error', 'Error al guardar los datos', 'No se pudo actualizar el estado del reclamo.');
+      handleFirestoreError(err, OperationType.UPDATE, `claims/${claimId}`);
+    }
+  };
+
+  const handleSendClaimMessage = async (claimId: string, text: string) => {
+    const existing = claims.find((c) => c.id === claimId);
+    if (!existing || !currentUser || !text.trim()) return;
+    const nowIso = new Date().toISOString();
+    const claimCode = existing.claimCode || `#REC-${existing.id.replace('clm_', '').slice(-5).toUpperCase()}`;
+
+    const newMsg: ClaimMessage = {
+      id: `cmsg_${Date.now()}_${Math.random().toString(36).slice(2, 5)}`,
+      senderId: currentUser.uid,
+      senderName: currentUser.displayName,
+      senderRole: currentUser.role,
+      text: text.trim(),
+      timestamp: nowIso.slice(0, 16).replace('T', ' '),
+    };
+
+    const updated: ClaimItem = {
+      ...existing,
+      messages: [...(existing.messages || []), newMsg],
+      updatedAtIso: nowIso,
+    };
+
+    try {
+      await setDoc(doc(db, 'claims', claimId), updated);
+      setClaims((prev) => prev.map((c) => (c.id === claimId ? updated : c)));
+
+      // Notificaciones automáticas bidireccionales
+      if (currentUser.role === 'administrador') {
+        await pushUserNotification(
+          existing.reporterId,
+          `Nueva respuesta en reclamo #${claimCode}`,
+          `La Administración respondió en tu reclamo "${existing.subject}": "${truncateText(text, 150)}"`,
+          'info',
+          { targetSubView: 'reclamos_usuario', targetClaimId: claimId, claimCode }
+        );
+      } else {
+        const adminUser =
+          users.find((u) => u.email.toLowerCase() === DEMO_ROLE_EMAILS.administrador) ||
+          INITIAL_USERS.find((u) => u.role === 'administrador');
+        if (adminUser) {
+          await pushUserNotification(
+            adminUser.uid,
+            `Mensaje de cliente en reclamo #${claimCode}`,
+            `${currentUser.displayName} respondió en el reclamo "${existing.subject}": "${truncateText(text, 150)}"`,
+            'info',
+            { targetSubView: 'admin_reclamos', targetClaimId: claimId, claimCode }
+          );
+        }
+      }
+      notify('success', 'Mensaje enviado', 'Se guardó en la conversación del reclamo.');
+    } catch (err) {
+      notify('error', 'Error al enviar mensaje', 'No se pudo registrar el mensaje.');
+      handleFirestoreError(err, OperationType.UPDATE, `claims/${claimId}`);
     }
   };
 
@@ -2151,24 +2489,9 @@ export default function App() {
     status: ClaimStatus,
     adminResolution: string
   ) => {
-    const existing = claims.find((c) => c.id === claimId);
-    if (!existing) return;
-    const updated: ClaimItem = { ...existing, status, adminResolution };
-
-    try {
-      await setDoc(doc(db, 'claims', claimId), updated);
-      setClaims((prev) => prev.map((c) => (c.id === claimId ? updated : c)));
-      await pushUserNotification(
-        existing.reporterId,
-        `Resolución de reclamo: ${existing.subject}`,
-        adminResolution,
-        'info'
-      );
-      notify('success', 'Reclamo resuelto correctamente', 'Se guardó la resolución en Firestore.');
-    } catch (err) {
-      notify('error', 'Error al guardar los datos', 'No se pudo actualizar el reclamo.');
-      handleFirestoreError(err, OperationType.UPDATE, `claims/${claimId}`);
-    }
+    await handleUpdateClaimStatus(claimId, status, adminResolution, {
+      solutionDescription: status === 'solucionado' ? adminResolution : undefined,
+    });
   };
 
   const handleUpdateUserAdmin = async (uid: string, role: UserRole, active: boolean) => {
@@ -2455,7 +2778,8 @@ export default function App() {
   }, [currentUser, favoriteIds.length, properties, users]);
 
   const heroFeaturedProperty =
-    approvedProperties[heroShowcaseIdx % Math.max(1, approvedProperties.length)] ||
+    approvedProperties.find((p) => p.id === 'prop_casa_quilmes_pileta') ||
+    approvedProperties[0] ||
     INITIAL_PROPERTIES[0];
 
   const markAllNotificationsRead = async () => {
@@ -2495,7 +2819,11 @@ export default function App() {
 
     let destinationSubView: WorkspaceSubView = getDefaultSubViewForRole(currentUser.role);
 
-    if (n.targetSubView) {
+    if (n.targetClaimId) {
+      setSelectedClaimId(n.targetClaimId);
+      destinationSubView =
+        currentUser.role === 'administrador' ? 'admin_reclamos' : 'reclamos_usuario';
+    } else if (n.targetSubView) {
       destinationSubView = n.targetSubView as WorkspaceSubView;
     } else if (text.includes('reclamo')) {
       destinationSubView =
@@ -2597,7 +2925,7 @@ export default function App() {
             key={t.id}
             className={`pointer-events-auto flex items-start gap-3 p-4 rounded-sm border-2 shadow-2xl backdrop-blur-md animate-fade-slide ${
               t.type === 'success'
-                ? 'bg-[#EBF9ED] text-[#0F4A1E] border-emerald-500 shadow-emerald-950/15 ring-2 ring-emerald-500/20'
+                ? 'bg-[#EBF9ED] text-[#0F4A1E] border-emerald-500 shadow-xl ring-2 ring-[#173B43]/20'
                 : t.type === 'error'
                 ? 'bg-[#FDF2F2] text-[#691C1C] border-red-500 shadow-red-950/15 ring-2 ring-red-500/20'
                 : 'bg-[#FEF9EE] text-[#5C3B00] border-amber-500 shadow-amber-950/15 ring-2 ring-amber-500/20'
@@ -2605,7 +2933,7 @@ export default function App() {
           >
             <div className="shrink-0 mt-0.5">
               {t.type === 'success' && (
-                <div className="w-7 h-7 rounded-full bg-emerald-500 text-white flex items-center justify-center shadow-xs">
+                <div className="w-7 h-7 rounded-full bg-[#F8F6F1]0 text-white flex items-center justify-center shadow-xs">
                   <CheckCircle2 className="w-4 h-4 stroke-[2.5]" />
                 </div>
               )}
@@ -2643,14 +2971,14 @@ export default function App() {
       {/* =====================================================================
           MINIMALIST ARCHITECTURAL HEADER WITH INTEGRATED HAMBURGER MENU
          ===================================================================== */}
-      <header className="sticky top-0 z-40 bg-[#FCFBF7]/95 backdrop-blur-xs border-b border-[#D8C7AA]">
+      <header className="sticky top-0 z-40 bg-[#F8F6F1]/95 backdrop-blur-md border-b border-[#D5BFA0]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 h-20 flex items-center justify-between gap-4">
           {/* Left: Hamburger Menu Button + Brand Wordmark */}
           <div className="flex items-center gap-4">
             <button
               type="button"
               onClick={() => setIsSideMenuOpen((prev) => !prev)}
-              className="p-2.5 text-[#39483A] hover:bg-[#F5F1E8] border border-[#D8C7AA] rounded-sm transition-colors flex items-center justify-center cursor-pointer"
+              className="p-2.5 text-[#303638] hover:bg-white/60 border border-[#D5BFA0] rounded-xl transition-colors flex items-center justify-center cursor-pointer shadow-2xs"
               aria-label="Abrir menú de navegación"
             >
               <Menu className="w-5 h-5" />
@@ -2659,26 +2987,26 @@ export default function App() {
             <button
               type="button"
               onClick={() => setActiveSection('catalogo')}
-              className="text-left"
+              className="text-left cursor-pointer group"
             >
-              <span className="text-2xl sm:text-3xl font-serif-display font-semibold tracking-tight text-[#39483A] block leading-none">
+              <span className="text-lg sm:text-xl font-serif-display font-normal tracking-tight text-[#303638] block leading-none">
                 ClaveHogar
               </span>
-              <span className="text-[10px] uppercase tracking-[0.22em] text-[#B86F52] block mt-1">
+              <span className="text-[9px] uppercase tracking-[0.2em] font-medium text-[#303638]/70 block mt-0.5">
                 Alquileres &amp; Ventas
               </span>
             </button>
           </div>
 
-          {/* Center: Clean Editorial Navigation Links */}
-          <nav className="hidden md:flex items-center gap-8">
+          {/* Center: Clean Editorial Navigation Links (Matching Image 1 & 2 pills) */}
+          <nav className="hidden md:flex items-center gap-2 bg-white/60 p-1.5 rounded-full border border-[#D5BFA0] shadow-2xs">
             <button
               type="button"
               onClick={() => setActiveSection('catalogo')}
-              className={`text-xs uppercase tracking-[0.16em] font-semibold pb-1 border-b-2 transition-colors ${
+              className={`text-xs font-semibold px-4 py-2 rounded-full transition-all cursor-pointer ${
                 activeSection === 'catalogo'
-                  ? 'border-[#39483A] text-[#39483A]'
-                  : 'border-transparent text-[#39483A]/70 hover:text-[#39483A]'
+                  ? 'bg-[#173B43] text-[#F8F6F1] shadow-xs'
+                  : 'text-[#303638]/75 hover:text-[#303638] hover:bg-white/80'
               }`}
             >
               Catálogo
@@ -2686,22 +3014,22 @@ export default function App() {
             <button
               type="button"
               onClick={() => setActiveSection('buscador_ia')}
-              className={`text-xs uppercase tracking-[0.16em] font-semibold pb-1 border-b-2 transition-colors flex items-center gap-1.5 ${
+              className={`text-xs font-semibold px-4 py-2 rounded-full transition-all flex items-center gap-1.5 cursor-pointer ${
                 activeSection === 'buscador_ia'
-                  ? 'border-[#B86F52] text-[#B86F52]'
-                  : 'border-transparent text-[#39483A]/70 hover:text-[#39483A]'
+                  ? 'bg-[#173B43] text-[#F8F6F1] shadow-xs'
+                  : 'text-[#303638]/75 hover:text-[#303638] hover:bg-white/80'
               }`}
             >
-              <Sparkles className="w-3.5 h-3.5 text-[#B86F52]" />
+              <Sparkles className="w-3.5 h-3.5 text-[#D5BFA0]" />
               Asistente IA
             </button>
             <button
               type="button"
               onClick={() => setActiveSection('comparador')}
-              className={`text-xs uppercase tracking-[0.16em] font-semibold pb-1 border-b-2 transition-colors ${
+              className={`text-xs font-semibold px-4 py-2 rounded-full transition-all cursor-pointer ${
                 activeSection === 'comparador'
-                  ? 'border-[#39483A] text-[#39483A]'
-                  : 'border-transparent text-[#39483A]/70 hover:text-[#39483A]'
+                  ? 'bg-[#173B43] text-[#F8F6F1] shadow-xs'
+                  : 'text-[#303638]/75 hover:text-[#303638] hover:bg-white/80'
               }`}
             >
               Comparador ({comparedIds.length})
@@ -2710,10 +3038,10 @@ export default function App() {
               <button
                 type="button"
                 onClick={() => setActiveSection('panel_rol')}
-                className={`text-xs uppercase tracking-[0.16em] font-semibold pb-1 border-b-2 transition-colors ${
+                className={`text-xs font-semibold px-4 py-2 rounded-full transition-all cursor-pointer ${
                   activeSection === 'panel_rol'
-                    ? 'border-[#39483A] text-[#39483A]'
-                    : 'border-transparent text-[#39483A]/70 hover:text-[#39483A]'
+                    ? 'bg-[#173B43] text-[#F8F6F1] shadow-xs'
+                    : 'text-[#303638]/75 hover:text-[#303638] hover:bg-white/80'
                 }`}
               >
                 Mi Espacio
@@ -2728,14 +3056,14 @@ export default function App() {
                 <button
                   type="button"
                   onClick={() => openAuthModal('login')}
-                  className="px-4 py-2 text-xs uppercase tracking-wider font-semibold text-[#39483A] border border-[#D8C7AA] hover:bg-[#F5F1E8] rounded-sm transition-colors"
+                  className="px-4 py-2 text-xs uppercase tracking-wider font-semibold text-[#303638] border border-[#D5BFA0] hover:bg-white rounded-xl transition-colors cursor-pointer"
                 >
                   Iniciar sesión
                 </button>
                 <button
                   type="button"
                   onClick={() => openAuthModal('register')}
-                  className="px-4 py-2 text-xs uppercase tracking-wider font-semibold text-[#FCFBF7] bg-[#39483A] hover:bg-[#2c382d] rounded-sm transition-colors"
+                  className="px-4 py-2 text-xs uppercase tracking-wider font-semibold text-white bg-[#173B43] hover:bg-[#122e35] rounded-xl transition-colors cursor-pointer shadow-xs"
                 >
                   Registrarse
                 </button>
@@ -2752,7 +3080,7 @@ export default function App() {
                         markAllNotificationsRead();
                       }
                     }}
-                    className="relative p-2.5 text-[#39483A] hover:bg-[#F5F1E8] border border-[#D8C7AA] rounded-sm transition-colors"
+                    className="relative p-2.5 text-[#303638] hover:bg-white border border-[#D5BFA0] rounded-xl transition-colors cursor-pointer shadow-2xs"
                     title="Notificaciones"
                   >
                     <Bell className="w-4 h-4" />
@@ -2764,13 +3092,13 @@ export default function App() {
                   </button>
 
                   {showNotifDropdown && (
-                    <div className="absolute right-0 mt-2 w-84 sm:w-96 bg-[#FCFBF7] text-[#1F241F] border border-[#D8C7AA] rounded-sm shadow-xl p-4 z-50 space-y-3">
-                      <div className="flex items-center justify-between border-b border-[#D8C7AA] pb-2.5">
+                    <div className="absolute right-0 mt-2 w-84 sm:w-96 bg-white text-[#303638] border border-[#D5BFA0] rounded-2xl shadow-xl p-4 z-50 space-y-3">
+                      <div className="flex items-center justify-between border-b border-[#D5BFA0] pb-2.5">
                         <div>
-                          <span className="text-xs uppercase tracking-wider font-bold text-[#39483A] block">
+                          <span className="text-xs uppercase tracking-wider font-bold text-[#173B43] block">
                             Mis Notificaciones ({myNotifications.length})
                           </span>
-                          <span className="text-[10px] text-[#39483A]/70">
+                          <span className="text-[10px] text-[#303638]/70">
                             Tocá cualquier cartel para ir directamente a esa sección
                           </span>
                         </div>
@@ -2779,13 +3107,13 @@ export default function App() {
                           onClick={() => setShowNotifDropdown(false)}
                           aria-label="Cerrar notificaciones"
                           title="Cerrar notificaciones"
-                          className="p-1.5 rounded-sm bg-red-50 text-red-600 hover:bg-red-600 hover:text-white border border-red-300 transition-colors cursor-pointer"
+                          className="p-1.5 rounded-lg bg-red-50 text-red-600 hover:bg-red-600 hover:text-white border border-red-300 transition-colors cursor-pointer"
                         >
                           <X className="w-4 h-4 stroke-[2.5]" />
                         </button>
                       </div>
                       {myNotifications.length === 0 ? (
-                        <p className="text-xs text-[#39483A]/70 py-4 text-center">
+                        <p className="text-xs text-[#303638]/70 py-4 text-center">
                           No tenés notificaciones recientes.
                         </p>
                       ) : (
@@ -2809,39 +3137,41 @@ export default function App() {
                             const cardColorClass = isRejectedOrError
                               ? 'bg-red-50 border-red-300 hover:border-red-500'
                               : isSuccess
-                              ? 'bg-emerald-50/80 border-emerald-300 hover:border-emerald-600'
+                              ? 'bg-[#F8F6F1] border-[#D5BFA0] hover:border-[#173B43]'
                               : isPendingOrReview
                               ? 'bg-amber-50 border-amber-300 hover:border-amber-500'
-                              : 'bg-[#F5F1E8] border-[#D8C7AA] hover:border-[#39483A]';
+                              : 'bg-[#F8F6F1] border-[#D5BFA0] hover:border-[#173B43]';
 
                             const titleColorClass = isRejectedOrError
                               ? 'text-red-800'
                               : isSuccess
-                              ? 'text-emerald-900'
+                              ? 'text-[#173B43]'
                               : isPendingOrReview
                               ? 'text-amber-900'
-                              : 'text-[#39483A]';
+                              : 'text-[#173B43]';
 
                             return (
                               <button
                                 key={n.id}
                                 type="button"
                                 onClick={() => handleNotificationClick(n)}
-                                className={`w-full text-left p-3 rounded-sm border text-xs space-y-1.5 transition-all cursor-pointer group ${cardColorClass}`}
+                                className={`w-full text-left p-3 rounded-xl border text-xs space-y-1.5 transition-all cursor-pointer group ${cardColorClass}`}
                               >
                                 <div className="flex items-start justify-between gap-2">
                                   <span className={`font-bold leading-snug ${titleColorClass}`}>
                                     {n.title}
                                   </span>
-                                  <ArrowRight className="w-3.5 h-3.5 shrink-0 text-[#39483A]/60 group-hover:text-[#1F241F] group-hover:translate-x-0.5 transition-all mt-0.5" />
+                                  <ArrowRight className="w-3.5 h-3.5 shrink-0 text-[#303638]/60 group-hover:text-[#303638] group-hover:translate-x-0.5 transition-all mt-0.5" />
                                 </div>
-                                <p className="text-[#1F241F]/85 leading-snug">{n.message}</p>
+                                <p className="text-[#303638]/85 leading-snug">{n.message}</p>
                                 <div className="flex items-center justify-between pt-0.5 text-[10px]">
-                                  <span className="text-[#39483A]/65 font-tabular">
+                                  <span className="text-[#303638]/65 font-tabular">
                                     {n.createdAtIso.slice(0, 16).replace('T', ' ')}
                                   </span>
-                                  <span className="font-semibold text-[#39483A] group-hover:underline">
-                                    Ir a la sección →
+                                  <span className="font-semibold text-[#173B43] group-hover:underline">
+                                    {n.targetClaimId
+                                      ? `Ver Reclamo ${n.claimCode ? '#' + n.claimCode : ''} →`
+                                      : 'Ir a la sección →'}
                                   </span>
                                 </div>
                               </button>
@@ -2853,13 +3183,13 @@ export default function App() {
                   )}
                 </div>
 
-                {/* User Profile Button */}
+                {/* User Profile Button matching Image 1 & 2 */}
                 <button
                   type="button"
                   onClick={() => openAuthModal('profile')}
-                  className="flex items-center gap-2 px-3 py-1.5 bg-[#F5F1E8] hover:bg-[#D8C7AA]/40 border border-[#D8C7AA] rounded-sm text-left transition-colors"
+                  className="flex items-center gap-2.5 px-3 py-1.5 bg-white/70 hover:bg-white border border-[#D5BFA0] rounded-full text-left transition-colors cursor-pointer shadow-2xs"
                 >
-                  <div className="w-6 h-6 rounded-full overflow-hidden bg-[#39483A] text-[#FCFBF7] flex items-center justify-center shrink-0">
+                  <div className="w-7 h-7 rounded-full overflow-hidden bg-[#173B43] text-white flex items-center justify-center shrink-0">
                     {currentUser.photoUrl ? (
                       <img
                         src={currentUser.photoUrl}
@@ -2867,17 +3197,17 @@ export default function App() {
                         className="w-full h-full object-cover"
                       />
                     ) : (
-                      <User className="w-3.5 h-3.5 text-[#FCFBF7]" />
+                      <User className="w-3.5 h-3.5 text-white" />
                     )}
                   </div>
                   <div className="hidden sm:block">
-                    <div className="text-xs font-semibold text-[#1F241F] leading-none">
+                    <div className="text-xs font-semibold text-[#303638] leading-none">
                       {currentUser.displayName.split(' ')[0]}
                     </div>
-                    <div className="text-[10px] text-[#B86F52] uppercase tracking-wider leading-none mt-0.5">
+                    <div className="text-[9px] text-[#303638]/60 uppercase tracking-wider leading-none mt-0.5 font-medium">
                       {currentUser.role === 'cliente' && currentUser.isAlsoOwner
-                        ? 'cliente / prop.'
-                        : currentUser.role}
+                        ? 'CLIENTE / PROP.'
+                        : currentUser.role.toUpperCase()}
                     </div>
                   </div>
                 </button>
@@ -2886,7 +3216,7 @@ export default function App() {
                 <button
                   type="button"
                   onClick={handleLogout}
-                  className="p-2.5 text-[#39483A] hover:text-[#B86F52] hover:bg-[#F5F1E8] border border-[#D8C7AA] rounded-sm transition-colors"
+                  className="p-2.5 text-[#303638] hover:text-[#C87955] hover:bg-white border border-[#D5BFA0] rounded-xl transition-colors cursor-pointer shadow-2xs"
                   title="Cerrar sesión"
                 >
                   <LogOut className="w-4 h-4" />
@@ -2908,11 +3238,11 @@ export default function App() {
             aria-hidden="true"
           />
 
-          <aside className="relative z-10 w-80 max-w-[85vw] bg-[#FCFBF7] border-r border-[#D8C7AA] h-full flex flex-col justify-between overflow-y-auto p-6">
+          <aside className="relative z-10 w-80 max-w-[85vw] bg-[#FCFBF7] border-r border-[#D5BFA0] h-full flex flex-col justify-between overflow-y-auto p-6">
             <div className="space-y-8">
-              <div className="flex items-center justify-between border-b border-[#D8C7AA] pb-4">
+              <div className="flex items-center justify-between border-b border-[#D5BFA0] pb-4">
                 <div>
-                  <span className="text-xl font-serif-display font-semibold text-[#39483A] block">
+                  <span className="text-xl font-serif-display font-semibold text-[#173B43] block">
                     ClaveHogar
                   </span>
                   <span className="text-[10px] uppercase tracking-[0.2em] text-[#B86F52]">
@@ -2922,7 +3252,7 @@ export default function App() {
                 <button
                   type="button"
                   onClick={() => setIsSideMenuOpen(false)}
-                  className="p-2 text-[#39483A] hover:bg-[#F5F1E8] rounded-sm"
+                  className="p-2 text-[#173B43] hover:bg-[#F8F6F1] rounded-sm"
                   aria-label="Cerrar menú"
                 >
                   <X className="w-5 h-5" />
@@ -2930,7 +3260,7 @@ export default function App() {
               </div>
 
               <div className="space-y-1.5">
-                <div className="text-[10px] uppercase tracking-[0.2em] text-[#39483A]/60 font-semibold px-2 mb-2">
+                <div className="text-[10px] uppercase tracking-[0.2em] text-[#173B43]/60 font-semibold px-2 mb-2">
                   Explorar Plataforma
                 </div>
                 <button
@@ -2941,8 +3271,8 @@ export default function App() {
                   }}
                   className={`w-full text-left px-3.5 py-2.5 text-sm font-medium rounded-sm transition-colors ${
                     activeSection === 'catalogo'
-                      ? 'bg-[#39483A] text-[#FCFBF7]'
-                      : 'text-[#1F241F] hover:bg-[#F5F1E8]'
+                      ? 'bg-[#173B43] text-[#FCFBF7]'
+                      : 'text-[#1F241F] hover:bg-[#F8F6F1]'
                   }`}
                 >
                   Catálogo de Propiedades
@@ -2955,8 +3285,8 @@ export default function App() {
                   }}
                   className={`w-full text-left px-3.5 py-2.5 text-sm font-medium rounded-sm transition-colors ${
                     activeSection === 'buscador_ia'
-                      ? 'bg-[#39483A] text-[#FCFBF7]'
-                      : 'text-[#1F241F] hover:bg-[#F5F1E8]'
+                      ? 'bg-[#173B43] text-[#FCFBF7]'
+                      : 'text-[#1F241F] hover:bg-[#F8F6F1]'
                   }`}
                 >
                   Buscador Inteligente con IA
@@ -2969,8 +3299,8 @@ export default function App() {
                   }}
                   className={`w-full text-left px-3.5 py-2.5 text-sm font-medium rounded-sm transition-colors ${
                     activeSection === 'comparador'
-                      ? 'bg-[#39483A] text-[#FCFBF7]'
-                      : 'text-[#1F241F] hover:bg-[#F5F1E8]'
+                      ? 'bg-[#173B43] text-[#FCFBF7]'
+                      : 'text-[#1F241F] hover:bg-[#F8F6F1]'
                   }`}
                 >
                   Comparador de Inmuebles ({comparedIds.length})
@@ -2978,9 +3308,9 @@ export default function App() {
               </div>
 
               {currentUser ? (
-                <div className="space-y-2 pt-2 border-t border-[#D8C7AA]">
+                <div className="space-y-2 pt-2 border-t border-[#D5BFA0]">
                   <div className="px-2 py-1 flex items-center gap-2.5">
-                    <div className="w-9 h-9 rounded-full overflow-hidden bg-[#39483A] text-[#FCFBF7] flex items-center justify-center shrink-0">
+                    <div className="w-9 h-9 rounded-full overflow-hidden bg-[#173B43] text-[#FCFBF7] flex items-center justify-center shrink-0">
                       {currentUser.photoUrl ? (
                         <img
                           src={currentUser.photoUrl}
@@ -2997,7 +3327,7 @@ export default function App() {
                           ? 'Cliente y Propietario'
                           : `Opciones de ${currentUser.role}`}
                       </span>
-                      <span className="text-sm font-serif-display font-semibold text-[#39483A] truncate block">
+                      <span className="text-sm font-serif-display font-semibold text-[#173B43] truncate block">
                         {currentUser.displayName}
                       </span>
                     </div>
@@ -3015,8 +3345,8 @@ export default function App() {
                         }}
                         className={`w-full text-left px-3.5 py-2.5 text-xs font-semibold rounded-sm transition-colors ${
                           activeSection === 'panel_rol' && activeSubView === btn.id
-                            ? 'bg-[#39483A] text-[#FCFBF7]'
-                            : 'text-[#39483A] hover:bg-[#F5F1E8]'
+                            ? 'bg-[#173B43] text-[#FCFBF7]'
+                            : 'text-[#173B43] hover:bg-[#F8F6F1]'
                         }`}
                       >
                         {btn.label}
@@ -3039,8 +3369,8 @@ export default function App() {
                   )}
                 </div>
               ) : (
-                <div className="space-y-3 pt-4 border-t border-[#D8C7AA]">
-                  <p className="text-xs text-[#39483A]/80 px-1">
+                <div className="space-y-3 pt-4 border-t border-[#D5BFA0]">
+                  <p className="text-xs text-[#173B43]/80 px-1">
                     Iniciá sesión para acceder a tus favoritos, reservas, publicaciones y chat.
                   </p>
                   <button
@@ -3049,7 +3379,7 @@ export default function App() {
                       setIsSideMenuOpen(false);
                       openAuthModal('login');
                     }}
-                    className="w-full py-2.5 px-4 text-xs uppercase tracking-widest font-semibold text-[#FCFBF7] bg-[#39483A] rounded-sm"
+                    className="w-full py-2.5 px-4 text-xs uppercase tracking-widest font-semibold text-[#FCFBF7] bg-[#173B43] rounded-sm"
                   >
                     Iniciar sesión
                   </button>
@@ -3059,7 +3389,7 @@ export default function App() {
                       setIsSideMenuOpen(false);
                       openAuthModal('register');
                     }}
-                    className="w-full py-2.5 px-4 text-xs uppercase tracking-widest font-semibold text-[#39483A] border border-[#D8C7AA] bg-[#F5F1E8] rounded-sm"
+                    className="w-full py-2.5 px-4 text-xs uppercase tracking-widest font-semibold text-[#173B43] border border-[#D5BFA0] bg-[#F8F6F1] rounded-sm"
                   >
                     Registrarse
                   </button>
@@ -3068,21 +3398,21 @@ export default function App() {
             </div>
 
             {currentUser && (
-              <div className="pt-4 border-t border-[#D8C7AA] space-y-2">
+              <div className="pt-4 border-t border-[#D5BFA0] space-y-2">
                 <button
                   type="button"
                   onClick={() => {
                     setIsSideMenuOpen(false);
                     openAuthModal('profile');
                   }}
-                  className="w-full text-left px-3.5 py-2 text-xs font-semibold text-[#39483A] hover:bg-[#F5F1E8] rounded-sm"
+                  className="w-full text-left px-3.5 py-2 text-xs font-semibold text-[#173B43] hover:bg-[#F8F6F1] rounded-sm"
                 >
                   Mi Perfil Personal y Foto
                 </button>
                 <button
                   type="button"
                   onClick={handleLogout}
-                  className="w-full text-left px-3.5 py-2 text-xs font-semibold text-[#B86F52] hover:bg-[#F5F1E8] rounded-sm"
+                  className="w-full text-left px-3.5 py-2 text-xs font-semibold text-[#B86F52] hover:bg-[#F8F6F1] rounded-sm"
                 >
                   Cerrar sesión
                 </button>
@@ -3107,158 +3437,107 @@ export default function App() {
            =================================================================== */}
         {activeSection === 'catalogo' && (
           <div>
-            <section className="bg-[#F5F1E8] border-b border-[#D8C7AA] py-12 lg:py-20">
-              <div className="max-w-7xl mx-auto px-6 grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
-                <div className="lg:col-span-6 space-y-6 animate-fade-slide">
-                  <div className="text-[11px] uppercase tracking-[0.24em] text-[#B86F52] font-semibold">
-                    Curaduría Inmobiliaria · Alquiler &amp; Venta
+            {/* Full-width Banner Image Hero with AI Search & Slogan Overlay */}
+            <section className="relative w-full min-h-[520px] lg:min-h-[600px] flex items-center justify-center overflow-hidden bg-[#173B43]">
+              <div className="absolute inset-0 z-0">
+                <img
+                  src={heroFeaturedProperty?.images[0] || HERO_IMAGE}
+                  alt="ClaveHogar Residencia Exclusiva"
+                  className="w-full h-full object-cover object-center scale-105 brightness-[0.85] contrast-[1.05]"
+                  referrerPolicy="no-referrer"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/45 to-black/30" />
+              </div>
+
+              <div className="relative z-10 max-w-5xl mx-auto px-6 py-16 text-center space-y-8 w-full">
+                <div className="space-y-3 animate-fade-slide">
+                  <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-white/10 backdrop-blur-md border border-white/20 text-[#D6CBB8] text-xs font-semibold uppercase tracking-[0.2em]">
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#C87955]" />
+                    <span>Curaduría Inmobiliaria ClaveHogar</span>
                   </div>
 
-                  <h1 className="text-4xl sm:text-5xl lg:text-[54px] font-serif-display font-semibold tracking-tight leading-[1.06] text-[#39483A]">
+                  <h1 className="text-3xl sm:text-5xl lg:text-6xl font-serif-display font-bold text-white tracking-tight leading-[1.1] max-w-3xl mx-auto drop-shadow-md">
                     Arquitectura pensada para ser habitada.
                   </h1>
 
-                  <p className="text-base text-[#1F241F]/80 max-w-xl leading-relaxed">
-                    Explorá residencias, casas con jardín y departamentos seleccionados. Describí con tus propias palabras el espacio que buscás y dejá que nuestra búsqueda inteligente te recomiende las mejores opciones reales.
+                  <p className="text-sm sm:text-base text-[#F4EFE6]/90 max-w-2xl mx-auto leading-relaxed font-medium">
+                    Explorá residencias, casas con jardín y departamentos seleccionados con luz cálida y diseño sofisticado.
                   </p>
+                </div>
 
-                  <form
-                    onSubmit={(e) => handleRunAISearch(e)}
-                    className="bg-[#FCFBF7] p-4 rounded-sm border border-[#D8C7AA] space-y-3"
-                  >
-                    <label className="block text-[11px] uppercase tracking-widest text-[#39483A] font-semibold">
-                      Buscador Inteligente con IA
-                    </label>
-                    <div className="flex flex-col sm:flex-row gap-2.5">
+                {/* Floating AI Search Box on top of the banner image */}
+                <form
+                  onSubmit={(e) => handleRunAISearch(e)}
+                  className="card-floating bg-white/95 backdrop-blur-md p-5 sm:p-6 rounded-2xl border-2 border-[#D5BFA0] shadow-2xl max-w-3xl mx-auto text-left space-y-3.5 animate-fade-slide"
+                >
+                  <div className="flex items-center justify-between border-b border-[#D5BFA0]/60 pb-2.5">
+                    <div className="flex items-center gap-2 text-xs uppercase tracking-wider font-bold text-[#173B43]">
+                      <Sparkles className="w-4 h-4 text-[#C87955]" />
+                      <span>Buscador Inteligente con Asistente IA</span>
+                    </div>
+                    <span className="text-[11px] text-[#303638]/60 font-semibold font-tabular">Clave v2.4</span>
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    <div className="relative flex-1">
+                      <Search className="w-4 h-4 text-[#303638]/50 absolute left-3.5 top-3.5" />
                       <input
                         type="text"
                         value={aiQuery}
                         onChange={(e) => setAiQuery(e.target.value)}
-                        placeholder="Ej: Busco una casa de 3 habitaciones, con pileta, cerca de Quilmes..."
-                        className="flex-1 px-4 py-3 text-sm bg-white text-[#1F241F] placeholder:text-[#39483A]/50 rounded-sm border border-[#D8C7AA] focus:outline-none focus:border-[#39483A]"
+                        placeholder="Describí tu espacio ideal (ej: Casa con pileta en Quilmes o dúplex en Palermo)..."
+                        className="w-full pl-10 pr-4 py-3 text-xs sm:text-sm bg-white text-[#303638] placeholder:text-[#303638]/50 rounded-xl border border-[#D5BFA0] focus:outline-none focus:border-[#173B43] font-medium shadow-2xs"
                       />
-                      <button
-                        type="submit"
-                        disabled={aiLoading}
-                        className="px-6 py-3 text-xs uppercase tracking-widest font-semibold text-[#FCFBF7] bg-[#39483A] hover:bg-[#2c382d] rounded-sm transition-colors shrink-0 cursor-pointer"
-                      >
-                        {aiLoading ? 'Analizando...' : 'Buscar con IA'}
-                      </button>
                     </div>
-                    <div className="flex flex-wrap items-center gap-2 pt-1 text-[11px] text-[#39483A]/80">
-                      <span className="font-semibold text-[#B86F52]">Sugerencias:</span>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setAiQuery(AI_PROMPT_SUGGESTIONS[0]);
-                          handleRunAISearch(undefined, AI_PROMPT_SUGGESTIONS[0]);
-                        }}
-                        className="underline hover:text-[#39483A] transition-colors text-left"
-                      >
-                        Casa 3 hab. con pileta en Quilmes
-                      </button>
-                      <span>·</span>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setAiQuery(AI_PROMPT_SUGGESTIONS[1]);
-                          handleRunAISearch(undefined, AI_PROMPT_SUGGESTIONS[1]);
-                        }}
-                        className="underline hover:text-[#39483A] transition-colors text-left"
-                      >
-                        Depto en Palermo con terraza
-                      </button>
-                    </div>
-                  </form>
-                </div>
-
-                <div className="lg:col-span-6">
-                  <div
-                    onClick={() => setSelectedProperty(heroFeaturedProperty)}
-                    className="group cursor-pointer bg-[#FCFBF7] border border-[#D8C7AA] rounded-sm overflow-hidden transition-colors hover:border-[#39483A]"
-                  >
-                    <div className="relative aspect-[16/11] overflow-hidden bg-[#D8C7AA]">
-                      <img
-                        src={heroFeaturedProperty.images[0] || HERO_IMAGE}
-                        alt={heroFeaturedProperty.title}
-                        referrerPolicy="no-referrer"
-                        onError={(e) => {
-                          if (e.currentTarget.src !== HERO_IMAGE) {
-                            e.currentTarget.src = HERO_IMAGE;
-                          }
-                        }}
-                        className="w-full h-full object-cover group-hover:scale-103 transition-transform duration-700"
-                      />
-                      <div className="absolute top-4 left-4 bg-[#FCFBF7]/95 text-[#39483A] px-3 py-1 text-[11px] uppercase tracking-widest font-semibold border border-[#D8C7AA]">
-                        {heroFeaturedProperty.operationType === 'alquiler' ? 'Alquiler' : 'Venta'} · {heroFeaturedProperty.propertyType}
-                      </div>
-                    </div>
-
-                    <div className="p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-[#FCFBF7]">
-                      <div className="space-y-1">
-                        <div className="text-xs uppercase tracking-wider text-[#B86F52] font-semibold">
-                          {heroFeaturedProperty.location}
-                        </div>
-                        <h3 className="text-2xl font-serif-display font-semibold text-[#1F241F] line-clamp-1">
-                          {heroFeaturedProperty.title}
-                        </h3>
-                      </div>
-                      <div className="sm:text-right shrink-0 flex flex-col items-start sm:items-end gap-1">
-                        <span className="text-xl font-semibold font-tabular text-[#39483A] block">
-                          {heroFeaturedProperty.currency} {heroFeaturedProperty.price.toLocaleString()}
-                        </span>
-                        <span className="text-xs text-[#39483A]/75 font-tabular">
-                          {heroFeaturedProperty.bedrooms} dorm. · {heroFeaturedProperty.surface} m²
-                        </span>
-                        {canUserEditProperty(heroFeaturedProperty, currentUser, users) && (
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setEditingProperty(heroFeaturedProperty);
-                              setIsPropertyFormOpen(true);
-                            }}
-                            className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-bold bg-[#B86F52] text-[#FCFBF7] rounded-sm hover:bg-[#a35e42] transition-colors mt-1 cursor-pointer"
-                          >
-                            <Edit3 className="w-3 h-3" />
-                            Editar ficha
-                          </button>
-                        )}
-                      </div>
-                    </div>
+                    <button
+                      type="submit"
+                      disabled={aiLoading}
+                      className="px-6 py-3 text-xs uppercase tracking-wider font-bold text-white bg-[#173B43] hover:bg-[#122e35] rounded-xl transition-all shrink-0 cursor-pointer shadow-xs flex items-center justify-center gap-2"
+                    >
+                      <span>{aiLoading ? 'Analizando...' : 'Buscar con IA'}</span>
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </button>
                   </div>
 
-                  <div className="flex items-center justify-end gap-2 mt-3">
-                    {approvedProperties.slice(0, 5).map((prop, idx) => (
-                      <button
-                        key={prop.id}
-                        type="button"
-                        onClick={() => setHeroShowcaseIdx(idx)}
-                        className={`h-1.5 transition-all ${
-                          idx === heroShowcaseIdx % Math.min(5, approvedProperties.length)
-                            ? 'w-8 bg-[#39483A]'
-                            : 'w-3 bg-[#D8C7AA] hover:bg-[#A8B5A0]'
-                        }`}
-                        aria-label={`Ver destacada ${idx + 1}`}
-                      />
-                    ))}
+                  <div className="flex flex-wrap items-center gap-2 pt-1 text-[11px]">
+                    <span className="font-semibold text-[#303638]/70">Sugerencias:</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAiQuery(AI_PROMPT_SUGGESTIONS[0]);
+                        handleRunAISearch(undefined, AI_PROMPT_SUGGESTIONS[0]);
+                      }}
+                      className="px-3 py-1.5 rounded-xl bg-[#F8F6F1] text-[#303638] border border-[#D5BFA0] hover:border-[#173B43] transition-colors cursor-pointer font-medium"
+                    >
+                      Casa 3 hab. con pileta en Quilmes
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAiQuery(AI_PROMPT_SUGGESTIONS[1]);
+                        handleRunAISearch(undefined, AI_PROMPT_SUGGESTIONS[1]);
+                      }}
+                      className="px-3 py-1.5 rounded-xl bg-[#F8F6F1] text-[#303638] border border-[#D5BFA0] hover:border-[#173B43] transition-colors cursor-pointer font-medium"
+                    >
+                      Dúplex en Palermo con terraza
+                    </button>
                   </div>
-                </div>
+                </form>
               </div>
             </section>
 
-            {/* Editorial Filter & Search Bar */}
+            {/* Floating Filter & Search Bar matching Image 1 */}
             <section className="max-w-7xl mx-auto px-6 pt-10">
-              <div className="bg-[#F5F1E8] border border-[#D8C7AA] rounded-sm p-5 space-y-4">
+              <div className="card-floating bg-white border border-[#D5BFA0] rounded-2xl p-4 sm:p-5 space-y-4 shadow-sm">
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3 items-center">
                   <div className="lg:col-span-4 relative">
-                    <Search className="w-4 h-4 text-[#39483A]/60 absolute left-3.5 top-3" />
+                    <Search className="w-4 h-4 text-[#303638]/50 absolute left-3.5 top-3.5" />
                     <input
                       type="text"
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      placeholder="Buscar por localidad (Quilmes, Palermo...), dirección o título"
-                      className="w-full pl-10 pr-4 py-2.5 text-xs bg-[#FCFBF7] border border-[#D8C7AA] rounded-sm focus:outline-none focus:border-[#39483A]"
+                      placeholder="Buscar por localidad (Ej: Nord, Palermo...) o dirección o título"
+                      className="w-full pl-10 pr-4 py-2.5 text-xs bg-[#F8F6F1]/60 border border-[#D5BFA0] rounded-xl text-[#303638] placeholder:text-[#303638]/50 focus:outline-none focus:border-[#173B43]"
                     />
                   </div>
 
@@ -3266,7 +3545,7 @@ export default function App() {
                     <select
                       value={filterOperation}
                       onChange={(e) => setFilterOperation(e.target.value as 'todos' | 'alquiler' | 'venta')}
-                      className="w-full px-3 py-2.5 text-xs font-medium bg-[#FCFBF7] border border-[#D8C7AA] rounded-sm focus:outline-none focus:border-[#39483A]"
+                      className="w-full px-3 py-2.5 text-xs font-medium bg-[#F8F6F1]/60 border border-[#D5BFA0] rounded-xl text-[#303638] focus:outline-none focus:border-[#173B43] cursor-pointer"
                     >
                       <option value="todos">Operación: Todas</option>
                       <option value="venta">En Venta</option>
@@ -3278,7 +3557,7 @@ export default function App() {
                     <select
                       value={filterPropertyType}
                       onChange={(e) => setFilterPropertyType(e.target.value)}
-                      className="w-full px-3 py-2.5 text-xs font-medium bg-[#FCFBF7] border border-[#D8C7AA] rounded-sm focus:outline-none focus:border-[#39483A]"
+                      className="w-full px-3 py-2.5 text-xs font-medium bg-[#F8F6F1]/60 border border-[#D5BFA0] rounded-xl text-[#303638] focus:outline-none focus:border-[#173B43] cursor-pointer"
                     >
                       <option value="todos">Inmueble: Todos</option>
                       {activePropertyTypes.map((t) => (
@@ -3295,9 +3574,9 @@ export default function App() {
                       onChange={(e) =>
                         setSortBy(e.target.value as 'fecha_desc' | 'precio_asc' | 'precio_desc')
                       }
-                      className="w-full px-3 py-2.5 text-xs font-medium bg-[#FCFBF7] border border-[#D8C7AA] rounded-sm focus:outline-none focus:border-[#39483A]"
+                      className="w-full px-3 py-2.5 text-xs font-medium bg-[#F8F6F1]/60 border border-[#D5BFA0] rounded-xl text-[#303638] focus:outline-none focus:border-[#173B43] cursor-pointer"
                     >
-                      <option value="fecha_desc">Orden: Más recientes</option>
+                      <option value="fecha_desc">Orden: Más nuevo</option>
                       <option value="precio_asc">Precio: Menor a mayor</option>
                       <option value="precio_desc">Precio: Mayor a menor</option>
                     </select>
@@ -3307,10 +3586,10 @@ export default function App() {
                     <button
                       type="button"
                       onClick={() => setShowAdvancedFilters((prev) => !prev)}
-                      className={`flex-1 py-2.5 px-3 text-xs font-semibold rounded-sm border flex items-center justify-center gap-1.5 transition-colors ${
+                      className={`flex-1 py-2.5 px-3 text-xs font-semibold rounded-xl border flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
                         showAdvancedFilters
-                          ? 'bg-[#39483A] text-[#FCFBF7] border-[#39483A]'
-                          : 'bg-[#FCFBF7] text-[#39483A] border-[#D8C7AA] hover:bg-white'
+                          ? 'bg-[#173B43] text-white border-[#173B43] shadow-xs'
+                          : 'bg-[#F8F6F1] text-[#303638] border-[#D5BFA0] hover:bg-white'
                       }`}
                     >
                       <SlidersHorizontal className="w-3.5 h-3.5" />
@@ -3320,7 +3599,7 @@ export default function App() {
                       type="button"
                       onClick={resetFilters}
                       title="Limpiar filtros"
-                      className="p-2.5 text-[#39483A] hover:text-[#B86F52] bg-[#FCFBF7] border border-[#D8C7AA] rounded-sm transition-colors"
+                      className="p-2.5 text-[#303638] hover:text-[#C87955] bg-[#F8F6F1] border border-[#D5BFA0] rounded-xl transition-colors cursor-pointer"
                     >
                       <RotateCcw className="w-4 h-4" />
                     </button>
@@ -3328,10 +3607,10 @@ export default function App() {
                 </div>
 
                 {showAdvancedFilters && (
-                  <div className="pt-4 border-t border-[#D8C7AA] space-y-4">
+                  <div className="pt-4 border-t border-[#D5BFA0] space-y-4">
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                       <div>
-                        <label className="block text-[11px] font-semibold text-[#39483A] mb-1">
+                        <label className="block text-[11px] font-semibold text-[#173B43] mb-1">
                           Precio Máximo
                         </label>
                         <input
@@ -3339,17 +3618,17 @@ export default function App() {
                           value={filterMaxPrice}
                           onChange={(e) => setFilterMaxPrice(e.target.value)}
                           placeholder="Ej. 200000"
-                          className="w-full px-3 py-2 text-xs bg-[#FCFBF7] border border-[#D8C7AA] rounded-sm font-tabular"
+                          className="w-full px-3 py-2 text-xs bg-[#FCFBF7] border border-[#D5BFA0] rounded-sm font-tabular"
                         />
                       </div>
                       <div>
-                        <label className="block text-[11px] font-semibold text-[#39483A] mb-1">
+                        <label className="block text-[11px] font-semibold text-[#173B43] mb-1">
                           Mínimo de Ambientes
                         </label>
                         <select
                           value={filterMinRooms}
                           onChange={(e) => setFilterMinRooms(Number(e.target.value))}
-                          className="w-full px-3 py-2 text-xs bg-[#FCFBF7] border border-[#D8C7AA] rounded-sm"
+                          className="w-full px-3 py-2 text-xs bg-[#FCFBF7] border border-[#D5BFA0] rounded-sm"
                         >
                           <option value={0}>Sin mínimo</option>
                           <option value={2}>2+ ambientes</option>
@@ -3358,7 +3637,7 @@ export default function App() {
                         </select>
                       </div>
                       <div>
-                        <label className="block text-[11px] font-semibold text-[#39483A] mb-1">
+                        <label className="block text-[11px] font-semibold text-[#303638] mb-1">
                           Superficie Mínima (m²)
                         </label>
                         <input
@@ -3366,13 +3645,13 @@ export default function App() {
                           value={filterMinSurface}
                           onChange={(e) => setFilterMinSurface(e.target.value)}
                           placeholder="Ej. 100"
-                          className="w-full px-3 py-2 text-xs bg-[#FCFBF7] border border-[#D8C7AA] rounded-sm font-tabular"
+                          className="w-full px-3 py-2 text-xs bg-[#F8F6F1]/60 border border-[#D5BFA0] rounded-xl font-tabular text-[#303638] focus:outline-none focus:border-[#173B43]"
                         />
                       </div>
                     </div>
 
                     <div>
-                      <span className="block text-[11px] font-semibold text-[#39483A] mb-2">
+                      <span className="block text-[11px] font-semibold text-[#303638] mb-2">
                         Filtrar por comodidades:
                       </span>
                       <div className="flex flex-wrap gap-2">
@@ -3387,10 +3666,10 @@ export default function App() {
                                   selected ? prev.filter((f) => f !== feat) : [...prev, feat]
                                 )
                               }
-                              className={`px-3 py-1.5 text-xs font-medium rounded-sm border transition-colors flex items-center gap-1.5 ${
+                              className={`px-3 py-1.5 text-xs font-medium rounded-xl border transition-all flex items-center gap-1.5 cursor-pointer ${
                                 selected
-                                  ? 'bg-[#39483A] text-[#FCFBF7] border-[#39483A]'
-                                  : 'bg-[#FCFBF7] text-[#39483A] border-[#D8C7AA] hover:bg-white'
+                                  ? 'bg-[#173B43] text-white border-[#173B43] shadow-xs'
+                                  : 'bg-[#F8F6F1] text-[#303638] border-[#D5BFA0] hover:bg-white'
                               }`}
                             >
                               {selected && <Check className="w-3.5 h-3.5" />}
@@ -3405,22 +3684,26 @@ export default function App() {
               </div>
             </section>
 
-            {/* Editorial Properties Catalog Grid */}
+            {/* Editorial Properties Catalog Grid matching Image 1 */}
             <section className="max-w-7xl mx-auto px-6 py-14 space-y-8">
-              <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 border-b border-[#D8C7AA] pb-5">
+              <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 border-b border-[#D5BFA0]/70 pb-5">
                 <div>
-                  <span className="text-[11px] uppercase tracking-[0.2em] text-[#B86F52] font-semibold block mb-1">
-                    Colección Residencial
-                  </span>
-                  <h2 className="text-3xl sm:text-4xl font-serif-display font-semibold text-[#39483A]">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#C87955]" />
+                    <span className="text-[11px] uppercase tracking-[0.2em] text-[#C87955] font-semibold block">
+                      Colección Residencial
+                    </span>
+                  </div>
+                  <h2 className="text-3xl sm:text-4xl font-serif-display font-semibold text-[#303638]">
                     Propiedades Disponibles
                   </h2>
                 </div>
 
                 <div className="flex items-center gap-4">
-                  <span className="text-xs text-[#39483A]/75 font-tabular">
-                    {filteredProperties.length} {filteredProperties.length === 1 ? 'inmueble' : 'inmuebles'}
-                  </span>
+                  <div className="flex items-center gap-1.5 text-xs text-[#303638]/75 font-tabular">
+                    <span className="w-2 h-2 rounded-full bg-[#173B43] inline-block" />
+                    <span>{filteredProperties.length} Inmuebles verificados</span>
+                  </div>
                   {currentUser &&
                     currentUser.role !== 'administrador' &&
                     (currentUser.role === 'propietario' ||
@@ -3432,7 +3715,7 @@ export default function App() {
                           setEditingProperty(null);
                           setIsPropertyFormOpen(true);
                         }}
-                        className="px-4 py-2.5 text-xs uppercase tracking-wider font-semibold text-[#FCFBF7] bg-[#39483A] hover:bg-[#2c382d] rounded-sm transition-colors"
+                        className="px-4 py-2.5 text-xs uppercase tracking-wider font-semibold text-white bg-[#173B43] hover:bg-[#122e35] rounded-xl transition-all cursor-pointer shadow-xs"
                       >
                         + Publicar Propiedad
                       </button>
@@ -3444,7 +3727,7 @@ export default function App() {
                     <button
                       type="button"
                       onClick={handleEnableOwnerRole}
-                      className="px-4 py-2.5 text-xs uppercase tracking-wider font-semibold text-[#FCFBF7] bg-[#B86F52] hover:bg-[#a35e42] rounded-sm transition-colors"
+                      className="px-4 py-2.5 text-xs uppercase tracking-wider font-semibold text-white bg-[#C87955] hover:bg-[#b56b49] rounded-xl transition-all cursor-pointer shadow-xs"
                     >
                       Quiero publicar mi propiedad
                     </button>
@@ -3453,32 +3736,32 @@ export default function App() {
               </div>
 
               {filteredProperties.length === 0 ? (
-                <div className="bg-[#F5F1E8] border border-[#D8C7AA] rounded-sm p-12 text-center space-y-4">
-                  <p className="text-lg font-serif-display font-semibold text-[#39483A]">
+                <div className="card-floating bg-white border border-[#D5BFA0] rounded-2xl p-12 text-center space-y-4 shadow-sm">
+                  <p className="text-lg font-serif-display font-semibold text-[#303638]">
                     No se encontraron propiedades con los filtros seleccionados.
                   </p>
                   <button
                     type="button"
                     onClick={resetFilters}
-                    className="px-5 py-2.5 text-xs uppercase tracking-widest font-semibold text-[#FCFBF7] bg-[#39483A] rounded-sm hover:bg-[#2c382d]"
+                    className="px-5 py-2.5 text-xs uppercase tracking-widest font-semibold text-white bg-[#173B43] rounded-xl hover:bg-[#122e35] transition-colors cursor-pointer shadow-xs"
                   >
                     Restablecer filtros
                   </button>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-12">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                   {filteredProperties.map((prop) => {
                     const isFav = favoriteIds.includes(prop.id);
                     const isComp = comparedIds.includes(prop.id);
                     return (
                       <article
                         key={prop.id}
-                        className="group flex flex-col justify-between bg-[#FCFBF7] border border-[#D8C7AA] rounded-sm overflow-hidden hover:border-[#39483A] transition-colors"
+                        className="card-floating group flex flex-col justify-between bg-white border border-[#D5BFA0] rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-all"
                       >
                         <div>
                           <div
                             onClick={() => setSelectedProperty(prop)}
-                            className="relative aspect-[4/3] bg-[#F5F1E8] overflow-hidden cursor-pointer"
+                            className="relative aspect-[4/3] bg-[#F8F6F1] overflow-hidden cursor-pointer"
                           >
                             <img
                               src={prop.images[0] || HERO_IMAGE}
@@ -3492,7 +3775,7 @@ export default function App() {
                               className="w-full h-full object-cover group-hover:scale-104 transition-transform duration-700"
                             />
 
-                            <div className="absolute top-3 left-3 bg-[#FCFBF7]/95 text-[#39483A] px-2.5 py-1 text-[10px] uppercase tracking-widest font-semibold border border-[#D8C7AA]">
+                            <div className="absolute top-3 left-3 bg-white/95 backdrop-blur-xs text-[#303638] px-3 py-1 text-[10px] uppercase tracking-wider font-bold rounded-lg border border-[#D5BFA0]/60 shadow-2xs">
                               {prop.operationType === 'alquiler' ? 'Alquiler' : 'Venta'} · {prop.propertyType}
                             </div>
 
@@ -3504,22 +3787,22 @@ export default function App() {
                                 type="button"
                                 onClick={() => handleToggleCompare(prop.id)}
                                 title="Comparar propiedad"
-                                className={`p-2 rounded-sm transition-colors ${
+                                className={`p-2 rounded-full transition-colors shadow-2xs cursor-pointer ${
                                   isComp
-                                    ? 'bg-[#39483A] text-[#FCFBF7]'
-                                    : 'bg-[#FCFBF7]/90 text-[#39483A] hover:bg-[#FCFBF7]'
+                                    ? 'bg-[#173B43] text-white'
+                                    : 'bg-white/90 text-[#303638] hover:bg-white'
                                 }`}
                               >
-                                <Scale className="w-3.5 h-3.5" />
+                                <ArrowLeftRight className="w-3.5 h-3.5" />
                               </button>
                               <button
                                 type="button"
                                 onClick={() => handleToggleFavorite(prop.id)}
                                 title="Guardar en favoritos"
-                                className={`p-2 rounded-sm transition-colors ${
+                                className={`p-2 rounded-full transition-colors shadow-2xs cursor-pointer ${
                                   isFav
-                                    ? 'bg-[#B86F52] text-[#FCFBF7]'
-                                    : 'bg-[#FCFBF7]/90 text-[#39483A] hover:bg-[#FCFBF7]'
+                                    ? 'bg-[#C87955] text-white'
+                                    : 'bg-white/90 text-[#303638] hover:bg-white'
                                 }`}
                               >
                                 <Heart className={`w-3.5 h-3.5 ${isFav ? 'fill-current' : ''}`} />
@@ -3529,16 +3812,16 @@ export default function App() {
 
                           <div className="p-6 space-y-3">
                             <div className="flex items-center justify-between text-xs">
-                              <span className="uppercase tracking-wider text-[#B86F52] font-semibold truncate">
+                              <span className="uppercase tracking-wider text-[#303638]/60 font-semibold truncate text-[11px]">
                                 {prop.location}
                               </span>
                               <span
-                                className={`text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-sm border ${
+                                className={`text-[10px] uppercase tracking-wider font-bold px-2.5 py-0.5 rounded-full border ${
                                   prop.availability === 'disponible'
-                                    ? 'bg-emerald-100 text-emerald-900 border-emerald-400'
+                                    ? 'bg-[#E5ECE4] text-[#173B43] border-[#C6D6C4]'
                                     : prop.availability === 'reservada'
-                                    ? 'bg-amber-100 text-amber-900 border-amber-400'
-                                    : 'bg-red-100 text-red-800 border-red-400'
+                                    ? 'bg-amber-100 text-amber-900 border-amber-300'
+                                    : 'bg-red-100 text-red-800 border-red-300'
                                 }`}
                               >
                                 {prop.availability}
@@ -3547,23 +3830,28 @@ export default function App() {
 
                             <h3
                               onClick={() => setSelectedProperty(prop)}
-                              className="text-2xl font-serif-display font-semibold text-[#1F241F] group-hover:text-[#39483A] transition-colors line-clamp-2 cursor-pointer leading-snug"
+                              className="text-xl sm:text-2xl font-serif-display font-semibold text-[#303638] group-hover:text-[#173B43] transition-colors line-clamp-2 cursor-pointer leading-snug"
                             >
                               {prop.title}
                             </h3>
 
-                            <p className="text-xs text-[#39483A]/80 line-clamp-2 leading-relaxed">
+                            <p className="text-xs text-[#303638]/75 line-clamp-2 leading-relaxed">
                               {prop.description}
                             </p>
                           </div>
                         </div>
 
-                        <div className="px-6 pb-6 pt-3 border-t border-[#D8C7AA]/60 space-y-4">
+                        <div className="px-6 pb-6 pt-3 border-t border-[#D5BFA0]/50 space-y-4">
                           <div className="flex items-baseline justify-between">
-                            <span className="text-xl font-semibold font-tabular text-[#39483A]">
-                              {prop.currency} {prop.price.toLocaleString()}
-                            </span>
-                            <span className="text-xs text-[#39483A]/80 font-tabular">
+                            <div>
+                              <span className="text-[10px] uppercase tracking-wider text-[#303638]/50 font-bold block">
+                                Precio
+                              </span>
+                              <span className="text-xl font-bold font-tabular text-[#303638]">
+                                {prop.currency} {prop.price.toLocaleString()}
+                              </span>
+                            </div>
+                            <span className="text-xs text-[#303638]/70 font-tabular">
                               {prop.bedrooms} dorm. · {prop.bathrooms} baños · {prop.surface} m²
                             </span>
                           </div>
@@ -3573,9 +3861,9 @@ export default function App() {
                               <button
                                 type="button"
                                 onClick={() => setSelectedProperty(prop)}
-                                className="flex-1 py-2 px-3 text-xs uppercase tracking-wider font-semibold text-[#39483A] bg-[#F5F1E8] hover:bg-[#39483A] hover:text-[#FCFBF7] border border-[#D8C7AA] rounded-sm transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+                                className="flex-1 py-2.5 px-3 text-xs uppercase tracking-wider font-semibold text-[#303638] bg-[#F8F6F1] hover:bg-[#173B43] hover:text-white border border-[#D5BFA0] rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer"
                               >
-                                Ver
+                                <span>Ver</span>
                                 <ArrowRight className="w-3.5 h-3.5" />
                               </button>
                               <button
@@ -3585,20 +3873,20 @@ export default function App() {
                                   setEditingProperty(prop);
                                   setIsPropertyFormOpen(true);
                                 }}
-                                className="flex-1 py-2 px-3 text-xs uppercase tracking-wider font-bold text-[#FCFBF7] bg-[#B86F52] hover:bg-[#a35e42] rounded-sm transition-colors flex items-center justify-center gap-1.5 cursor-pointer shadow-sm"
+                                className="flex-1 py-2.5 px-3 text-xs uppercase tracking-wider font-semibold text-white bg-[#173B43] hover:bg-[#122e35] rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
                                 title="Editar ficha de esta propiedad"
                               >
                                 <Edit3 className="w-3.5 h-3.5" />
-                                Editar ficha
+                                <span>Editar</span>
                               </button>
                             </div>
                           ) : (
                             <button
                               type="button"
                               onClick={() => setSelectedProperty(prop)}
-                              className="w-full py-2.5 px-4 text-xs uppercase tracking-widest font-semibold text-[#39483A] bg-[#F5F1E8] hover:bg-[#39483A] hover:text-[#FCFBF7] border border-[#D8C7AA] rounded-sm transition-colors flex items-center justify-center gap-2 cursor-pointer"
+                              className="w-full py-2.5 px-4 text-xs uppercase tracking-wider font-semibold text-[#303638] bg-[#F8F6F1] hover:bg-[#173B43] hover:text-white border border-[#D5BFA0] rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer shadow-2xs"
                             >
-                              Ver Propiedad
+                              <span>Ver Propiedad</span>
                               <ArrowRight className="w-3.5 h-3.5" />
                             </button>
                           )}
@@ -3655,6 +3943,7 @@ export default function App() {
             allVisits={visits}
             allInquiries={inquiries}
             allOperations={operations}
+            contracts={contracts}
             claims={scopedClaims}
             categories={categories}
             onEnableOwnerRole={handleEnableOwnerRole}
@@ -3678,11 +3967,18 @@ export default function App() {
             onUpdateVisit={handleUpdateVisit}
             onSendChatMessage={handleSendChatMessage}
             onUpdateOperation={handleUpdateOperation}
+            onCounterOffer={handleCounterOffer}
+            onConfirmContract={handleConfirmContract}
             onCreateClaim={handleCreateClaim}
             onResolveClaim={handleResolveClaim}
+            onUpdateClaimStatus={handleUpdateClaimStatus}
+            onSendClaimMessage={handleSendClaimMessage}
+            selectedClaimId={selectedClaimId}
+            onSelectClaimId={setSelectedClaimId}
             onUpdateUserAdmin={handleUpdateUserAdmin}
             onAddCategory={handleAddCategory}
             onToggleCategory={handleToggleCategory}
+            onNotify={notify}
           />
         )}
       </main>
@@ -3710,6 +4006,7 @@ export default function App() {
             setEditingProperty(prop);
             setIsPropertyFormOpen(true);
           }}
+          onDeleteProperty={handleDeleteProperty}
           onRequireLogin={() => openAuthModal('login')}
           onToggleFavorite={handleToggleFavorite}
           onToggleCompare={handleToggleCompare}
@@ -3718,6 +4015,66 @@ export default function App() {
           onRequestOperation={handleRequestOperation}
           onNotify={notify}
         />
+      )}
+
+      {/* Cartel Modal de Confirmación para Eliminar Propiedad de la Base de Datos */}
+      {propertyToDelete && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[#1F241F]/70 p-4 overflow-y-auto backdrop-blur-xs">
+          <div className="relative w-full max-w-lg bg-[#FCFBF7] border-2 border-[#173B43] rounded-md overflow-hidden my-8 shadow-2xl flex flex-col">
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-4 bg-[#173B43] text-white">
+              <div className="flex items-center gap-2.5">
+                <Trash2 className="w-5 h-5 text-[#D5BFA0]" />
+                <h3 className="text-base font-serif-display font-semibold text-white">
+                  Confirmar eliminación
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPropertyToDelete(null)}
+                disabled={isDeletingProperty}
+                className="p-1 text-[#D5BFA0] hover:text-white rounded-sm hover:bg-white/10 transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="p-6 space-y-5 text-[#303638]">
+              <p className="text-sm font-bold text-[#173B43] leading-relaxed">
+                ¿Eliminar la publicación &ldquo;{propertyToDelete.title}&rdquo;? Esta acción no se puede deshacer.
+              </p>
+
+              <div className="p-3.5 bg-amber-50/90 border border-amber-300 rounded-sm text-xs text-amber-950 space-y-1">
+                <div className="font-bold text-[#173B43]">Advertencia de borrado de base de datos:</div>
+                <p className="leading-relaxed text-[#303638]/90">
+                  El inmueble será eliminado de manera permanente y se retirará automáticamente del catálogo público y de los paneles de gestión.
+                </p>
+              </div>
+
+              {/* Actions */}
+              <div className="flex items-center justify-end gap-2.5 pt-4 border-t border-[#D5BFA0]">
+                <button
+                  type="button"
+                  onClick={() => setPropertyToDelete(null)}
+                  disabled={isDeletingProperty}
+                  className="px-4 py-2 text-xs font-bold text-[#173B43] bg-white border border-[#D5BFA0] rounded-sm hover:bg-[#F8F6F1] cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmDeleteProperty}
+                  disabled={isDeletingProperty}
+                  className="px-4.5 py-2 text-xs font-bold text-white bg-red-600 rounded-sm hover:bg-red-700 disabled:opacity-50 cursor-pointer shadow-xs inline-flex items-center gap-1.5"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  {isDeletingProperty ? 'Eliminando...' : 'Eliminar publicación'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
 
       <PropertyFormModal

@@ -10,16 +10,16 @@ import {
 } from '../types';
 
 export const HERO_IMAGE =
-  'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&w=1600&q=85';
+  'https://images.unsplash.com/photo-1613490493576-7fde63acd811?auto=format&fit=crop&w=1600&q=85';
 const heroPenthouseImg = HERO_IMAGE;
 const villaPoolImg =
-  'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1400&q=85';
+  'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1600&q=85';
 const nordicLoftImg =
-  'https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?auto=format&fit=crop&w=1400&q=85';
+  'https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?auto=format&fit=crop&w=1600&q=85';
 const townhousePatioImg =
-  'https://images.unsplash.com/photo-1600566753376-12c8ab7fb75b?auto=format&fit=crop&w=1400&q=85';
+  'https://images.unsplash.com/photo-1600585154526-990dced4db0d?auto=format&fit=crop&w=1600&q=85';
 const skylineSuiteImg =
-  'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=1400&q=85';
+  'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=1600&q=85';
 
 /**
  * Convierte rutas locales de desarrollo (/src/assets/images/... o /assets/...)
@@ -630,12 +630,12 @@ export const INITIAL_OPERATIONS: OperationItem[] = [
     clientName: 'Martina Echeverría',
     ownerId: 'kKqp7VS3xhPYfy6RvCh0SWJIqi12',
     agentId: 'SysykUHU5FVubQzrSHOBi3JnhQs2',
-    status: 'aprobada',
+    status: 'aceptada',
     message: 'Presento reserva formal por contrato de 24 meses con garantía propietaria en CABA y demostración de ingresos.',
-    contractCode: 'CH-2026-REC-084',
-    contractTerms: 'Locación habitacional por 24 meses conforme Código Civil y Comercial. Depósito en garantía de 1 mes (USD 1.350). Entrega de unidad recién pintada con inventario firmado.',
-    contractStartDate: '2026-11-01',
-    contractEndDate: '2028-10-31',
+    conditions: 'Alquiler por 24 meses. Garantía propietaria en CABA e ingresos demostrables.',
+    guaranteeType: 'Garantía Propietaria CABA',
+    desiredTerm: '24 meses',
+    declaredIncome: 'Ingresos demostrables en relación de dependencia',
     createdAtIso: '2026-10-03T17:00:00Z',
   },
   {
@@ -658,15 +658,58 @@ export const INITIAL_OPERATIONS: OperationItem[] = [
 export const INITIAL_CLAIMS: ClaimItem[] = [
   {
     id: 'clm_demo_1',
+    claimCode: 'REC-2026-001',
     reporterId: 'NNota96m2mSmoxRc9ENGXgqFMUs1',
     reporterName: 'Martina Echeverría',
+    reporterEmail: 'cliente@clavehogar.com',
     targetType: 'visita',
     targetReference: 'Visita en Recoleta #vis_09',
     subject: 'Demora en confirmación de horario de visita',
     description: 'Solicité cambio de horario hace 48 horas y aún figuraba pendiente en el calendario.',
     status: 'en_revision',
     adminResolution: 'Se notificó a la corredora asignada para priorizar la confirmación en menos de 12 horas.',
+    solutionDescription: '',
+    dismissalReason: '',
+    messages: [
+      {
+        id: 'cmsg_1',
+        senderId: 'NNota96m2mSmoxRc9ENGXgqFMUs1',
+        senderName: 'Martina Echeverría',
+        senderRole: 'cliente',
+        text: 'Hola, buenas tardes. Quería consultar si ya tienen novedades sobre el nuevo horario de visita.',
+        timestamp: '2026-10-04 11:20',
+      },
+      {
+        id: 'cmsg_2',
+        senderId: 'v8Zk40ZfTfXJq5Z2a1BcDeFgHi01',
+        senderName: 'Mariano Casares (Admin)',
+        senderRole: 'administrador',
+        text: 'Hola Martina, estamos gestionando la disponibilidad con la corredora asignada para confirmar el horario.',
+        timestamp: '2026-10-04 11:50',
+      },
+    ],
+    statusHistory: [
+      {
+        id: 'csh_1',
+        timestamp: '2026-10-04 11:00',
+        changedBy: 'Martina Echeverría',
+        changedByRole: 'cliente',
+        fromStatus: 'pendiente',
+        toStatus: 'pendiente',
+        note: 'Reclamo generado por el cliente',
+      },
+      {
+        id: 'csh_2',
+        timestamp: '2026-10-04 11:45',
+        changedBy: 'Mariano Casares',
+        changedByRole: 'administrador',
+        fromStatus: 'pendiente',
+        toStatus: 'en_revision',
+        note: 'Puesto en revisión para coordinación con la corredora',
+      },
+    ],
     createdAtIso: '2026-10-04T11:00:00Z',
+    updatedAtIso: '2026-10-04T11:50:00Z',
   },
 ];
 

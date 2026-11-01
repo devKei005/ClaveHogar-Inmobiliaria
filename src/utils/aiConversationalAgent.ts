@@ -2853,7 +2853,7 @@ export function buildAgentConversationReply(
     if (criteria.locationNotFound || !hasRequestedInCatalog) {
       const motive = buildLocationNotFoundMotive(criteria, alternativeMatches, false);
       return {
-        message: `${acknowledgment}Por el momento no disponemos de propiedades en esa dirección que buscás (${requestedLoc || 'esa zona'}) en nuestro catálogo.\n\nAunque no coincidió con los requisitos que querés ${mismatchDesc}, te puedo dar algunas opciones que cumplen con algunas de las necesidades que fuiste mencionando, como ${motive}, disponibles en ${altZonesText}.\n\nTe invito a revisar estas alternativas.`,
+        message: `${acknowledgment}Por el momento no disponemos de propiedades en esa dirección que buscás (${requestedLoc || 'esa zona'}) en nuestro catálogo.\n\nAunque no coincidió con todos los requisitos que querés (ya sea por ubicación, por tipo de operación o por algunas características mencionadas), te puedo dar algunas opciones que cumplen con algunas de las necesidades que fuiste mencionando, como ${motive}, disponibles en ${altZonesText}.\n\nTe invito a revisar estas alternativas.`,
       };
     }
 
@@ -2863,7 +2863,7 @@ export function buildAgentConversationReply(
       const opText = criteria.operationType ? ` para ${criteria.operationType === 'venta' ? 'compra' : 'alquiler'}` : '';
       const typeText = criteria.propertyType ? ` de tipo ${criteria.propertyType}` : '';
       return {
-        message: `${acknowledgment}En ${requestedLoc} no contamos actualmente con publicaciones${opText}${typeText} que coincidan con todos tus requisitos (${mismatchDesc}), pero seleccioné alternativas disponibles en zonas como ${altZonesText} que cumplen con ${motive}.\n\nTe invito a visitar estas opciones.`,
+        message: `${acknowledgment}En ${requestedLoc} no contamos actualmente con publicaciones${opText}${typeText} que coincidan con todos tus requisitos (ya sea por ubicación, por tipo de operación o por algunas características mencionadas), pero seleccioné alternativas disponibles en zonas como ${altZonesText} que cumplen con ${motive}.\n\nTe invito a visitar estas opciones.`,
       };
     }
 
@@ -2883,7 +2883,7 @@ export function buildAgentConversationReply(
     }
 
     return {
-      message: `${acknowledgment}No encontré propiedades que coincidan al 100% con todos los requisitos en ${requestedLoc}, pero seleccioné alternativas disponibles en esta zona que te pueden servir:\n\n${differenceExplanation.charAt(0).toUpperCase() + differenceExplanation.slice(1)}.\n\nTe invito a revisar estas opciones.`,
+      message: `${acknowledgment}No encontré propiedades que coincidan al 100% con todos tus requisitos (ya sea por ubicación, por tipo de operación o por algunas características mencionadas) en ${requestedLoc}, pero seleccioné alternativas disponibles en esta zona que te pueden servir:\n\n${differenceExplanation.charAt(0).toUpperCase() + differenceExplanation.slice(1)}.\n\nTe invito a revisar estas opciones.`,
     };
   }
 

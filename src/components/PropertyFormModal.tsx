@@ -469,13 +469,13 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#1F241F]/60 p-4 overflow-y-auto">
-      <div className="relative w-full max-w-3xl bg-[#FCFBF7] border border-[#D8C7AA] rounded-md overflow-hidden my-8 max-h-[92vh] flex flex-col">
-        <div className="flex items-center justify-between px-6 py-4 bg-[#39483A] text-[#FCFBF7] shrink-0">
+      <div className="relative w-full max-w-3xl bg-[#FCFBF7] border border-[#D5BFA0] rounded-md overflow-hidden my-8 max-h-[92vh] flex flex-col">
+        <div className="flex items-center justify-between px-6 py-4 bg-[#173B43] text-[#FCFBF7] shrink-0">
           <div>
-            <span className="text-[11px] uppercase tracking-[0.2em] text-[#D8C7AA] font-semibold block">
+            <span className="text-[11px] uppercase tracking-[0.2em] text-[#D5BFA0] font-semibold block">
               Mis Propiedades · ClaveHogar
             </span>
-            <h2 className="text-xl font-serif-display font-semibold">
+            <h2 className="text-xl font-serif-display font-semibold text-white">
               {editingProperty
                 ? 'Editar Propiedad Registrada'
                 : 'Publicar Nueva Propiedad'}
@@ -484,7 +484,7 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
           <button
             type="button"
             onClick={onClose}
-            className="p-2 text-[#D8C7AA] hover:text-[#FCFBF7] rounded-sm hover:bg-white/10 transition-colors"
+            className="p-2 text-[#D5BFA0] hover:text-[#FCFBF7] rounded-sm hover:bg-white/10 transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
@@ -492,7 +492,7 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
 
         <form onSubmit={handleSubmit} className="overflow-y-auto p-6 space-y-5">
           {!editingProperty && currentUser?.role !== 'administrador' && (
-            <div className="p-3.5 bg-[#F5F1E8] border border-[#D8C7AA] rounded-sm text-xs text-[#39483A]">
+            <div className="p-3.5 bg-[#F8F6F1] border border-[#D5BFA0] rounded-sm text-xs text-[#173B43]">
               <strong>Nota sobre revisión:</strong> Al publicar tu propiedad, quedará en estado{' '}
               <strong className="text-[#B86F52]">Pendiente de revisión</strong> hasta que el administrador la apruebe para aparecer públicamente en el catálogo.
             </div>
@@ -500,7 +500,7 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="sm:col-span-2">
-              <label className="block text-xs font-semibold text-[#39483A] mb-1">
+              <label className="block text-xs font-semibold text-[#173B43] mb-1">
                 Título de la publicación *
               </label>
               <input
@@ -511,18 +511,18 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder="Ej. Casa Moderna de 3 Habitaciones con Pileta en Quilmes"
-                className="w-full px-3.5 py-2.5 text-sm bg-white border border-[#D8C7AA] rounded-sm focus:outline-none focus:border-[#39483A]"
+                className="w-full px-3.5 py-2.5 text-sm bg-white border border-[#D5BFA0] rounded-sm focus:outline-none focus:border-[#173B43]"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-[#39483A] mb-1">
+              <label className="block text-xs font-semibold text-[#173B43] mb-1">
                 Tipo de operación *
               </label>
               <select
                 value={operationType}
                 onChange={(e) => setOperationType(e.target.value as OperationTypeChoice)}
-                className="w-full px-3.5 py-2.5 text-sm bg-white border border-[#D8C7AA] rounded-sm focus:outline-none focus:border-[#39483A]"
+                className="w-full px-3.5 py-2.5 text-sm bg-white border border-[#D5BFA0] rounded-sm focus:outline-none focus:border-[#173B43]"
               >
                 <option value="venta">Venta</option>
                 <option value="alquiler">Alquiler</option>
@@ -530,13 +530,13 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-[#39483A] mb-1">
+              <label className="block text-xs font-semibold text-[#173B43] mb-1">
                 Tipo de inmueble *
               </label>
               <select
                 value={propertyType}
                 onChange={(e) => setPropertyType(e.target.value)}
-                className="w-full px-3.5 py-2.5 text-sm bg-white border border-[#D8C7AA] rounded-sm focus:outline-none focus:border-[#39483A]"
+                className="w-full px-3.5 py-2.5 text-sm bg-white border border-[#D5BFA0] rounded-sm focus:outline-none focus:border-[#173B43]"
               >
                 {propertyTypes.map((pt) => (
                   <option key={pt} value={pt}>
@@ -547,7 +547,7 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-[#39483A] mb-1">
+              <label className="block text-xs font-semibold text-[#173B43] mb-1">
                 Ciudad / Localidad / Barrio *
               </label>
               <input
@@ -557,12 +557,12 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
                 value={location}
                 onChange={(e) => setLocation(e.target.value)}
                 placeholder="Ej. Quilmes, Zona Sur / Palermo, CABA"
-                className="w-full px-3.5 py-2.5 text-sm bg-white border border-[#D8C7AA] rounded-sm focus:outline-none focus:border-[#39483A]"
+                className="w-full px-3.5 py-2.5 text-sm bg-white border border-[#D5BFA0] rounded-sm focus:outline-none focus:border-[#173B43]"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-[#39483A] mb-1">
+              <label className="block text-xs font-semibold text-[#173B43] mb-1">
                 Dirección exacta *
               </label>
               <input
@@ -572,24 +572,24 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
                 value={address}
                 onChange={(e) => setAddress(e.target.value)}
                 placeholder="Ej. Alvear 840, Quilmes"
-                className="w-full px-3.5 py-2.5 text-sm bg-white border border-[#D8C7AA] rounded-sm focus:outline-none focus:border-[#39483A]"
+                className="w-full px-3.5 py-2.5 text-sm bg-white border border-[#D5BFA0] rounded-sm focus:outline-none focus:border-[#173B43]"
               />
             </div>
 
             <div className="grid grid-cols-3 gap-2">
               <div>
-                <label className="block text-xs font-semibold text-[#39483A] mb-1">Moneda</label>
+                <label className="block text-xs font-semibold text-[#173B43] mb-1">Moneda</label>
                 <select
                   value={currency}
                   onChange={(e) => setCurrency(e.target.value as 'USD' | 'ARS')}
-                  className="w-full px-2.5 py-2.5 text-sm bg-white border border-[#D8C7AA] rounded-sm font-tabular"
+                  className="w-full px-2.5 py-2.5 text-sm bg-white border border-[#D5BFA0] rounded-sm font-tabular"
                 >
                   <option value="USD">USD</option>
                   <option value="ARS">ARS</option>
                 </select>
               </div>
               <div className="col-span-2">
-                <label className="block text-xs font-semibold text-[#39483A] mb-1">Precio *</label>
+                <label className="block text-xs font-semibold text-[#173B43] mb-1">Precio *</label>
                 <input
                   type="number"
                   required
@@ -597,19 +597,19 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
                   value={price}
                   onChange={(e) => setPrice(e.target.value)}
                   placeholder="Ej. 185000"
-                  className="w-full px-3.5 py-2.5 text-sm bg-white border border-[#D8C7AA] rounded-sm font-tabular focus:outline-none focus:border-[#39483A]"
+                  className="w-full px-3.5 py-2.5 text-sm bg-white border border-[#D5BFA0] rounded-sm font-tabular focus:outline-none focus:border-[#173B43]"
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-[#39483A] mb-1">
+              <label className="block text-xs font-semibold text-[#173B43] mb-1">
                 Estado de disponibilidad
               </label>
               <select
                 value={availability}
                 onChange={(e) => setAvailability(e.target.value as AvailabilityStatus)}
-                className="w-full px-3.5 py-2.5 text-sm bg-white border border-[#D8C7AA] rounded-sm"
+                className="w-full px-3.5 py-2.5 text-sm bg-white border border-[#D5BFA0] rounded-sm"
               >
                 <option value="disponible">Disponible</option>
                 <option value="reservada">Reservada</option>
@@ -621,7 +621,7 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
 
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <div>
-              <label className="block text-xs font-semibold text-[#39483A] mb-1">Superficie (m²) *</label>
+              <label className="block text-xs font-semibold text-[#173B43] mb-1">Superficie (m²) *</label>
               <input
                 type="number"
                 required
@@ -629,11 +629,11 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
                 value={surface}
                 onChange={(e) => setSurface(e.target.value)}
                 placeholder="180"
-                className="w-full px-3 py-2 text-sm bg-white border border-[#D8C7AA] rounded-sm font-tabular"
+                className="w-full px-3 py-2 text-sm bg-white border border-[#D5BFA0] rounded-sm font-tabular"
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-[#39483A] mb-1">Ambientes *</label>
+              <label className="block text-xs font-semibold text-[#173B43] mb-1">Ambientes *</label>
               <input
                 type="number"
                 required
@@ -641,11 +641,11 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
                 value={rooms}
                 onChange={(e) => setRooms(e.target.value)}
                 placeholder="3"
-                className="w-full px-3 py-2 text-sm bg-white border border-[#D8C7AA] rounded-sm font-tabular"
+                className="w-full px-3 py-2 text-sm bg-white border border-[#D5BFA0] rounded-sm font-tabular"
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-[#39483A] mb-1">Habitaciones *</label>
+              <label className="block text-xs font-semibold text-[#173B43] mb-1">Habitaciones *</label>
               <input
                 type="number"
                 required
@@ -653,11 +653,11 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
                 value={bedrooms}
                 onChange={(e) => setBedrooms(e.target.value)}
                 placeholder="2"
-                className="w-full px-3 py-2 text-sm bg-white border border-[#D8C7AA] rounded-sm font-tabular"
+                className="w-full px-3 py-2 text-sm bg-white border border-[#D5BFA0] rounded-sm font-tabular"
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-[#39483A] mb-1">Baños *</label>
+              <label className="block text-xs font-semibold text-[#173B43] mb-1">Baños *</label>
               <input
                 type="number"
                 required
@@ -665,13 +665,13 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
                 value={bathrooms}
                 onChange={(e) => setBathrooms(e.target.value)}
                 placeholder="2"
-                className="w-full px-3 py-2 text-sm bg-white border border-[#D8C7AA] rounded-sm font-tabular"
+                className="w-full px-3 py-2 text-sm bg-white border border-[#D5BFA0] rounded-sm font-tabular"
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-[#39483A] mb-1">
+            <label className="block text-xs font-semibold text-[#173B43] mb-1">
               Descripción completa de la propiedad *
             </label>
             <textarea
@@ -682,7 +682,7 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Describe distribución, orientación, estado general, jardín, pileta..."
-              className="w-full px-3.5 py-2.5 text-sm bg-white border border-[#D8C7AA] rounded-sm focus:outline-none focus:border-[#39483A]"
+              className="w-full px-3.5 py-2.5 text-sm bg-white border border-[#D5BFA0] rounded-sm focus:outline-none focus:border-[#173B43]"
             />
           </div>
 
@@ -693,15 +693,15 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
               MODALIDAD DE GESTIÓN Y ASIGNACIÓN OPCIONAL DE AGENTE
               ================================================================= */}
           {!isAgentEditor && (
-            <div className="p-5 bg-[#F5F1E8] border border-[#D8C7AA] rounded-sm space-y-4">
+            <div className="p-5 bg-[#F8F6F1] border border-[#D5BFA0] rounded-sm space-y-4">
               <div>
                 <span className="text-[11px] uppercase tracking-[0.18em] text-[#B86F52] font-semibold block">
                   Modalidad de Administración (Opcional)
                 </span>
-                <h3 className="text-base font-serif-display font-semibold text-[#39483A]">
+                <h3 className="text-base font-serif-display font-semibold text-[#173B43]">
                   ¿Cómo querés gestionar esta propiedad?
                 </h3>
-                <p className="text-xs text-[#39483A]/80 mt-0.5">
+                <p className="text-xs text-[#173B43]/80 mt-0.5">
                   Podés administrarla por tu cuenta o solicitar la asistencia de un agente inmobiliario.
                 </p>
               </div>
@@ -715,19 +715,19 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
                   }}
                   className={`p-3.5 rounded-sm border text-left transition-colors cursor-pointer ${
                     managementMode === 'directa'
-                      ? 'bg-[#39483A] text-[#FCFBF7] border-[#39483A] ring-2 ring-[#B86F52]/40'
-                      : 'bg-[#FCFBF7] text-[#1F241F] border-[#D8C7AA] hover:border-[#39483A]'
+                      ? 'bg-[#173B43] text-[#FCFBF7] border-[#173B43] ring-2 ring-[#B86F52]/40'
+                      : 'bg-[#FCFBF7] text-[#1F241F] border-[#D5BFA0] hover:border-[#173B43]'
                   }`}
                 >
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-semibold uppercase tracking-wider">
                       1. Propietario Independiente
                     </span>
-                    {managementMode === 'directa' && <Check className="w-4 h-4 text-[#D8C7AA]" />}
+                    {managementMode === 'directa' && <Check className="w-4 h-4 text-[#D5BFA0]" />}
                   </div>
                   <p
                     className={`text-xs mt-1 leading-relaxed ${
-                      managementMode === 'directa' ? 'text-[#FCFBF7]/85' : 'text-[#39483A]/80'
+                      managementMode === 'directa' ? 'text-[#FCFBF7]/85' : 'text-[#173B43]/80'
                     }`}
                   >
                     Administro mi propiedad por mi cuenta y recibo consultas, visitas y ofertas directamente.
@@ -747,19 +747,19 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
                   }}
                   className={`p-3.5 rounded-sm border text-left transition-colors cursor-pointer ${
                     managementMode === 'con_agente'
-                      ? 'bg-[#39483A] text-[#FCFBF7] border-[#39483A] ring-2 ring-[#B86F52]/40'
-                      : 'bg-[#FCFBF7] text-[#1F241F] border-[#D8C7AA] hover:border-[#39483A]'
+                      ? 'bg-[#173B43] text-[#FCFBF7] border-[#173B43] ring-2 ring-[#B86F52]/40'
+                      : 'bg-[#FCFBF7] text-[#1F241F] border-[#D5BFA0] hover:border-[#173B43]'
                   }`}
                 >
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-semibold uppercase tracking-wider">
                       2. Trabajar con un Agente
                     </span>
-                    {managementMode === 'con_agente' && <Check className="w-4 h-4 text-[#D8C7AA]" />}
+                    {managementMode === 'con_agente' && <Check className="w-4 h-4 text-[#D5BFA0]" />}
                   </div>
                   <p
                     className={`text-xs mt-1 leading-relaxed ${
-                      managementMode === 'con_agente' ? 'text-[#FCFBF7]/85' : 'text-[#39483A]/80'
+                      managementMode === 'con_agente' ? 'text-[#FCFBF7]/85' : 'text-[#173B43]/80'
                     }`}
                   >
                     Solicito asistencia profesional para gestionar consultas, coordinar visitas y seguir la operación.
@@ -769,26 +769,26 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
 
               {/* Banner informativo de opción pre-marcada para Propietario Independiente */}
               {managementMode === 'directa' && (
-                <div className="p-2.5 bg-[#FCFBF7] border border-[#D8C7AA] rounded-sm text-xs text-[#39483A] flex items-center justify-between gap-2">
+                <div className="p-2.5 bg-[#FCFBF7] border border-[#D5BFA0] rounded-sm text-xs text-[#173B43] flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2">
-                    <Check className="w-4 h-4 text-emerald-700 shrink-0" />
+                    <Check className="w-4 h-4 text-[#173B43] shrink-0" />
                     <span>
                       <strong>Opción seleccionada:</strong> Propietario Independiente (Gestión directa por mi cuenta sin agente).
                     </span>
                   </div>
-                  <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded-xs shrink-0">
+                  <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 bg-[#D5BFA0]/30 text-[#173B43] rounded-xs shrink-0">
                     Marcado
                   </span>
                 </div>
               )}
 
               {managementMode === 'con_agente' && (
-                <div className="pt-3 border-t border-[#D8C7AA] space-y-3">
+                <div className="pt-3 border-t border-[#D5BFA0] space-y-3">
                   {/* Banner informativo si la propiedad ya tenía agente asignado */}
                   {editingProperty && (editingProperty.agentName || editingProperty.requestedAgentName) && (
-                    <div className="p-3 bg-emerald-50 border border-emerald-300 rounded-sm text-xs text-emerald-900 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div className="p-3 bg-[#F8F6F1] border border-[#D5BFA0] rounded-sm text-xs text-[#173B43] flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                       <div className="flex items-center gap-2">
-                        <Check className="w-4 h-4 text-emerald-700 shrink-0" />
+                        <Check className="w-4 h-4 text-[#173B43] shrink-0" />
                         <div>
                           <span className="font-bold">Agente actual asignado / solicitado:</span>{' '}
                           {editingProperty.agentName || editingProperty.requestedAgentName}{' '}
@@ -797,13 +797,13 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
                           </span>
                         </div>
                       </div>
-                      <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 bg-emerald-200 text-emerald-900 rounded-xs self-start sm:self-auto shrink-0">
+                      <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 bg-[#D5BFA0]/55 text-[#173B43] rounded-xs self-start sm:self-auto shrink-0">
                         Marcado por defecto
                       </span>
                     </div>
                   )}
 
-                  <div className="text-xs font-semibold text-[#39483A]">
+                  <div className="text-xs font-semibold text-[#173B43]">
                     Elegí cómo solicitar tu agente inmobiliario:
                   </div>
 
@@ -818,8 +818,8 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
                       }}
                       className={`p-3 rounded-sm border text-left flex items-start gap-2.5 transition-colors cursor-pointer ${
                         agentRequestType === 'elegir_agente'
-                          ? 'bg-white border-[#39483A] ring-2 ring-[#39483A]'
-                          : 'bg-[#FCFBF7] border-[#D8C7AA]'
+                          ? 'bg-white border-[#173B43] ring-2 ring-[#173B43]'
+                          : 'bg-[#FCFBF7] border-[#D5BFA0]'
                       }`}
                     >
                       <UserCheck className="w-4 h-4 text-[#B86F52] shrink-0 mt-0.5" />
@@ -827,7 +827,7 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
                         <div className="text-xs font-semibold text-[#1F241F]">
                           Opción A: Elegir un agente disponible
                         </div>
-                        <div className="text-[11px] text-[#39483A]/75 mt-0.5">
+                        <div className="text-[11px] text-[#173B43]/75 mt-0.5">
                           Consultá los perfiles disponibles y seleccioná uno. Quedará asignado o pendiente según corresponda.
                         </div>
                       </div>
@@ -838,8 +838,8 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
                       onClick={() => setAgentRequestType('asignacion_admin')}
                       className={`p-3 rounded-sm border text-left flex items-start gap-2.5 transition-colors cursor-pointer ${
                         agentRequestType === 'asignacion_admin'
-                          ? 'bg-white border-[#39483A] ring-2 ring-[#39483A]'
-                          : 'bg-[#FCFBF7] border-[#D8C7AA]'
+                          ? 'bg-white border-[#173B43] ring-2 ring-[#173B43]'
+                          : 'bg-[#FCFBF7] border-[#D5BFA0]'
                       }`}
                     >
                       <ShieldCheck className="w-4 h-4 text-[#B86F52] shrink-0 mt-0.5" />
@@ -847,7 +847,7 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
                         <div className="text-xs font-semibold text-[#1F241F]">
                           Opción B: Que me asignen uno
                         </div>
-                        <div className="text-[11px] text-[#39483A]/75 mt-0.5">
+                        <div className="text-[11px] text-[#173B43]/75 mt-0.5">
                           El administrador recibe tu solicitud y te asigna un agente inmobiliario matriculado.
                         </div>
                       </div>
@@ -856,7 +856,7 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
 
                   {agentRequestType === 'elegir_agente' && (
                     <div className="space-y-2 pt-1">
-                      <div className="text-xs font-semibold text-[#39483A]">
+                      <div className="text-xs font-semibold text-[#173B43]">
                         Perfiles de Agentes Disponibles ({allDisplayAgents.length}):
                       </div>
                       {allDisplayAgents.length === 0 ? (
@@ -888,11 +888,11 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
                                 onClick={() => setSelectedAgentId(ag.uid)}
                                 className={`p-3 rounded-sm border cursor-pointer transition-colors flex items-start gap-3 ${
                                   isSelected
-                                    ? 'bg-[#39483A] text-[#FCFBF7] border-[#39483A] ring-2 ring-[#B86F52]'
-                                    : 'bg-white text-[#1F241F] border-[#D8C7AA] hover:border-[#39483A]'
+                                    ? 'bg-[#173B43] text-[#FCFBF7] border-[#173B43] ring-2 ring-[#B86F52]'
+                                    : 'bg-white text-[#1F241F] border-[#D5BFA0] hover:border-[#173B43]'
                                 }`}
                               >
-                                <div className="w-10 h-10 rounded-full overflow-hidden bg-[#D8C7AA] text-[#39483A] flex items-center justify-center shrink-0">
+                                <div className="w-10 h-10 rounded-full overflow-hidden bg-[#D5BFA0] text-[#173B43] flex items-center justify-center shrink-0">
                                   {ag.photoUrl ? (
                                     <img
                                       src={ag.photoUrl}
@@ -908,23 +908,23 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
                                     <span className="text-xs font-semibold truncate">
                                       {ag.displayName}
                                     </span>
-                                    {isSelected && <Check className="w-3.5 h-3.5 text-[#D8C7AA] shrink-0" />}
+                                    {isSelected && <Check className="w-3.5 h-3.5 text-[#D5BFA0] shrink-0" />}
                                   </div>
                                   {isCurrentPropAgent && (
-                                    <span className="inline-block px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider bg-[#D8C7AA] text-[#1F241F] rounded-xs">
+                                    <span className="inline-block px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider bg-[#D5BFA0] text-[#1F241F] rounded-xs">
                                       Agente de esta propiedad
                                     </span>
                                   )}
                                   <div
                                     className={`text-[11px] truncate ${
-                                      isSelected ? 'text-[#D8C7AA]' : 'text-[#B86F52]'
+                                      isSelected ? 'text-[#D5BFA0]' : 'text-[#B86F52]'
                                     }`}
                                   >
                                     {ag.agencyName || 'Agente Inmobiliario'}
                                   </div>
                                   <div
                                     className={`text-[10px] font-tabular truncate ${
-                                      isSelected ? 'text-[#FCFBF7]/80' : 'text-[#39483A]/75'
+                                      isSelected ? 'text-[#FCFBF7]/80' : 'text-[#173B43]/75'
                                     }`}
                                   >
                                     {ag.email} · {ag.phone}
@@ -932,7 +932,7 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
                                   {ag.bio && (
                                     <p
                                       className={`text-[10px] line-clamp-2 pt-0.5 ${
-                                        isSelected ? 'text-[#FCFBF7]/85' : 'text-[#39483A]/75'
+                                        isSelected ? 'text-[#FCFBF7]/85' : 'text-[#173B43]/75'
                                       }`}
                                     >
                                       {ag.bio}
@@ -953,7 +953,7 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
 
           {/* Features selector */}
           <div className="space-y-2">
-            <label className="block text-xs font-semibold text-[#39483A]">
+            <label className="block text-xs font-semibold text-[#173B43]">
               Características y comodidades del inmueble
             </label>
             <div className="flex flex-wrap gap-2">
@@ -966,8 +966,8 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
                     onClick={() => toggleFeature(feat)}
                     className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-sm border transition-colors ${
                       active
-                        ? 'bg-[#39483A] text-[#FCFBF7] border-[#39483A]'
-                        : 'bg-white text-[#39483A] border-[#D8C7AA] hover:bg-[#F5F1E8]'
+                        ? 'bg-[#173B43] text-[#FCFBF7] border-[#173B43]'
+                        : 'bg-white text-[#173B43] border-[#D5BFA0] hover:bg-[#F8F6F1]'
                     }`}
                   >
                     {active && <Check className="w-3.5 h-3.5" />}
@@ -981,10 +981,10 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
           {/* Real Device File Upload */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <label className="block text-xs font-semibold text-[#39483A]">
+              <label className="block text-xs font-semibold text-[#173B43]">
                 Fotografías del inmueble ({selectedImages.length} / {SCHEMA_LIMITS.PROP_IMAGES_MAX}) *
               </label>
-              <span className="text-[11px] text-[#39483A]/60">
+              <span className="text-[11px] text-[#173B43]/60">
                 Formatos JPG, PNG o WEBP desde tu dispositivo
               </span>
             </div>
@@ -1000,21 +1000,21 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
 
             <div
               onClick={() => fileInputRef.current?.click()}
-              className="border border-dashed border-[#A8B5A0] hover:border-[#39483A] bg-[#F5F1E8]/60 hover:bg-[#F5F1E8] rounded-sm p-6 text-center cursor-pointer transition-colors"
+              className="border border-dashed border-[#A8B5A0] hover:border-[#173B43] bg-[#F8F6F1]/60 hover:bg-[#F8F6F1] rounded-sm p-6 text-center cursor-pointer transition-colors"
             >
-              <UploadCloud className="w-7 h-7 text-[#39483A] mx-auto mb-2" />
-              <p className="text-sm font-semibold text-[#39483A]">
+              <UploadCloud className="w-7 h-7 text-[#173B43] mx-auto mb-2" />
+              <p className="text-sm font-semibold text-[#173B43]">
                 {uploadingFiles
                   ? 'Procesando imágenes seleccionadas...'
                   : 'Hacé clic aquí para adjuntar fotos desde tu dispositivo'}
               </p>
-              <p className="text-xs text-[#39483A]/70 mt-1">
+              <p className="text-xs text-[#173B43]/70 mt-1">
                 Seleccioná una o varias fotografías reales de la propiedad
               </p>
             </div>
 
             {selectedImages.length === 0 ? (
-              <div className="flex items-center gap-2 text-xs text-[#B86F52] bg-[#F5F1E8] border border-[#D8C7AA] rounded-sm px-3.5 py-2.5">
+              <div className="flex items-center gap-2 text-xs text-[#B86F52] bg-[#F8F6F1] border border-[#D5BFA0] rounded-sm px-3.5 py-2.5">
                 <ImageIcon className="w-4 h-4 shrink-0" />
                 <span>Aún no has subido fotografías. Seleccioná al menos una imagen de tu dispositivo.</span>
               </div>
@@ -1023,7 +1023,7 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
                 {selectedImages.map((imgUrl, idx) => (
                   <div
                     key={idx}
-                    className="relative aspect-[4/3] rounded-sm overflow-hidden border border-[#D8C7AA] bg-[#F5F1E8]"
+                    className="relative aspect-[4/3] rounded-sm overflow-hidden border border-[#D5BFA0] bg-[#F8F6F1]"
                   >
                     <img
                       src={imgUrl}
@@ -1039,7 +1039,7 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
-                    <span className="absolute bottom-1.5 left-1.5 bg-[#39483A]/85 text-[#FCFBF7] text-[10px] px-2 py-0.5 rounded-sm font-tabular">
+                    <span className="absolute bottom-1.5 left-1.5 bg-[#173B43]/85 text-[#FCFBF7] text-[10px] px-2 py-0.5 rounded-sm font-tabular">
                       Foto #{idx + 1}
                     </span>
                   </div>
@@ -1048,18 +1048,18 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
             )}
           </div>
 
-          <div className="flex items-center justify-end gap-3 pt-4 border-t border-[#D8C7AA]">
+          <div className="flex items-center justify-end gap-3 pt-4 border-t border-[#D5BFA0]">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2.5 text-xs font-semibold text-[#39483A] bg-white border border-[#D8C7AA] rounded-sm hover:bg-[#F5F1E8]"
+              className="px-4 py-2.5 text-xs font-semibold text-[#173B43] bg-white border border-[#D5BFA0] rounded-sm hover:bg-[#F8F6F1]"
             >
               Cancelar
             </button>
             <button
               type="submit"
               disabled={saving || uploadingFiles}
-              className="px-6 py-2.5 text-xs font-semibold text-[#FCFBF7] bg-[#39483A] hover:bg-[#2c382d] rounded-sm transition-colors disabled:opacity-50"
+              className="px-6 py-2.5 text-xs font-semibold text-[#FCFBF7] bg-[#173B43] hover:bg-[#2c382d] rounded-sm transition-colors disabled:opacity-50"
             >
               {saving
                 ? 'Guardando...'

@@ -7,6 +7,8 @@ import {
   ArrowRight,
   MapPin,
   Info,
+  Sparkles,
+  Bot,
 } from 'lucide-react';
 import { PropertyItem, UserProfile } from '../types';
 import { HERO_IMAGE } from '../data/initialData';
@@ -32,6 +34,8 @@ interface AIChatAssistantProps {
   initialPrompt?: string;
   currentUser?: UserProfile | null;
 }
+
+const CLARA_AVATAR_URL = 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=400&q=80';
 
 const INITIAL_GREETING: ChatMessageItem = {
   id: 'msg_welcome',
@@ -321,29 +325,29 @@ export const AIChatAssistant: React.FC<AIChatAssistantProps> = ({
     Boolean(currentCriteria.requiredFeatures && currentCriteria.requiredFeatures.length > 0);
 
   return (
-    <div className="w-full h-full flex flex-col bg-[#FCFBF7] overflow-hidden">
+    <div className="w-full h-full flex flex-col bg-[#F8F6F1] overflow-hidden">
       {/* 1. Header Superior Full-Width Diferenciado del Nav */}
-      <header className="bg-[#2c382d] text-[#FCFBF7] border-b border-[#D8C7AA]/50 px-4 sm:px-8 py-3.5 flex items-center justify-between gap-4 shrink-0 shadow-md">
+      <header className="bg-[#173B43] text-[#F4EFE6] border-b border-[#D5BFA0]/50 px-4 sm:px-8 py-3.5 flex items-center justify-between gap-4 shrink-0 shadow-md">
         <div className="flex items-center gap-3.5">
           <div className="relative">
-            <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-full bg-[#FCFBF7] text-[#39483A] flex items-center justify-center font-serif-display text-xl font-bold shadow-sm">
+            <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-full bg-[#F8F6F1] text-[#173B43] flex items-center justify-center font-serif-display text-xl font-bold shadow-sm">
               C
             </div>
             <span
-              className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-emerald-400 border-2 border-[#2c382d] rounded-full"
+              className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-emerald-400 border-2 border-[#173B43] rounded-full"
               title="En línea · Asesoramiento en tiempo real"
             />
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-lg sm:text-2xl font-serif-display font-semibold text-[#FCFBF7]">
+              <h1 className="text-lg sm:text-2xl font-serif-display font-semibold text-[#F4EFE6]">
                 Clara · Asesora Inmobiliaria
               </h1>
-              <span className="text-[10px] bg-emerald-900/80 text-emerald-200 border border-emerald-500/50 px-2 py-0.5 rounded-full font-medium hidden sm:inline">
+              <span className="text-[10px] bg-[#2B2B2B]/40 text-emerald-200 border border-emerald-500/50 px-2 py-0.5 rounded-full font-medium hidden sm:inline">
                 En línea
               </span>
             </div>
-            <p className="text-xs text-[#FCFBF7]/80 line-clamp-1">
+            <p className="text-xs text-[#F4EFE6]/80 line-clamp-1">
               Asesoramiento personalizado en tiempo real · Consultá propiedades, zonas, requisitos y visitas
             </p>
           </div>
@@ -353,7 +357,7 @@ export const AIChatAssistant: React.FC<AIChatAssistantProps> = ({
           <button
             type="button"
             onClick={handleResetConversation}
-            className="px-3 py-2 text-xs uppercase tracking-wider font-semibold text-[#FCFBF7] bg-[#39483A] hover:bg-[#475748] border border-[#D8C7AA]/60 rounded-sm transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs"
+            className="px-3 py-2 text-xs uppercase tracking-wider font-semibold text-[#F4EFE6] bg-[#173B43] hover:bg-[#3d4538] border border-[#D5BFA0]/60 rounded-sm transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs"
             title="Reiniciar diálogo"
           >
             <RotateCcw className="w-3.5 h-3.5" />
@@ -362,7 +366,7 @@ export const AIChatAssistant: React.FC<AIChatAssistantProps> = ({
           <button
             type="button"
             onClick={onGoToCatalog}
-            className="px-3.5 py-2 text-xs uppercase tracking-wider font-semibold text-[#39483A] bg-[#F5F1E8] hover:bg-[#FCFBF7] rounded-sm transition-colors cursor-pointer shadow-xs"
+            className="px-3.5 py-2 text-xs uppercase tracking-wider font-semibold text-[#173B43] bg-[#F8F6F1] hover:bg-[#D6CBB8] rounded-sm transition-colors cursor-pointer shadow-xs"
           >
             Catálogo
           </button>
@@ -371,35 +375,35 @@ export const AIChatAssistant: React.FC<AIChatAssistantProps> = ({
 
       {/* 2. Barra de Preferencias Recordadas (Full-Width, compacta) */}
       {hasActiveCriteria && (
-        <div className="bg-[#F9F7F1] border-b border-[#D8C7AA]/80 px-4 sm:px-8 py-2.5 text-xs flex flex-wrap items-center justify-between gap-2 shrink-0 animate-fade-slide">
+        <div className="bg-[#F8F6F1] border-b border-[#D5BFA0] px-4 sm:px-8 py-2.5 text-xs flex flex-wrap items-center justify-between gap-2 shrink-0 animate-fade-slide">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="font-semibold text-[#39483A] uppercase tracking-wider text-[11px] flex items-center gap-1.5">
-              <Info className="w-3.5 h-3.5 text-[#B86F52]" />
+            <span className="font-semibold text-[#173B43] uppercase tracking-wider text-[11px] flex items-center gap-1.5">
+              <Info className="w-3.5 h-3.5 text-[#C87955]" />
               Preferencias activas:
             </span>
             {currentCriteria.operationType && (
-              <span className="bg-[#FCFBF7] border border-[#D8C7AA] px-2.5 py-0.5 rounded-sm text-[#1F241F] capitalize font-medium">
+              <span className="bg-white border border-[#D5BFA0] px-2.5 py-0.5 rounded-full text-[#303638] capitalize font-medium">
                 {currentCriteria.operationType}
               </span>
             )}
             {currentCriteria.propertyType && (
-              <span className="bg-[#FCFBF7] border border-[#D8C7AA] px-2.5 py-0.5 rounded-sm text-[#1F241F] capitalize font-medium">
+              <span className="bg-white border border-[#D5BFA0] px-2.5 py-0.5 rounded-full text-[#303638] capitalize font-medium">
                 Tipo: {currentCriteria.propertyType}
               </span>
             )}
             {currentCriteria.locations && currentCriteria.locations.length > 0 && (
-              <span className="bg-[#FCFBF7] border border-[#D8C7AA] px-2.5 py-0.5 rounded-sm text-[#1F241F] font-medium flex items-center gap-1">
-                <MapPin className="w-3 h-3 text-[#B86F52]" />
+              <span className="bg-white border border-[#D5BFA0] px-2.5 py-0.5 rounded-full text-[#303638] font-medium flex items-center gap-1">
+                <MapPin className="w-3 h-3 text-[#C87955]" />
                 {currentCriteria.locations.join(', ')}
               </span>
             )}
             {currentCriteria.maxPrice && (
-              <span className="bg-[#FCFBF7] border border-[#D8C7AA] px-2.5 py-0.5 rounded-sm text-[#1F241F] font-medium font-tabular">
+              <span className="bg-white border border-[#D5BFA0] px-2.5 py-0.5 rounded-full text-[#303638] font-medium font-tabular">
                 Hasta USD {currentCriteria.maxPrice.toLocaleString()}
               </span>
             )}
             {currentCriteria.requiredFeatures && currentCriteria.requiredFeatures.length > 0 && (
-              <span className="bg-[#FCFBF7] border border-[#D8C7AA] px-2.5 py-0.5 rounded-sm text-[#1F241F] font-medium">
+              <span className="bg-white border border-[#D5BFA0] px-2.5 py-0.5 rounded-full text-[#303638] font-medium">
                 Comodidades: {currentCriteria.requiredFeatures.join(', ')}
               </span>
             )}
@@ -407,7 +411,7 @@ export const AIChatAssistant: React.FC<AIChatAssistantProps> = ({
           <button
             type="button"
             onClick={() => setCurrentCriteria({})}
-            className="text-[11px] text-[#B86F52] hover:underline font-semibold cursor-pointer shrink-0"
+            className="text-[11px] text-[#C87955] hover:underline font-semibold cursor-pointer shrink-0"
           >
             Limpiar filtros
           </button>
@@ -425,8 +429,12 @@ export const AIChatAssistant: React.FC<AIChatAssistantProps> = ({
                 className={`flex gap-3.5 ${isUser ? 'justify-end' : 'justify-start'}`}
               >
                 {!isUser && (
-                  <div className="w-9 h-9 rounded-full bg-[#39483A] text-[#FCFBF7] flex items-center justify-center shrink-0 font-serif-display font-bold text-sm shadow-xs mt-1">
-                    C
+                  <div className="w-9 h-9 rounded-full overflow-hidden border border-[#D5BFA0] shrink-0 shadow-xs mt-1 bg-[#173B43]">
+                    <img
+                      src={CLARA_AVATAR_URL}
+                      alt="Clara Asesora"
+                      className="w-full h-full object-cover"
+                    />
                   </div>
                 )}
 
@@ -437,18 +445,18 @@ export const AIChatAssistant: React.FC<AIChatAssistantProps> = ({
                 >
                   {/* Globo de Texto */}
                   <div
-                    className={`rounded-sm p-4 sm:p-5 text-sm leading-relaxed transition-all ${
+                    className={`rounded-2xl p-4 sm:p-5 text-sm leading-relaxed transition-all ${
                       isUser
-                        ? 'bg-[#39483A] text-[#FCFBF7] shadow-sm ml-auto'
-                        : 'bg-[#F5F1E8] text-[#1F241F] border border-[#D8C7AA]'
+                        ? 'bg-[#173B43] text-white shadow-xs ml-auto'
+                        : 'bg-white text-[#303638] border border-[#D5BFA0] shadow-2xs'
                     }`}
                   >
                     {!isUser && (
-                      <div className="flex items-center justify-between gap-2 pb-1.5 border-b border-[#D8C7AA]/50 mb-2">
-                        <span className="text-[11px] font-bold uppercase tracking-wider text-[#39483A]">
+                      <div className="flex items-center justify-between gap-2 pb-1.5 border-b border-[#D5BFA0]/50 mb-2">
+                        <span className="text-[11px] font-bold uppercase tracking-wider text-[#173B43]">
                           Clara · Asesora Inmobiliaria
                         </span>
-                        <span className="text-[10px] text-[#39483A]/60 font-tabular">
+                        <span className="text-[10px] text-[#173B43]/60 font-tabular">
                           {msg.timestamp}
                         </span>
                       </div>
@@ -468,7 +476,7 @@ export const AIChatAssistant: React.FC<AIChatAssistantProps> = ({
                   {/* 1. SECCIÓN DE COINCIDENCIAS DESTACADAS */}
                   {!isUser && msg.exactMatches && msg.exactMatches.length > 0 && (
                     <div className="space-y-3 pt-2">
-                      <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-emerald-800 bg-emerald-50 border border-emerald-300 px-3.5 py-2 rounded-sm">
+                      <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-[#173B43] bg-[#F8F6F1] border border-[#D5BFA0] px-3.5 py-2 rounded-sm">
                         <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
                         <span>
                           Coincidencias encontradas ({msg.exactMatches.length})
@@ -479,10 +487,10 @@ export const AIChatAssistant: React.FC<AIChatAssistantProps> = ({
                         {msg.exactMatches.map((prop) => (
                           <div
                             key={prop.id}
-                            className="bg-[#FCFBF7] border-2 border-emerald-600 rounded-sm overflow-hidden flex flex-col justify-between hover:shadow-md transition-shadow"
+                            className="bg-[#FCFBF7] border-2 border-[#173B43] rounded-sm overflow-hidden flex flex-col justify-between hover:shadow-md transition-shadow"
                           >
                             <div>
-                              <div className="relative aspect-[16/10] bg-[#F5F1E8]">
+                              <div className="relative aspect-[16/10] bg-[#F8F6F1]">
                                 <img
                                   src={prop.images[0] || HERO_IMAGE}
                                   alt={prop.title}
@@ -494,7 +502,7 @@ export const AIChatAssistant: React.FC<AIChatAssistantProps> = ({
                                   }}
                                   className="w-full h-full object-cover"
                                 />
-                                <div className="absolute top-2.5 left-2.5 px-2.5 py-1 bg-emerald-700 text-[#FCFBF7] text-[11px] font-bold rounded-sm shadow-xs flex items-center gap-1">
+                                <div className="absolute top-2.5 left-2.5 px-2.5 py-1 bg-[#173B43] text-[#FCFBF7] text-[11px] font-bold rounded-sm shadow-xs flex items-center gap-1">
                                   <CheckCircle2 className="w-3.5 h-3.5" />
                                   Coincidencia destacada
                                 </div>
@@ -514,7 +522,7 @@ export const AIChatAssistant: React.FC<AIChatAssistantProps> = ({
                                 <p className="text-xs text-[#1F241F]/75 line-clamp-2 leading-relaxed">
                                   {prop.description}
                                 </p>
-                                <div className="flex flex-wrap gap-2 pt-1 text-[11px] text-[#39483A] font-tabular">
+                                <div className="flex flex-wrap gap-2 pt-1 text-[11px] text-[#173B43] font-tabular">
                                   <span>{prop.bedrooms} dorm.</span>
                                   <span>·</span>
                                   <span>{prop.bathrooms} baños</span>
@@ -527,7 +535,7 @@ export const AIChatAssistant: React.FC<AIChatAssistantProps> = ({
                                     {prop.features.slice(0, 3).map((feat, idx) => (
                                       <span
                                         key={idx}
-                                        className="text-[10px] bg-[#F5F1E8] border border-[#D8C7AA] text-[#39483A] px-2 py-0.5 rounded-sm"
+                                        className="text-[10px] bg-[#F8F6F1] border border-[#D5BFA0] text-[#173B43] px-2 py-0.5 rounded-sm"
                                       >
                                         {feat}
                                       </span>
@@ -541,7 +549,7 @@ export const AIChatAssistant: React.FC<AIChatAssistantProps> = ({
                               <button
                                 type="button"
                                 onClick={() => onSelectProperty(prop)}
-                                className="w-full py-2.5 px-3 text-xs uppercase tracking-widest font-semibold text-[#FCFBF7] bg-[#39483A] hover:bg-[#2c382d] rounded-sm transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+                                className="w-full py-2.5 px-3 text-xs uppercase tracking-widest font-semibold text-[#FCFBF7] bg-[#173B43] hover:bg-[#2c382d] rounded-sm transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
                               >
                                 Ver Ficha Completa
                                 <ArrowRight className="w-3.5 h-3.5" />
@@ -572,7 +580,7 @@ export const AIChatAssistant: React.FC<AIChatAssistantProps> = ({
                               className="bg-[#FCFBF7] border border-amber-300 rounded-sm overflow-hidden flex flex-col justify-between hover:shadow-md transition-shadow"
                             >
                               <div>
-                                <div className="relative aspect-[16/10] bg-[#F5F1E8]">
+                                <div className="relative aspect-[16/10] bg-[#F8F6F1]">
                                   <img
                                     src={prop.images[0] || HERO_IMAGE}
                                     alt={prop.title}
@@ -618,7 +626,7 @@ export const AIChatAssistant: React.FC<AIChatAssistantProps> = ({
                                     )}
                                   </div>
 
-                                  <div className="flex flex-wrap gap-2 pt-1 text-[11px] text-[#39483A] font-tabular">
+                                  <div className="flex flex-wrap gap-2 pt-1 text-[11px] text-[#173B43] font-tabular">
                                     <span>{prop.bedrooms} dorm.</span>
                                     <span>·</span>
                                     <span>{prop.bathrooms} baños</span>
@@ -632,7 +640,7 @@ export const AIChatAssistant: React.FC<AIChatAssistantProps> = ({
                                 <button
                                   type="button"
                                   onClick={() => onSelectProperty(prop)}
-                                  className="w-full py-2.5 px-3 text-xs uppercase tracking-widest font-semibold text-[#39483A] bg-[#F5F1E8] hover:bg-[#39483A] hover:text-[#FCFBF7] border border-[#D8C7AA] rounded-sm transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+                                  className="w-full py-2.5 px-3 text-xs uppercase tracking-widest font-semibold text-[#173B43] bg-[#F8F6F1] hover:bg-[#173B43] hover:text-[#FCFBF7] border border-[#D5BFA0] rounded-sm transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
                                 >
                                   Ver Ficha Completa
                                   <ArrowRight className="w-3.5 h-3.5" />
@@ -652,14 +660,14 @@ export const AIChatAssistant: React.FC<AIChatAssistantProps> = ({
           {/* Indicador de respuesta de Clara */}
           {isLoading && (
             <div className="flex gap-3.5 justify-start items-center">
-              <div className="w-9 h-9 rounded-full bg-[#39483A] text-[#FCFBF7] flex items-center justify-center shrink-0 font-serif-display font-bold text-sm shadow-xs">
+              <div className="w-9 h-9 rounded-full bg-[#173B43] text-[#FCFBF7] flex items-center justify-center shrink-0 font-serif-display font-bold text-sm shadow-xs">
                 C
               </div>
-              <div className="bg-[#F5F1E8] border border-[#D8C7AA] rounded-sm px-4 py-3 flex items-center gap-2.5 text-xs text-[#39483A]">
+              <div className="bg-[#F8F6F1] border border-[#D5BFA0] rounded-sm px-4 py-3 flex items-center gap-2.5 text-xs text-[#173B43]">
                 <div className="flex gap-1">
-                  <span className="w-2 h-2 rounded-full bg-[#39483A] animate-bounce [animation-delay:-0.3s]" />
-                  <span className="w-2 h-2 rounded-full bg-[#39483A] animate-bounce [animation-delay:-0.15s]" />
-                  <span className="w-2 h-2 rounded-full bg-[#39483A] animate-bounce" />
+                  <span className="w-2 h-2 rounded-full bg-[#173B43] animate-bounce [animation-delay:-0.3s]" />
+                  <span className="w-2 h-2 rounded-full bg-[#173B43] animate-bounce [animation-delay:-0.15s]" />
+                  <span className="w-2 h-2 rounded-full bg-[#173B43] animate-bounce" />
                 </div>
                 <span className="font-medium">Clara está analizando las opciones y redactando su respuesta...</span>
               </div>
@@ -670,16 +678,23 @@ export const AIChatAssistant: React.FC<AIChatAssistantProps> = ({
         </div>
       </div>
 
-      {/* 4. Barra de Entrada Pinned en la Parte Inferior (Full-Width) */}
-      <footer className="w-full bg-[#F5F1E8] border-t border-[#D8C7AA] p-4 sm:p-5 shrink-0 sticky bottom-0 z-10">
-        <div className="max-w-4xl mx-auto space-y-2">
+      {/* 4. Barra de Entrada Destacada con Fondo Elegante */}
+      <footer className="w-full bg-gradient-to-t from-[#EAE2D5] via-[#F4EFE6] to-[#F4EFE6] border-t-2 border-[#D5BFA0] p-4 sm:p-5 shrink-0 sticky bottom-0 z-10 shadow-lg">
+        <div className="max-w-4xl mx-auto space-y-2.5">
           <form
             onSubmit={(e) => {
               e.preventDefault();
               handleSendMessage();
             }}
-            className="flex gap-3"
+            className="card-floating bg-white border-2 border-[#D5BFA0] hover:border-[#173B43]/60 focus-within:border-[#173B43] focus-within:ring-4 focus-within:ring-[#173B43]/15 rounded-2xl p-2 sm:p-2.5 shadow-md flex items-center gap-3 transition-all"
           >
+            <div className="w-9 h-9 rounded-xl overflow-hidden border border-[#D5BFA0] shrink-0 shadow-2xs hidden sm:flex bg-[#173B43]">
+              <img
+                src={CLARA_AVATAR_URL}
+                alt="Clara Asesora"
+                className="w-full h-full object-cover"
+              />
+            </div>
             <input
               ref={inputRef}
               type="text"
@@ -687,20 +702,20 @@ export const AIChatAssistant: React.FC<AIChatAssistantProps> = ({
               onChange={(e) => setInputValue(e.target.value)}
               placeholder="Escribile a Clara (ej: Busco casa en alquiler en Belgrano de aprox 2000 usd)..."
               disabled={isLoading}
-              className="flex-1 px-4 py-3 text-sm bg-[#FCFBF7] text-[#1F241F] rounded-sm border border-[#D8C7AA] focus:outline-none focus:border-[#39483A] disabled:opacity-60 placeholder:text-[#1F241F]/40 shadow-2xs"
+              className="flex-1 px-3 py-2 text-sm bg-transparent text-[#303638] focus:outline-none placeholder:text-[#303638]/50 font-medium disabled:opacity-60"
             />
             <button
               type="submit"
               disabled={isLoading || !inputValue.trim()}
-              className="px-6 py-3 text-xs uppercase tracking-widest font-semibold text-[#FCFBF7] bg-[#39483A] hover:bg-[#2c382d] rounded-sm transition-colors flex items-center gap-2 shrink-0 cursor-pointer disabled:opacity-40 shadow-xs"
+              className="px-6 py-3 text-xs uppercase tracking-wider font-bold text-white bg-[#173B43] hover:bg-[#122e35] rounded-xl transition-all flex items-center gap-2 shrink-0 cursor-pointer disabled:opacity-40 shadow-xs"
             >
               <span>Enviar</span>
               <Send className="w-3.5 h-3.5" />
             </button>
           </form>
-          <div className="flex items-center justify-between text-[11px] text-[#39483A]/70 px-1">
-            <span>Presioná Enter para enviar. Podés hacerle preguntas directas sobre cualquier propiedad, visita o requisito.</span>
-            <span className="hidden sm:inline">Asesoramiento inmobiliario profesional</span>
+          <div className="flex items-center justify-between text-[11px] text-[#303638]/75 px-1.5 font-medium">
+            <span>Presioná Enter para enviar. Consultale sobre características, barrios, visitas y presupuestos.</span>
+            <span className="hidden sm:inline text-[#173B43] font-semibold">Curaduría ClaveHogar · Clara</span>
           </div>
         </div>
       </footer>

@@ -5,9 +5,114 @@ export type AvailabilityStatus = 'disponible' | 'reservada' | 'alquilada' | 'ven
 export type PublicationStatus = 'pendiente' | 'aprobada' | 'rechazada' | 'suspendida'; // Estado legado, tratado como rechazo en la interfaz.
 export type VisitStatus = 'pendiente' | 'confirmada' | 'reprogramada' | 'rechazada' | 'cancelada' | 'realizada';
 export type InquiryStatus = 'pendiente' | 'respondida';
-export type DealStatus = 'solicitada' | 'en_revision' | 'aprobada' | 'rechazada' | 'concretada';
+export type DealStatus =
+  | 'pendiente'
+  | 'en_negociacion'
+  | 'aceptada'
+  | 'rechazada'
+  | 'concretada'
+  | 'solicitada'
+  | 'en_revision';
+
+export interface CounterOfferItem {
+  amount: number;
+  currency: 'USD' | 'ARS';
+  conditions: string;
+  proposedBy: 'propietario' | 'agente';
+  createdAtIso: string;
+}
+
+export interface ContractItem {
+  id: string;
+  operationId: string;
+  propertyId: string;
+  propertyTitle: string;
+  operationType: OperationTypeChoice;
+  contractCode: string; // e.g. "CTR-2026-X8F92"
+  finalPrice: number;
+  finalCurrency: 'USD' | 'ARS';
+  ownerId: string;
+  ownerName: string;
+  clientId: string;
+  clientName: string;
+  agentId?: string;
+  agentName?: string;
+  closingDate: string; // Fecha de firma / cierre
+  startDate?: string;   // Fecha de inicio (alquiler)
+  endDate?: string;     // Fecha de finalización (alquiler)
+  possessionDate?: string; // Fecha de posesión / escritura (venta)
+  contractTermMonths?: string; // e.g. "24 meses"
+  signedContractDocRef: string; // Referencia/archivo del contrato firmado
+  contractTerms?: string;
+  createdAtIso: string;
+}
+
+export interface OperationItem {
+  id: string;
+  propertyId: string;
+  propertyTitle: string;
+  operationType: OperationTypeChoice;
+  offeredAmount: number;
+  currency: 'USD' | 'ARS';
+  publishedPrice?: number;
+  publishedCurrency?: 'USD' | 'ARS';
+  publishedPriceReference?: number;
+
+  // Rental specific proposal fields:
+  guaranteeType?: string;
+  desiredTerm?: string;
+  declaredIncome?: string;
+
+  // Purchase specific proposal fields:
+  paymentMethod?: string;
+
+  conditions?: string; // General conditions text
+  clientId: string;
+  clientName: string;
+  ownerId: string;
+  ownerName?: string;
+  agentId?: string;
+  agentName?: string;
+  status: DealStatus;
+  message?: string;
+
+  // Counter offer if status === 'en_negociacion'
+  counterOffer?: CounterOfferItem;
+
+  // Registered contract reference when concretada
+  contractCode?: string;
+  contractTerms?: string;
+  contractClosingDate?: string;
+  contractStartDate?: string;
+  contractEndDate?: string;
+  contractPosessionDate?: string;
+  signedContractDocRef?: string;
+  contractFinalPrice?: number;
+  contractFinalCurrency?: 'USD' | 'ARS';
+
+  createdAtIso: string;
+  updatedAtIso?: string;
+}
 export type ClaimTargetType = 'publicacion' | 'usuario' | 'visita' | 'operacion';
-export type ClaimStatus = 'abierto' | 'en_revision' | 'resuelto' | 'desestimado';
+export type ClaimStatus =
+  | 'pendiente'
+  | 'en_revision'
+  | 'solucionado'
+  | 'abierto'
+  | 'resuelto';
+
+export function normalizeClaimStatus(
+  status?: ClaimStatus | string
+): 'pendiente' | 'en_revision' | 'solucionado' {
+  const s = (status || '').toString().toLowerCase().trim().replace(/[\s-]+/g, '_');
+  if (['solucionado', 'resuelto', 'solucionada', 'resuelta'].includes(s)) {
+    return 'solucionado';
+  }
+  if (['en_revision', 'revision', 'en_proceso', 'investigacion'].includes(s)) {
+    return 'en_revision';
+  }
+  return 'pendiente';
+}
 
 export type PropertyManagementMode = 'directa' | 'con_agente';
 export type AgentRequestType = 'ninguna' | 'elegir_agente' | 'asignacion_admin';
@@ -155,37 +260,45 @@ export interface InquiryItem {
   updatedAtIso?: string;
 }
 
-export interface OperationItem {
+export interface ClaimMessage {
   id: string;
-  propertyId: string;
-  propertyTitle: string;
-  operationType: OperationTypeChoice;
-  offeredAmount: number;
-  currency: 'USD' | 'ARS';
-  clientId: string;
-  clientName: string;
-  ownerId: string;
-  agentId?: string;
-  status: DealStatus;
-  message: string;
-  contractCode?: string;
-  contractTerms?: string;
-  contractStartDate?: string;
-  contractEndDate?: string;
-  createdAtIso: string;
+  senderId: string;
+  senderName: string;
+  senderRole: UserRole;
+  text: string;
+  timestamp: string;
+}
+
+export interface ClaimStatusHistoryItem {
+  id: string;
+  timestamp: string;
+  changedBy: string;
+  changedByRole: UserRole;
+  fromStatus: ClaimStatus;
+  toStatus: ClaimStatus;
+  note?: string;
 }
 
 export interface ClaimItem {
   id: string;
+  claimCode?: string;
   reporterId: string;
   reporterName: string;
+  reporterEmail?: string;
   targetType: ClaimTargetType;
   targetReference: string;
   subject: string;
   description: string;
   status: ClaimStatus;
-  adminResolution: string;
+  adminResolution?: string;
+  solutionDescription?: string;
+  dismissalReason?: string;
+  reopenReason?: string;
+  messages?: ClaimMessage[];
+  statusHistory?: ClaimStatusHistoryItem[];
   createdAtIso: string;
+  updatedAtIso?: string;
+  resolvedAtIso?: string;
 }
 
 export interface CategoryConfigItem {
@@ -205,6 +318,8 @@ export interface NotificationItem {
   targetSubView?: string;
   targetPropertyId?: string;
   targetInquiryId?: string;
+  targetClaimId?: string;
+  claimCode?: string;
   createdAtIso: string;
 }
 

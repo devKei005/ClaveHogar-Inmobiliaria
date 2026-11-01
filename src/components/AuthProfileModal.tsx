@@ -273,14 +273,14 @@ export const AuthProfileModal: React.FC<AuthProfileModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#1F241F]/60 p-4 overflow-y-auto">
-      <div className="relative w-full max-w-md bg-[#FCFBF7] border border-[#D8C7AA] rounded-md overflow-hidden my-8">
+      <div className="relative w-full max-w-md bg-[#FCFBF7] border border-[#D5BFA0] rounded-md overflow-hidden my-8">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-5 bg-[#39483A] text-[#FCFBF7]">
+        <div className="flex items-center justify-between px-6 py-5 bg-[#173B43] text-[#FCFBF7]">
           <div>
-            <span className="text-[10px] uppercase tracking-[0.2em] text-[#D8C7AA] block">
+            <span className="text-[10px] uppercase tracking-[0.2em] text-[#D5BFA0] font-semibold block">
               ClaveHogar
             </span>
-            <h2 className="text-xl font-serif-display font-semibold">
+            <h2 className="text-xl font-serif-display font-semibold text-white">
               {mode === 'login' && 'Iniciar sesión'}
               {mode === 'register' && 'Crear cuenta'}
               {mode === 'recover' && 'Recuperar contraseña'}
@@ -293,7 +293,7 @@ export const AuthProfileModal: React.FC<AuthProfileModalProps> = ({
               clearAuthForms();
               onClose();
             }}
-            className="p-1.5 text-[#D8C7AA] hover:text-[#FCFBF7] rounded-sm hover:bg-white/10 transition-colors"
+            className="p-1.5 text-[#D5BFA0] hover:text-[#FCFBF7] rounded-sm hover:bg-white/10 transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
@@ -305,7 +305,7 @@ export const AuthProfileModal: React.FC<AuthProfileModalProps> = ({
             <div className="space-y-5">
               <form onSubmit={handleLogin} autoComplete="off" className="space-y-4">
                 <div>
-                  <label className="block text-xs font-semibold text-[#39483A] mb-1">
+                  <label className="block text-xs font-semibold text-[#173B43] mb-1">
                     Correo electrónico
                   </label>
                   <input
@@ -316,12 +316,12 @@ export const AuthProfileModal: React.FC<AuthProfileModalProps> = ({
                     value={loginEmail}
                     onChange={(e) => setLoginEmail(e.target.value)}
                     placeholder="tu@email.com"
-                    className="w-full px-3.5 py-2.5 text-sm bg-white border border-[#D8C7AA] rounded-sm focus:outline-none focus:border-[#39483A]"
+                    className="w-full px-3.5 py-2.5 text-sm bg-white border border-[#D5BFA0] rounded-sm focus:outline-none focus:border-[#173B43]"
                   />
                 </div>
                 <div>
                   <div className="flex items-center justify-between mb-1">
-                    <label className="block text-xs font-semibold text-[#39483A]">
+                    <label className="block text-xs font-semibold text-[#173B43]">
                       Contraseña
                     </label>
                     <button
@@ -340,19 +340,19 @@ export const AuthProfileModal: React.FC<AuthProfileModalProps> = ({
                     value={loginPassword}
                     onChange={(e) => setLoginPassword(e.target.value)}
                     placeholder="••••••••"
-                    className="w-full px-3.5 py-2.5 text-sm bg-white border border-[#D8C7AA] rounded-sm focus:outline-none focus:border-[#39483A]"
+                    className="w-full px-3.5 py-2.5 text-sm bg-white border border-[#D5BFA0] rounded-sm focus:outline-none focus:border-[#173B43]"
                   />
                 </div>
                 <button
                   type="submit"
                   disabled={busy}
-                  className="w-full py-3 px-4 text-xs uppercase tracking-widest font-semibold text-[#FCFBF7] bg-[#39483A] hover:bg-[#2c382d] rounded-sm transition-colors disabled:opacity-50"
+                  className="w-full py-3 px-4 text-xs uppercase tracking-widest font-semibold text-[#FCFBF7] bg-[#173B43] hover:bg-[#2c382d] rounded-sm transition-colors disabled:opacity-50"
                 >
                   {busy ? 'Iniciando sesión...' : 'Iniciar sesión'}
                 </button>
               </form>
 
-              <div className="text-center text-xs text-[#39483A]/80 pt-2 border-t border-[#D8C7AA]">
+              <div className="text-center text-xs text-[#173B43]/80 pt-2 border-t border-[#D5BFA0]">
                 ¿No tenés una cuenta?{' '}
                 <button
                   type="button"
@@ -368,13 +368,13 @@ export const AuthProfileModal: React.FC<AuthProfileModalProps> = ({
           {/* SCREEN 2: REGISTRARSE */}
           {mode === 'register' && (
             <div className="space-y-4">
-              <div className="p-3 bg-[#F5F1E8] border border-[#D8C7AA] rounded-sm text-xs text-[#39483A]">
+              <div className="p-3 bg-[#F8F6F1] border border-[#D5BFA0] rounded-sm text-xs text-[#173B43]">
                 Tu cuenta se creará con perfil de <strong>Cliente</strong>. Desde la misma cuenta podrás convertirte también en <strong>Propietario</strong> cuando quieras publicar y administrar tus inmuebles.
               </div>
 
               <form onSubmit={handleRegister} autoComplete="off" className="space-y-3.5">
                 <div>
-                  <label className="block text-xs font-semibold text-[#39483A] mb-1">
+                  <label className="block text-xs font-semibold text-[#173B43] mb-1">
                     Nombre y Apellido *
                   </label>
                   <input
@@ -385,11 +385,11 @@ export const AuthProfileModal: React.FC<AuthProfileModalProps> = ({
                     value={regName}
                     onChange={(e) => setRegName(e.target.value)}
                     placeholder="Ej. Juan Pérez"
-                    className="w-full px-3.5 py-2 text-sm bg-white border border-[#D8C7AA] rounded-sm focus:outline-none focus:border-[#39483A]"
+                    className="w-full px-3.5 py-2 text-sm bg-white border border-[#D5BFA0] rounded-sm focus:outline-none focus:border-[#173B43]"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-[#39483A] mb-1">
+                  <label className="block text-xs font-semibold text-[#173B43] mb-1">
                     Correo electrónico *
                   </label>
                   <input
@@ -400,12 +400,12 @@ export const AuthProfileModal: React.FC<AuthProfileModalProps> = ({
                     value={regEmail}
                     onChange={(e) => setRegEmail(e.target.value)}
                     placeholder="juan@ejemplo.com"
-                    className="w-full px-3.5 py-2 text-sm bg-white border border-[#D8C7AA] rounded-sm focus:outline-none focus:border-[#39483A]"
+                    className="w-full px-3.5 py-2 text-sm bg-white border border-[#D5BFA0] rounded-sm focus:outline-none focus:border-[#173B43]"
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-xs font-semibold text-[#39483A] mb-1">
+                    <label className="block text-xs font-semibold text-[#173B43] mb-1">
                       Teléfono *
                     </label>
                     <input
@@ -416,11 +416,11 @@ export const AuthProfileModal: React.FC<AuthProfileModalProps> = ({
                       value={regPhone}
                       onChange={(e) => setRegPhone(e.target.value)}
                       placeholder="+54 9 11..."
-                      className="w-full px-3 py-2 text-sm bg-white border border-[#D8C7AA] rounded-sm font-tabular focus:outline-none focus:border-[#39483A]"
+                      className="w-full px-3 py-2 text-sm bg-white border border-[#D5BFA0] rounded-sm font-tabular focus:outline-none focus:border-[#173B43]"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold text-[#39483A] mb-1">
+                    <label className="block text-xs font-semibold text-[#173B43] mb-1">
                       DNI *
                     </label>
                     <input
@@ -431,12 +431,12 @@ export const AuthProfileModal: React.FC<AuthProfileModalProps> = ({
                       value={regDni}
                       onChange={(e) => setRegDni(e.target.value)}
                       placeholder="35.000.000"
-                      className="w-full px-3 py-2 text-sm bg-white border border-[#D8C7AA] rounded-sm font-tabular focus:outline-none focus:border-[#39483A]"
+                      className="w-full px-3 py-2 text-sm bg-white border border-[#D5BFA0] rounded-sm font-tabular focus:outline-none focus:border-[#173B43]"
                     />
                   </div>
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-[#39483A] mb-1">
+                  <label className="block text-xs font-semibold text-[#173B43] mb-1">
                     Localidad / Dirección
                   </label>
                   <input
@@ -446,11 +446,11 @@ export const AuthProfileModal: React.FC<AuthProfileModalProps> = ({
                     value={regAddress}
                     onChange={(e) => setRegAddress(e.target.value)}
                     placeholder="Quilmes / CABA / Zona Norte"
-                    className="w-full px-3.5 py-2 text-sm bg-white border border-[#D8C7AA] rounded-sm focus:outline-none focus:border-[#39483A]"
+                    className="w-full px-3.5 py-2 text-sm bg-white border border-[#D5BFA0] rounded-sm focus:outline-none focus:border-[#173B43]"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-[#39483A] mb-1">
+                  <label className="block text-xs font-semibold text-[#173B43] mb-1">
                     Contraseña *
                   </label>
                   <input
@@ -462,19 +462,19 @@ export const AuthProfileModal: React.FC<AuthProfileModalProps> = ({
                     value={regPassword}
                     onChange={(e) => setRegPassword(e.target.value)}
                     placeholder="Mínimo 6 caracteres"
-                    className="w-full px-3.5 py-2 text-sm bg-white border border-[#D8C7AA] rounded-sm focus:outline-none focus:border-[#39483A]"
+                    className="w-full px-3.5 py-2 text-sm bg-white border border-[#D5BFA0] rounded-sm focus:outline-none focus:border-[#173B43]"
                   />
                 </div>
                 <button
                   type="submit"
                   disabled={busy}
-                  className="w-full py-3 px-4 text-xs uppercase tracking-widest font-semibold text-[#FCFBF7] bg-[#39483A] hover:bg-[#2c382d] rounded-sm transition-colors disabled:opacity-50"
+                  className="w-full py-3 px-4 text-xs uppercase tracking-widest font-semibold text-[#FCFBF7] bg-[#173B43] hover:bg-[#2c382d] rounded-sm transition-colors disabled:opacity-50"
                 >
                   {busy ? 'Registrando usuario...' : 'Registrarse'}
                 </button>
               </form>
 
-              <div className="text-center text-xs text-[#39483A]/80 pt-1">
+              <div className="text-center text-xs text-[#173B43]/80 pt-1">
                 ¿Ya tenés una cuenta?{' '}
                 <button
                   type="button"
@@ -493,17 +493,17 @@ export const AuthProfileModal: React.FC<AuthProfileModalProps> = ({
               <button
                 type="button"
                 onClick={() => switchMode('login')}
-                className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#39483A] hover:underline"
+                className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#173B43] hover:underline"
               >
                 <ArrowLeft className="w-3.5 h-3.5" />
                 Volver a Iniciar sesión
               </button>
-              <p className="text-xs text-[#39483A]/80 leading-relaxed">
+              <p className="text-xs text-[#173B43]/80 leading-relaxed">
                 Ingresá el correo electrónico de tu cuenta y te enviaremos un enlace para restablecer tu contraseña.
               </p>
               <form onSubmit={handleRecover} autoComplete="off" className="space-y-4">
                 <div>
-                  <label className="block text-xs font-semibold text-[#39483A] mb-1">
+                  <label className="block text-xs font-semibold text-[#173B43] mb-1">
                     Correo electrónico registrado
                   </label>
                   <input
@@ -513,13 +513,13 @@ export const AuthProfileModal: React.FC<AuthProfileModalProps> = ({
                     value={recoverEmail}
                     onChange={(e) => setRecoverEmail(e.target.value)}
                     placeholder="tu@email.com"
-                    className="w-full px-3.5 py-2.5 text-sm bg-white border border-[#D8C7AA] rounded-sm focus:outline-none focus:border-[#39483A]"
+                    className="w-full px-3.5 py-2.5 text-sm bg-white border border-[#D5BFA0] rounded-sm focus:outline-none focus:border-[#173B43]"
                   />
                 </div>
                 <button
                   type="submit"
                   disabled={busy}
-                  className="w-full py-3 px-4 text-xs uppercase tracking-widest font-semibold text-[#FCFBF7] bg-[#39483A] hover:bg-[#2c382d] rounded-sm transition-colors"
+                  className="w-full py-3 px-4 text-xs uppercase tracking-widest font-semibold text-[#FCFBF7] bg-[#173B43] hover:bg-[#2c382d] rounded-sm transition-colors"
                 >
                   Enviar instrucciones
                 </button>
@@ -531,8 +531,8 @@ export const AuthProfileModal: React.FC<AuthProfileModalProps> = ({
           {mode === 'profile' && currentUser && (
             <div className="space-y-4">
               {/* Foto de perfil propia */}
-              <div className="p-4 bg-[#F5F1E8] border border-[#D8C7AA] rounded-sm flex items-center gap-4">
-                <div className="relative w-16 h-16 rounded-full overflow-hidden bg-[#39483A] text-[#FCFBF7] border-2 border-[#D8C7AA] flex items-center justify-center shrink-0">
+              <div className="p-4 bg-[#F8F6F1] border border-[#D5BFA0] rounded-sm flex items-center gap-4">
+                <div className="relative w-16 h-16 rounded-full overflow-hidden bg-[#173B43] text-[#FCFBF7] border-2 border-[#D5BFA0] flex items-center justify-center shrink-0">
                   {profPhotoUrl ? (
                     <img
                       src={profPhotoUrl}
@@ -565,7 +565,7 @@ export const AuthProfileModal: React.FC<AuthProfileModalProps> = ({
                       type="button"
                       onClick={() => avatarInputRef.current?.click()}
                       disabled={uploadingPhoto}
-                      className="inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-semibold bg-[#39483A] text-[#FCFBF7] rounded-sm hover:bg-[#2c382d] transition-colors cursor-pointer"
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-semibold bg-[#173B43] text-[#FCFBF7] rounded-sm hover:bg-[#2c382d] transition-colors cursor-pointer"
                     >
                       <Camera className="w-3.5 h-3.5" />
                       {uploadingPhoto ? 'Guardando foto...' : profPhotoUrl ? 'Cambiar foto' : 'Subir foto propia'}
@@ -587,7 +587,7 @@ export const AuthProfileModal: React.FC<AuthProfileModalProps> = ({
 
               <form onSubmit={handleSaveProfile} className="space-y-3.5">
                 <div>
-                  <label className="block text-xs font-semibold text-[#39483A] mb-1">
+                  <label className="block text-xs font-semibold text-[#173B43] mb-1">
                     Nombre y Apellido *
                   </label>
                   <input
@@ -595,12 +595,12 @@ export const AuthProfileModal: React.FC<AuthProfileModalProps> = ({
                     required
                     value={profName}
                     onChange={(e) => setProfName(e.target.value)}
-                    className="w-full px-3.5 py-2 text-sm bg-white border border-[#D8C7AA] rounded-sm"
+                    className="w-full px-3.5 py-2 text-sm bg-white border border-[#D5BFA0] rounded-sm"
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-xs font-semibold text-[#39483A] mb-1">
+                    <label className="block text-xs font-semibold text-[#173B43] mb-1">
                       Teléfono *
                     </label>
                     <input
@@ -608,65 +608,65 @@ export const AuthProfileModal: React.FC<AuthProfileModalProps> = ({
                       required
                       value={profPhone}
                       onChange={(e) => setProfPhone(e.target.value)}
-                      className="w-full px-3 py-2 text-sm bg-white border border-[#D8C7AA] rounded-sm font-tabular"
+                      className="w-full px-3 py-2 text-sm bg-white border border-[#D5BFA0] rounded-sm font-tabular"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold text-[#39483A] mb-1">
+                    <label className="block text-xs font-semibold text-[#173B43] mb-1">
                       DNI / Documento
                     </label>
                     <input
                       type="text"
                       value={profDni}
                       onChange={(e) => setProfDni(e.target.value)}
-                      className="w-full px-3 py-2 text-sm bg-white border border-[#D8C7AA] rounded-sm font-tabular"
+                      className="w-full px-3 py-2 text-sm bg-white border border-[#D5BFA0] rounded-sm font-tabular"
                     />
                   </div>
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-[#39483A] mb-1">
+                  <label className="block text-xs font-semibold text-[#173B43] mb-1">
                     Domicilio / Localidad
                   </label>
                   <input
                     type="text"
                     value={profAddress}
                     onChange={(e) => setProfAddress(e.target.value)}
-                    className="w-full px-3.5 py-2 text-sm bg-white border border-[#D8C7AA] rounded-sm"
+                    className="w-full px-3.5 py-2 text-sm bg-white border border-[#D5BFA0] rounded-sm"
                   />
                 </div>
                 {(currentUser.role === 'propietario' ||
                   currentUser.role === 'agente' ||
                   currentUser.isAlsoOwner) && (
                   <div>
-                    <label className="block text-xs font-semibold text-[#39483A] mb-1">
+                    <label className="block text-xs font-semibold text-[#173B43] mb-1">
                       Inmobiliaria / Firma (opcional)
                     </label>
                     <input
                       type="text"
                       value={profAgency}
                       onChange={(e) => setProfAgency(e.target.value)}
-                      className="w-full px-3.5 py-2 text-sm bg-white border border-[#D8C7AA] rounded-sm"
+                      className="w-full px-3.5 py-2 text-sm bg-white border border-[#D5BFA0] rounded-sm"
                     />
                   </div>
                 )}
                 <div>
-                  <label className="block text-xs font-semibold text-[#39483A] mb-1">
+                  <label className="block text-xs font-semibold text-[#173B43] mb-1">
                     Biografía / Preferencias
                   </label>
                   <textarea
                     rows={2}
                     value={profBio}
                     onChange={(e) => setProfBio(e.target.value)}
-                    className="w-full px-3.5 py-2 text-sm bg-white border border-[#D8C7AA] rounded-sm"
+                    className="w-full px-3.5 py-2 text-sm bg-white border border-[#D5BFA0] rounded-sm"
                   />
                 </div>
 
                 {currentUser.role === 'cliente' && !currentUser.isAlsoOwner && (
-                  <div className="p-4 bg-[#F5F1E8] border border-[#D8C7AA] rounded-sm space-y-2">
-                    <div className="text-xs font-semibold text-[#39483A]">
+                  <div className="p-4 bg-[#F8F6F1] border border-[#D5BFA0] rounded-sm space-y-2">
+                    <div className="text-xs font-semibold text-[#173B43]">
                       ¿Querés vender o alquilar tu propia propiedad?
                     </div>
-                    <p className="text-[11px] text-[#39483A]/80">
+                    <p className="text-[11px] text-[#173B43]/80">
                       Podés convertirte en <strong>Propietario</strong> desde esta misma cuenta manteniendo todas tus funciones de Cliente (favoritos, búsquedas y reservas).
                     </p>
                     <button
@@ -686,17 +686,17 @@ export const AuthProfileModal: React.FC<AuthProfileModalProps> = ({
                   <button
                     type="submit"
                     disabled={busy}
-                    className="w-full py-3 px-4 text-xs uppercase tracking-widest font-semibold text-[#FCFBF7] bg-[#39483A] hover:bg-[#2c382d] rounded-sm transition-colors"
+                    className="w-full py-3 px-4 text-xs uppercase tracking-widest font-semibold text-[#FCFBF7] bg-[#173B43] hover:bg-[#2c382d] rounded-sm transition-colors"
                   >
                     {busy ? 'Guardando...' : 'Guardar Datos Personales'}
                   </button>
 
-                  <div className="flex items-center justify-between gap-2 pt-2 border-t border-[#D8C7AA]">
+                  <div className="flex items-center justify-between gap-2 pt-2 border-t border-[#D5BFA0]">
                     <button
                       type="button"
                       disabled={busy}
                       onClick={handleClearOptionalProfileData}
-                      className="px-3 py-1.5 text-[11px] font-semibold text-[#39483A] bg-[#F5F1E8] border border-[#D8C7AA] rounded-sm hover:bg-[#D8C7AA]/40 transition-colors"
+                      className="px-3 py-1.5 text-[11px] font-semibold text-[#173B43] bg-[#F8F6F1] border border-[#D5BFA0] rounded-sm hover:bg-[#D5BFA0]/40 transition-colors"
                     >
                       Limpiar datos opcionales
                     </button>
@@ -732,7 +732,7 @@ export const AuthProfileModal: React.FC<AuthProfileModalProps> = ({
                             <button
                               type="button"
                               onClick={() => setConfirmDeleteAccount(false)}
-                              className="px-2 py-1 text-[11px] text-[#39483A] underline"
+                              className="px-2 py-1 text-[11px] text-[#173B43] underline"
                             >
                               Cancelar
                             </button>
