@@ -3550,7 +3550,7 @@ export default function App() {
             <section className="relative w-full min-h-[520px] lg:min-h-[600px] flex items-center justify-center overflow-hidden bg-[#173B43]">
               <div className="absolute inset-0 z-0">
                 <img
-                  src={heroFeaturedProperty?.images[0] || HERO_IMAGE}
+                  src={HERO_IMAGE}
                   alt="ClaveHogar Residencia Exclusiva"
                   className="w-full h-full object-cover object-center scale-105 brightness-[0.85] contrast-[1.05]"
                   referrerPolicy="no-referrer"
@@ -3561,7 +3561,6 @@ export default function App() {
               <div className="relative z-10 max-w-5xl mx-auto px-6 py-16 text-center space-y-8 w-full">
                 <div className="space-y-3 animate-fade-slide">
                   <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-white/10 backdrop-blur-md border border-white/20 text-[#D6CBB8] text-xs font-semibold uppercase tracking-[0.2em]">
-                    {/* <span className="w-1.5 h-1.5 rounded-full bg-[#C87955]" /> */}
                     <span>La clave para encontrar tu lugar.</span>
                   </div>
 
