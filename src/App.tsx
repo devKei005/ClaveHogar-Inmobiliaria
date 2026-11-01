@@ -2594,9 +2594,10 @@ export default function App() {
     if (!target) return;
     if (
       currentUser?.uid === uid ||
-      currentUser?.email.toLowerCase() === target.email.toLowerCase()
+      currentUser?.email.toLowerCase() === target.email.toLowerCase() ||
+      currentUser?.role === 'administrador' && target.role === 'administrador'
     ) {
-      notify('error', 'Acción no permitida', 'No podés cambiar tu propio rol o estado desde esta sesión.');
+      notify('error', 'Acción no permitida', 'No podés cambiar tu propio rol o estado desde esta sesión, ni modificar a otros administradores.');
       return;
     }
     const updated: UserProfile = {

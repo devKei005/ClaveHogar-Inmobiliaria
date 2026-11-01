@@ -1468,6 +1468,22 @@ export function extractCriteriaLocally(
     locations: [],
   };
 
+  // Detección de texto o números entre paréntesis (ej. (Quilmes), (3))
+  const parenMatch = query.match(/\(([^)]+)\)/);
+  if (parenMatch) {
+    const parenContent = parenMatch[1].trim();
+    const parenNum = parseSpanishNumber(parenContent);
+    if (parenNum !== null && parenNum > 0) {
+      if (!updated.minBedrooms) updated.minBedrooms = parenNum;
+    } else if (parenContent.length >= 2) {
+      const cleanParen = parenContent.charAt(0).toUpperCase() + parenContent.slice(1);
+      if (!updated.locations) updated.locations = [];
+      if (!updated.locations.includes(cleanParen)) {
+        updated.locations.push(cleanParen);
+      }
+    }
+  }
+
   // 1. Operación
   if (
     qNorm.includes('comprar') ||
@@ -1931,9 +1947,12 @@ export function hasSufficientCriteriaToSearch(criteria: ExtractedSearchCriteria)
   }
   const hasOperation = Boolean(criteria.operationType);
   const hasLocation = Boolean(
-    (criteria.locations && criteria.locations.length > 0) || criteria.isProximitySearch
+    (criteria.locations && criteria.locations.length > 0) || criteria.isProximitySearch || criteria.requestedAddress
   );
-  return hasOperation && hasLocation;
+  const hasOtherCriteria = Boolean(
+    criteria.propertyType || criteria.minBedrooms || criteria.maxPrice || (criteria.requiredFeatures && criteria.requiredFeatures.length > 0)
+  );
+  return hasOperation || hasLocation || hasOtherCriteria;
 }
 
 /**
@@ -2712,7 +2731,7 @@ export function buildAgentConversationReply(
   if (previousCriteria && !previousCriteria.operationType && criteria.operationType) {
     acknowledgment = `¡Perfecto! `;
   } else if (previousCriteria && (!previousCriteria.locations || previousCriteria.locations.length === 0) && criteria.locations && criteria.locations.length > 0) {
-    acknowledgment = `¡Entendido! Buscando en ${criteria.locations.join(', ')}. `;
+    acknowledgment = `¡Entendido! `;
   } else if (
     previousCriteria &&
     previousCriteria.locations &&
@@ -2721,7 +2740,7 @@ export function buildAgentConversationReply(
     criteria.locations.length > 0 &&
     previousCriteria.locations.join(',') !== criteria.locations.join(',')
   ) {
-    acknowledgment = `¡Entendido! Buscando en ${criteria.locations.join(', ')}. `;
+    acknowledgment = `¡Entendido! `;
   }
 
   // 3. Intención de coordinar o consultar cómo hacer una visita presencial

@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Plus,
   Edit3,
@@ -840,7 +841,10 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
                 <button
                   key={inq.id}
                   type="button"
-                  onClick={() => setSelectedChatId(inq.id)}
+                  onClick={() => {
+                    setSelectedChatId(inq.id);
+                    setIsChatFullscreen(true);
+                  }}
                   className="w-full p-5 text-left hover:bg-[#F8F6F1] transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-4 group"
                 >
                   <div className="flex items-start gap-4 min-w-0">
@@ -1070,9 +1074,21 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
                               : 'EN NEGOCIACIÓN / SOLICITADA'}
                           </span>
                         </div>
-                        <h3 className="text-base font-serif-display font-semibold text-[#1F241F]">
-                          {op.propertyTitle}
-                        </h3>
+                        {prop ? (
+                          <button
+                            type="button"
+                            onClick={() => onSelectProperty(prop)}
+                            className="text-base font-serif-display font-semibold text-[#1F241F] hover:text-[#173B43] hover:underline text-left inline-flex items-center gap-1.5 cursor-pointer group"
+                            title="Ver ficha completa de la propiedad"
+                          >
+                            <span>{op.propertyTitle}</span>
+                            <Eye className="w-3.5 h-3.5 text-[#173B43] opacity-60 group-hover:opacity-100 shrink-0" />
+                          </button>
+                        ) : (
+                          <h3 className="text-base font-serif-display font-semibold text-[#1F241F]">
+                            {op.propertyTitle}
+                          </h3>
+                        )}
                         <div className="text-xs text-[#173B43]/80">
                           {prop ? `${prop.location} · ${prop.propertyType} (${prop.surface} m²)` : 'Inmueble'}
                         </div>
@@ -1622,9 +1638,14 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
                       <div className="text-[11px] uppercase tracking-wider text-[#B86F52] font-semibold">
                         {prop.propertyType} · {prop.location}
                       </div>
-                      <div className="text-base font-serif-display font-semibold text-[#1F241F] line-clamp-1">
+                      <button
+                        type="button"
+                        onClick={() => onSelectProperty(prop)}
+                        className="text-base font-serif-display font-semibold text-[#1F241F] hover:text-[#173B43] hover:underline text-left line-clamp-1 cursor-pointer block w-full"
+                        title="Ver ficha completa de la propiedad"
+                      >
                         {prop.title}
-                      </div>
+                      </button>
                       <div className="text-base font-tabular font-semibold text-[#173B43]">
                         {prop.currency} {prop.price.toLocaleString()}
                       </div>
@@ -1683,7 +1704,21 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
                   {clientVisits.map((v) => (
                     <tr key={v.id}>
                       <td className="py-3.5 pr-4">
-                        <div className="font-semibold text-[#1F241F]">{v.propertyTitle}</div>
+                        {(() => {
+                          const vp = allProperties.find((p) => p.id === v.propertyId);
+                          return vp ? (
+                            <button
+                              type="button"
+                              onClick={() => onSelectProperty(vp)}
+                              className="font-semibold text-[#1F241F] hover:text-[#173B43] hover:underline text-left cursor-pointer block"
+                              title="Ver ficha completa de la propiedad"
+                            >
+                              {v.propertyTitle}
+                            </button>
+                          ) : (
+                            <div className="font-semibold text-[#1F241F]">{v.propertyTitle}</div>
+                          );
+                        })()}
                         {v.status === 'reprogramada' && (
                           <span className="text-[11px] font-semibold text-amber-900 bg-amber-100/90 px-2 py-0.5 rounded-sm inline-block mt-1 border border-amber-300">
                             Propietario reprogramó fecha/horario. Por favor aceptá o rechazá.
@@ -1741,7 +1776,11 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
                           </div>
                         ) : v.status === 'cancelada' ? (
                           <span className="text-xs text-rose-700 font-semibold italic">Visita cancelada</span>
-                        ) : v.status !== 'realizada' ? (
+                        ) : v.status === 'rechazada' ? (
+                          <span className="text-xs text-rose-700 font-semibold italic">Visita rechazada</span>
+                        ) : v.status === 'realizada' ? (
+                          <span className="text-xs text-[#173B43]/60">Sin acciones</span>
+                        ) : (
                           <button
                             type="button"
                             onClick={() => {
@@ -1752,8 +1791,6 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
                           >
                             Cancelar Visita
                           </button>
-                        ) : (
-                          <span className="text-xs text-[#173B43]/60">Sin acciones</span>
                         )}
                       </td>
                     </tr>
@@ -1764,75 +1801,77 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
           )}
 
           {/* Modal de Confirmación de Cancelación de Visita por el Cliente */}
-          {visitToCancel && (
-            <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
-              <div className="bg-[#FCFBF7] border border-[#D5BFA0] rounded-sm p-6 max-w-md w-full space-y-4 shadow-xl animate-in fade-in zoom-in-95">
-                <div className="flex items-center justify-between border-b border-[#D5BFA0] pb-3">
-                  <h3 className="text-lg font-serif-display font-bold text-[#1F241F] flex items-center gap-2">
-                    <AlertCircle className="w-5 h-5 text-rose-600 shrink-0" />
-                    ¿Confirmar cancelación de visita?
-                  </h3>
-                  <button
-                    type="button"
-                    onClick={() => setVisitToCancel(null)}
-                    className="text-[#173B43]/70 hover:text-[#1F241F] p-1 cursor-pointer"
-                  >
-                    <X className="w-5 h-5" />
-                  </button>
-                </div>
+          {visitToCancel &&
+            createPortal(
+              <div className="fixed inset-0 bg-black/60 z-[9999] flex items-center justify-center p-4">
+                <div className="bg-[#FCFBF7] border-2 border-[#173B43] rounded-xl p-6 max-w-md w-full space-y-4 shadow-2xl animate-in fade-in zoom-in-95">
+                  <div className="flex items-center justify-between border-b border-[#D5BFA0] pb-3">
+                    <h3 className="text-lg font-serif-display font-bold text-[#1F241F] flex items-center gap-2">
+                      <AlertCircle className="w-5 h-5 text-rose-600 shrink-0" />
+                      ¿Confirmar cancelación de visita?
+                    </h3>
+                    <button
+                      type="button"
+                      onClick={() => setVisitToCancel(null)}
+                      className="text-[#173B43]/70 hover:text-[#1F241F] p-1 cursor-pointer"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+                  </div>
 
-                <div className="p-3.5 bg-[#F8F6F1] border border-[#D5BFA0] rounded-sm text-xs space-y-1">
-                  <p className="font-semibold text-[#1F241F]">{visitToCancel.propertyTitle}</p>
-                  <p className="text-[#173B43]">
-                    Fecha y horario: <strong>{visitToCancel.date} · {visitToCancel.timeSlot}</strong>
+                  <div className="p-3.5 bg-[#F8F6F1] border border-[#D5BFA0] rounded-sm text-xs space-y-1">
+                    <p className="font-semibold text-[#1F241F]">{visitToCancel.propertyTitle}</p>
+                    <p className="text-[#173B43]">
+                      Fecha y horario: <strong>{visitToCancel.date} · {visitToCancel.timeSlot}</strong>
+                    </p>
+                  </div>
+
+                  <p className="text-xs text-[#173B43]/85 leading-relaxed">
+                    ¿Estás seguro de que deseas cancelar esta solicitud de visita? Esta acción notificará al propietario o agente responsable y el estado pasará a cancelado definitivamente.
                   </p>
-                </div>
 
-                <p className="text-xs text-[#173B43]/85 leading-relaxed">
-                  ¿Estás seguro de que deseas cancelar esta solicitud de visita? Esta acción notificará al propietario o agente responsable y el estado pasará a cancelado definitivamente.
-                </p>
+                  <div>
+                    <label className="block text-xs font-semibold text-[#173B43] mb-1">
+                      Motivo de la cancelación (opcional):
+                    </label>
+                    <textarea
+                      rows={2}
+                      value={cancelReason}
+                      onChange={(e) => setCancelReason(e.target.value)}
+                      placeholder="Ej: Inconveniente de agenda / Ya conseguí otra propiedad"
+                      className="w-full text-xs p-2.5 bg-white border border-[#D5BFA0] rounded-sm focus:outline-none focus:border-[#173B43]"
+                    />
+                  </div>
 
-                <div>
-                  <label className="block text-xs font-semibold text-[#173B43] mb-1">
-                    Motivo de la cancelación (opcional):
-                  </label>
-                  <textarea
-                    rows={2}
-                    value={cancelReason}
-                    onChange={(e) => setCancelReason(e.target.value)}
-                    placeholder="Ej: Inconveniente de agenda / Ya conseguí otra propiedad"
-                    className="w-full text-xs p-2.5 bg-white border border-[#D5BFA0] rounded-sm focus:outline-none focus:border-[#173B43]"
-                  />
+                  <div className="flex items-center justify-end gap-2 pt-2 border-t border-[#D5BFA0]/60">
+                    <button
+                      type="button"
+                      onClick={() => setVisitToCancel(null)}
+                      className="px-4 py-2 text-xs font-semibold text-[#173B43] bg-[#F8F6F1] border border-[#D5BFA0] rounded-sm hover:bg-[#D5BFA0]/40 cursor-pointer"
+                    >
+                      Volver / Mantener Visita
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onUpdateVisit(
+                          visitToCancel.id,
+                          'cancelada',
+                          visitToCancel.date,
+                          visitToCancel.timeSlot,
+                          cancelReason ? `Cancelada por el cliente: ${cancelReason}` : 'Cancelada por el cliente'
+                        );
+                        setVisitToCancel(null);
+                      }}
+                      className="px-4 py-2 text-xs font-bold text-white bg-rose-700 hover:bg-rose-800 rounded-sm cursor-pointer shadow-xs"
+                    >
+                      Sí, Cancelar Visita
+                    </button>
+                  </div>
                 </div>
-
-                <div className="flex items-center justify-end gap-2 pt-2 border-t border-[#D5BFA0]/60">
-                  <button
-                    type="button"
-                    onClick={() => setVisitToCancel(null)}
-                    className="px-4 py-2 text-xs font-semibold text-[#173B43] bg-[#F8F6F1] border border-[#D5BFA0] rounded-sm hover:bg-[#D5BFA0]/40 cursor-pointer"
-                  >
-                    Volver / Mantener Visita
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      onUpdateVisit(
-                        visitToCancel.id,
-                        'cancelada',
-                        visitToCancel.date,
-                        visitToCancel.timeSlot,
-                        cancelReason ? `Cancelada por el cliente: ${cancelReason}` : 'Cancelada por el cliente'
-                      );
-                      setVisitToCancel(null);
-                    }}
-                    className="px-4 py-2 text-xs font-bold text-white bg-rose-700 hover:bg-rose-800 rounded-sm cursor-pointer shadow-xs"
-                  >
-                    Sí, Cancelar Visita
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
+              </div>,
+              document.body
+            )}
         </div>
       )}
 
@@ -1867,9 +1906,20 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
                         <span className="text-[11px] font-semibold text-[#C87955] uppercase tracking-wider">
                           Propuesta de {op.operationType}
                         </span>
-                        <h3 className="text-lg font-serif-display font-semibold text-[#303638]">
-                          {op.propertyTitle}
-                        </h3>
+                        {prop ? (
+                          <button
+                            type="button"
+                            onClick={() => onSelectProperty(prop)}
+                            className="text-lg font-serif-display font-semibold text-[#303638] hover:text-[#173B43] hover:underline text-left block cursor-pointer"
+                            title="Ver ficha completa de la propiedad"
+                          >
+                            {op.propertyTitle}
+                          </button>
+                        ) : (
+                          <h3 className="text-lg font-serif-display font-semibold text-[#303638]">
+                            {op.propertyTitle}
+                          </h3>
+                        )}
                       </div>
                       <div className="text-right space-y-1">
                         <span className="text-base font-semibold font-tabular text-[#173B43] block">
@@ -1942,13 +1992,6 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
                         </>
                       )}
                     </div>
-
-                    {/* Message / Observations */}
-                    {op.message && (
-                      <p className="text-xs text-[#173B43]/85 italic">
-                        &ldquo;{op.message}&rdquo;
-                      </p>
-                    )}
 
                     {/* Counter Offer response for Client */}
                     {op.status === 'en_negociacion' && op.counterOffer && (
@@ -2983,6 +3026,11 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
                           <XCircle className="w-4 h-4 text-rose-700 shrink-0" />
                           <span>CANCELADO POR EL CLIENTE</span>
                         </div>
+                      ) : v.status === 'rechazada' ? (
+                        <div className="px-3.5 py-2 bg-rose-100 text-rose-900 border border-rose-300 rounded-sm text-xs font-bold uppercase tracking-wider flex items-center gap-2 shadow-xs">
+                          <XCircle className="w-4 h-4 text-rose-700 shrink-0" />
+                          <span>RECHAZADA</span>
+                        </div>
                       ) : v.status !== 'pendiente' && editingVisitId !== v.id ? (
                         <button
                           type="button"
@@ -3201,9 +3249,20 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
                         <span className="text-xs font-semibold text-[#B86F52] uppercase tracking-wider">
                           {op.operationType} · Solicitante: {op.clientName}
                         </span>
-                        <h3 className="text-lg font-serif-display font-semibold text-[#1F241F]">
-                          {op.propertyTitle}
-                        </h3>
+                        {prop ? (
+                          <button
+                            type="button"
+                            onClick={() => onSelectProperty(prop)}
+                            className="text-lg font-serif-display font-semibold text-[#1F241F] hover:text-[#173B43] hover:underline text-left block cursor-pointer"
+                            title="Ver ficha completa de la propiedad"
+                          >
+                            {op.propertyTitle}
+                          </button>
+                        ) : (
+                          <h3 className="text-lg font-serif-display font-semibold text-[#1F241F]">
+                            {op.propertyTitle}
+                          </h3>
+                        )}
                       </div>
                       <div className="text-right space-y-1">
                         <span className="text-base font-semibold font-tabular text-[#173B43] block">
@@ -3278,13 +3337,6 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
                       )}
                     </div>
 
-                    {/* Observations / Message */}
-                    {op.message && (
-                      <p className="text-xs text-[#173B43]/85 italic">
-                        &ldquo;{op.message}&rdquo;
-                      </p>
-                    )}
-
                     {/* Counter offer details if present */}
                     {op.counterOffer && (
                       <div className="p-3.5 bg-amber-50 border border-amber-300 rounded-sm text-xs space-y-1">
@@ -3302,6 +3354,14 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
 
                     {/* Status-specific Action Buttons */}
                     <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-[#D5BFA0]/70">
+                      <button
+                        type="button"
+                        onClick={() => prop && onSelectProperty(prop)}
+                        className="px-3.5 py-2 text-xs font-bold text-[#173B43] bg-[#F8F6F1] border border-[#D5BFA0] hover:bg-[#D5BFA0]/40 rounded-sm transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs"
+                      >
+                        <Eye className="w-3.5 h-3.5 text-[#B86F52]" />
+                        <span>Ver Ficha</span>
+                      </button>
                       {op.status !== 'concretada' && isPropConcretada ? (
                         <div className="w-full p-3 bg-amber-50 border border-amber-300 rounded-sm text-xs text-amber-900 flex items-center gap-2">
                           <AlertCircle className="w-4 h-4 text-amber-700 shrink-0" />
@@ -3313,14 +3373,23 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
                         <>
                           {(op.status === 'pendiente' || op.status === 'solicitada' || op.status === 'en_negociacion') && (
                             <>
-                              <button
-                                type="button"
-                                onClick={() => onUpdateOperation(op.id, 'aceptada')}
-                                className="px-3.5 py-2 text-xs font-semibold text-white bg-[#173B43] hover:bg-[#122e35] rounded-sm cursor-pointer inline-flex items-center gap-1.5"
-                              >
-                                <Check className="w-3.5 h-3.5" />
-                                Aceptar Propuesta
-                              </button>
+                              {op.counterOffer && (op.counterOffer.proposedBy === 'propietario' || op.counterOffer.proposedBy === 'agente') ? (
+                                <div className="w-full p-3 bg-amber-50 border border-amber-300 rounded-sm text-xs text-amber-900 flex items-center gap-2">
+                                  <Clock className="w-4 h-4 text-amber-700 shrink-0" />
+                                  <span className="font-semibold">
+                                    Contrapropuesta enviada al cliente: esperando la respuesta y decisión del cliente.
+                                  </span>
+                                </div>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => onUpdateOperation(op.id, 'aceptada')}
+                                  className="px-3.5 py-2 text-xs font-semibold text-white bg-[#173B43] hover:bg-[#122e35] rounded-sm cursor-pointer inline-flex items-center gap-1.5"
+                                >
+                                  <Check className="w-3.5 h-3.5" />
+                                  Aceptar Propuesta
+                                </button>
+                              )}
                               <button
                                 type="button"
                                 onClick={() => setActiveCounterModalOp(op)}
@@ -3346,13 +3415,6 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
                                   Propuesta Aceptada · Condiciones Acordadas
                                 </span>
                                 <div className="flex flex-wrap items-center gap-2">
-                                  <button
-                                    type="button"
-                                    onClick={() => setActiveCounterModalOp(op)}
-                                    className="px-3.5 py-2 text-xs font-semibold text-amber-900 bg-amber-100 border border-amber-400 hover:bg-amber-200 rounded-sm cursor-pointer inline-flex items-center gap-1.5"
-                                  >
-                                    Proponer Otros Términos
-                                  </button>
                                   <button
                                     type="button"
                                     onClick={() => onUpdateOperation(op.id, 'rechazada')}
