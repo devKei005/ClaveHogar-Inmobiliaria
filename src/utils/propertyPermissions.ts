@@ -1,4 +1,73 @@
-import { PropertyItem, UserProfile } from '../types';
+import { PropertyItem, UserProfile, OperationItem } from '../types';
+
+/**
+ * Normaliza el estado de una operación para saber si está concretada.
+ */
+export function isDealConcretada(status?: string): boolean {
+  const s = (status || '').toString().toLowerCase().trim().replace(/[\s-]+/g, '_');
+  return ['concretada', 'cerrada', 'finalizada', 'completada'].includes(s);
+}
+
+/**
+ * Verifica si una propiedad ya está concretada (alquilada o vendida),
+ * ya sea por su disponibilidad o por contar con una operación concretada.
+ */
+export function isPropertyConcretada(
+  prop?: PropertyItem | null,
+  allOperations?: OperationItem[]
+): boolean {
+  if (!prop) return false;
+  if (prop.availability === 'vendida' || prop.availability === 'alquilada') {
+    return true;
+  }
+  if (allOperations && allOperations.length > 0) {
+    return allOperations.some(
+      (op) => op.propertyId === prop.id && isDealConcretada(op.status)
+    );
+  }
+  return false;
+}
+
+/**
+ * Verifica si una propiedad es una VENTA y ya está CONCRETADA (vendida).
+ */
+export function isPropertySoldConcretada(
+  prop?: PropertyItem | null,
+  allOperations?: OperationItem[]
+): boolean {
+  if (!prop) return false;
+  if (prop.operationType === 'venta' && prop.availability === 'vendida') {
+    return true;
+  }
+  if (allOperations && allOperations.length > 0) {
+    return allOperations.some(
+      (op) =>
+        op.propertyId === prop.id &&
+        op.operationType === 'venta' &&
+        isDealConcretada(op.status)
+    );
+  }
+  return false;
+}
+
+/**
+ * Determina si el propietario o agente pueden administrar/hacer CRUD sobre la publicación.
+ * Regla: Cuando la propiedad ya está concretada (en operaciones de alquiler o venta),
+ * el propietario y el agente a cargo no pueden modificar el estado ni editar los datos.
+ */
+export function canUserManageProperty(
+  prop: PropertyItem,
+  user: UserProfile | null,
+  allOperations?: OperationItem[],
+  allUsers?: UserProfile[]
+): boolean {
+  if (!user) return false;
+  // Si la propiedad está concretada (alquiler o venta), el propietario y el agente NO pueden administrar ni hacer CRUD
+  if (isPropertyConcretada(prop, allOperations)) {
+    return false;
+  }
+  return canUserEditProperty(prop, user, allUsers, allOperations);
+}
 
 /**
  * Verifica si un agente está confirmado o solicitado en una propiedad.
@@ -139,15 +208,19 @@ export function isUserAssignedAgentOfProperty(
  * Determina si un usuario tiene permisos para editar la propiedad:
  * - Propietario titular del inmueble
  * - Agente inmobiliario confirmado a cargo
+ * Si la propiedad ya está concretada (alquiler o venta), ni el propietario ni el agente pueden editarla.
  * Nota: El administrador modera, aprueba, rechaza o suspende publicaciones, pero no edita directamente los datos del inmueble.
  */
 export function canUserEditProperty(
   prop: PropertyItem,
   user: UserProfile | null,
-  allUsers?: UserProfile[]
+  allUsers?: UserProfile[],
+  allOperations?: OperationItem[]
 ): boolean {
   if (!user) return false;
   if (user.role === 'administrador') return false;
+  // Cuando la propiedad está concretada (alquiler o venta), el propietario y el agente a cargo no pueden editar los datos de la propiedad
+  if (isPropertyConcretada(prop, allOperations)) return false;
   if (isUserOwnerOfProperty(prop, user, allUsers)) return true;
   if (isUserAssignedAgentOfProperty(prop, user, allUsers)) return true;
   return false;

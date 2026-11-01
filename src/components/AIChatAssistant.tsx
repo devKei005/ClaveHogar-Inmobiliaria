@@ -35,7 +35,7 @@ interface AIChatAssistantProps {
   currentUser?: UserProfile | null;
 }
 
-const CLARA_AVATAR_URL = 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=400&q=80';
+const CLARA_AVATAR_URL = 'https://framerusercontent.com/images/EZuuEf9dxVrkBeIz7bQp6oHcyI.jpg?width=1024&height=1024';
 
 const INITIAL_GREETING: ChatMessageItem = {
   id: 'msg_welcome',
@@ -330,9 +330,13 @@ export const AIChatAssistant: React.FC<AIChatAssistantProps> = ({
       <header className="bg-[#173B43] text-[#F4EFE6] border-b border-[#D5BFA0]/50 px-4 sm:px-8 py-3.5 flex items-center justify-between gap-4 shrink-0 shadow-md">
         <div className="flex items-center gap-3.5">
           <div className="relative">
-            <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-full bg-[#F8F6F1] text-[#173B43] flex items-center justify-center font-serif-display text-xl font-bold shadow-sm">
-              C
-            </div>
+           <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-full overflow-hidden bg-[#F8F6F1] flex items-center justify-center shadow-sm shrink-0">
+        <img 
+          src={CLARA_AVATAR_URL} 
+          alt="Clara Asesora" 
+          className="w-full h-full object-cover" // <-- Estas clases ajustan la imagen
+        />
+      </div>
             <span
               className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-emerald-400 border-2 border-[#173B43] rounded-full"
               title="En línea · Asesoramiento en tiempo real"
@@ -688,13 +692,6 @@ export const AIChatAssistant: React.FC<AIChatAssistantProps> = ({
             }}
             className="card-floating bg-white border-2 border-[#D5BFA0] hover:border-[#173B43]/60 focus-within:border-[#173B43] focus-within:ring-4 focus-within:ring-[#173B43]/15 rounded-2xl p-2 sm:p-2.5 shadow-md flex items-center gap-3 transition-all"
           >
-            <div className="w-9 h-9 rounded-xl overflow-hidden border border-[#D5BFA0] shrink-0 shadow-2xs hidden sm:flex bg-[#173B43]">
-              <img
-                src={CLARA_AVATAR_URL}
-                alt="Clara Asesora"
-                className="w-full h-full object-cover"
-              />
-            </div>
             <input
               ref={inputRef}
               type="text"

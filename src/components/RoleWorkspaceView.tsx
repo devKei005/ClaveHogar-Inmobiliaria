@@ -179,12 +179,16 @@ export {
   isUserAssignedAgentOfProperty,
   canUserEditProperty,
   getMinVisitDate,
+  isPropertyConcretada,
+  isPropertySoldConcretada,
 } from '../utils/propertyPermissions';
 import {
   isAgentConfirmedOnProperty,
   isUserOwnerOfProperty,
   isUserAssignedAgentOfProperty,
   getMinVisitDate,
+  isPropertyConcretada,
+  isPropertySoldConcretada,
 } from '../utils/propertyPermissions';
 
 /**
@@ -195,7 +199,8 @@ import {
 function getPublicationStatusBadgeClass(status: PublicationStatus): string {
   switch (status) {
     case 'aprobada':
-      return 'bg-[#D5BFA0]/30 text-[#173B43] border-[#173B43]';
+      // Usamos tonos verdes (emerald) claros para el fondo y oscuros para el texto
+      return 'bg-emerald-100 text-emerald-900 border-emerald-400'; 
     case 'pendiente':
       return 'bg-amber-100 text-amber-900 border-amber-400';
     case 'rechazada':
@@ -937,10 +942,10 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
               Supervisión de Transacciones
             </span>
             <h2 className="text-2xl font-serif-display font-semibold text-[#173B43]">
-              Propiedades por Estado de Operación
+              Historial y Detalles de Operaciones
             </h2>
             <p className="text-xs text-[#173B43]/75 mt-0.5">
-              Hacé clic en cualquiera de los botones para ver las propiedades según estén concretadas, con propuesta aceptada, en negociación o rechazadas.
+              Como Administrador podés consultar el historial completo y los detalles de cada operación: comprador, propietario titular, agente a cargo, montos pactados, fecha de cierre y contratos registrados.
             </p>
           </div>
 
@@ -1353,7 +1358,7 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
                         : 'bg-white hover:bg-[#F8F6F1] text-[#303638] border-2 border-[#D5BFA0] font-medium shadow-2xs'
                     }`}
                   >
-                    <span>{item.label}</span>
+                    {/* <span>{item.label}</span>
                     {item.count !== undefined && item.count > 0 && (
                       <span
                         className={`text-[10px] font-tabular px-1.5 py-0.2 rounded-full border ${
@@ -1365,7 +1370,9 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
                         {item.count}
                       </span>
                     )}
-                  </button>
+                  </button> */}
+                   <span>{item.label}</span>
+                      </button>
                 );
               })}
             </div>
@@ -1412,7 +1419,7 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
                         : 'bg-white hover:bg-[#F8F6F1] text-[#303638] border-2 border-[#D5BFA0] font-medium shadow-2xs'
                     }`}
                   >
-                    <span>{item.label}</span>
+                    {/* <span>{item.label}</span>
                     {item.count !== undefined && item.count > 0 && (
                       <span
                         className={`text-[10px] font-tabular px-1.5 py-0.2 rounded-full border ${
@@ -1424,7 +1431,9 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
                         {item.badgeLabel || item.count}
                       </span>
                     )}
-                  </button>
+                  </button> */}
+                     <span>{item.label}</span>
+                      </button>
                 );
               })}
             </div>
@@ -1468,7 +1477,7 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
                             : 'bg-white hover:bg-[#F8F6F1] text-[#303638] border-2 border-[#D5BFA0] font-medium shadow-2xs'
                         }`}
                       >
-                        <span>{item.label}</span>
+                        {/* <span>{item.label}</span>
                         {item.count > 0 && (
                           <span
                             className={`text-[10px] font-tabular px-1.5 py-0.2 rounded-full ${
@@ -1480,6 +1489,8 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
                             {item.count}
                           </span>
                         )}
+                      </button> */}
+                       <span>{item.label}</span>
                       </button>
                     );
                   })}
@@ -1521,7 +1532,7 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
                             : 'bg-white hover:bg-[#F8F6F1] text-[#303638] border-2 border-[#D5BFA0] font-medium shadow-2xs'
                         }`}
                       >
-                        <span>{item.label}</span>
+                        {/* <span>{item.label}</span>
                         {item.count > 0 && (
                           <span
                             className={`text-[10px] font-tabular px-1.5 py-0.2 rounded-full ${
@@ -1533,6 +1544,8 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
                             {item.count}
                           </span>
                         )}
+                      </button> */}
+                      <span>{item.label}</span>
                       </button>
                     );
                   })}
@@ -1841,6 +1854,7 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
             <div className="space-y-4">
               {clientOperations.map((op) => {
                 const isRental = op.operationType === 'alquiler';
+                const prop = allProperties.find((p) => p.id === op.propertyId);
                 const relatedContract = contracts.find((c) => c.operationId === op.id);
 
                 return (
@@ -1984,22 +1998,38 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
 
                     {/* Contract Details - Únicamente visible cuando la operación está CONCRETADA */}
                     {normalizeDealCategory(op.status) === 'concretada' && (op.contractCode || relatedContract) && (
-                      <div className="p-4 bg-[#F8F6F1] border-2 border-[#173B43] rounded-sm text-xs space-y-1.5">
-                        <div className="font-bold text-[#173B43] font-tabular text-sm flex items-center justify-between">
+                      <div className="p-4 bg-[#F8F6F1] border-2 border-[#173B43] rounded-xl text-xs space-y-2">
+                        <div className="flex items-center gap-1.5 text-emerald-900 bg-emerald-100/90 border border-emerald-400 px-3 py-1.5 rounded-lg font-bold text-xs">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-700 shrink-0" />
+                          <span>Registro Oficial Permanente: Operación de {isRental ? 'Alquiler' : 'Compra'} Concretada</span>
+                        </div>
+                        <div className="font-bold text-[#173B43] font-tabular text-sm flex items-center justify-between pt-1">
                           <span>Contrato Registrado: #{op.contractCode || relatedContract?.contractCode}</span>
-                          <span className="uppercase text-[10px] bg-[#D5BFA0]/55 text-[#173B43] px-2 py-0.5 rounded-sm">
+                          <span className="uppercase text-[10px] bg-emerald-700 text-white px-2.5 py-0.5 rounded-full font-bold">
                             Concretada
                           </span>
                         </div>
                         <div className="text-[#173B43] font-medium font-tabular">
                           Monto final: {relatedContract?.finalCurrency || op.currency} {(relatedContract?.finalPrice || op.offeredAmount).toLocaleString()} · Fecha de Cierre: {relatedContract?.closingDate || op.createdAtIso.slice(0, 10)}
                         </div>
-                        <p className="text-[#173B43]/80">
-                          {relatedContract?.contractTerms || op.contractTerms || 'Contrato archivado correctamente.'}
+                        <p className="text-[#173B43]/85 leading-relaxed">
+                          {relatedContract?.contractTerms || op.contractTerms || 'Contrato archivado correctamente. Registro disponible para conservación del comprador.'}
                         </p>
                         {relatedContract?.signedContractDocRef && (
                           <div className="text-[11px] font-mono text-[#173B43] pt-1">
-                            Documento: {relatedContract.signedContractDocRef}
+                            Documento firmado: {relatedContract.signedContractDocRef}
+                          </div>
+                        )}
+                        {prop && (
+                          <div className="pt-2">
+                            <button
+                              type="button"
+                              onClick={() => onSelectProperty(prop)}
+                              className="px-3.5 py-1.5 text-xs font-semibold text-white bg-[#173B43] hover:bg-[#122e35] rounded-xl inline-flex items-center gap-1.5 transition-colors cursor-pointer"
+                            >
+                              <Eye className="w-3.5 h-3.5" />
+                              <span>Ver Ficha del Inmueble Comprado</span>
+                            </button>
                           </div>
                         )}
                       </div>
@@ -2024,7 +2054,6 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#D5BFA0]/60 pb-5">
             <div>
               <div className="flex items-center gap-1.5 mb-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-[#C87955]" />
                 <span className="text-[11px] uppercase tracking-[0.2em] text-[#C87955] font-semibold block">
                   Panel de Propietario
                 </span>
@@ -2136,6 +2165,7 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
           ) : (
             <div className="space-y-4">
               {myOwnedProperties.map((prop) => {
+                const isConcretadaProp = isPropertyConcretada(prop, allOperations);
                 const status =
                   prop.agentAssignmentStatus ||
                   (prop.agentId?.trim() ? 'asignado' : 'sin_agente');
@@ -2237,18 +2267,25 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
                           <label className="block text-[10px] uppercase tracking-wider text-[#303638]/60 mb-1 font-semibold">
                             Disponibilidad
                           </label>
-                          <select
-                            value={prop.availability}
-                            onChange={(e) =>
-                              onUpdateAvailability(prop.id, e.target.value as AvailabilityStatus)
-                            }
-                            className="px-3 py-2 text-xs font-medium bg-[#F8F6F1]/60 border border-[#D5BFA0] rounded-xl text-[#303638] focus:outline-none focus:border-[#173B43] cursor-pointer"
-                          >
-                            <option value="disponible">Disponible</option>
-                            <option value="reservada">Reservada</option>
-                            <option value="alquilada">Alquilada</option>
-                            <option value="vendida">Vendida</option>
-                          </select>
+                          {isConcretadaProp ? (
+                            <span className="px-3 py-2 text-xs font-bold bg-emerald-100 text-emerald-950 border border-emerald-400 rounded-xl inline-flex items-center gap-1.5">
+                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-700" />
+                              <span>{prop.operationType === 'alquiler' ? 'Alquilada (Concretada)' : 'Vendida (Concretada)'}</span>
+                            </span>
+                          ) : (
+                            <select
+                              value={prop.availability}
+                              onChange={(e) =>
+                                onUpdateAvailability(prop.id, e.target.value as AvailabilityStatus)
+                              }
+                              className="px-3 py-2 text-xs font-medium bg-[#F8F6F1]/60 border border-[#D5BFA0] rounded-xl text-[#303638] focus:outline-none focus:border-[#173B43] cursor-pointer"
+                            >
+                              <option value="disponible">Disponible</option>
+                              <option value="reservada">Reservada</option>
+                              <option value="alquilada">Alquilada</option>
+                              <option value="vendida">Vendida</option>
+                            </select>
+                          )}
                         </div>
 
                         <div className="flex items-center gap-2 pt-4">
@@ -2261,31 +2298,47 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
                             <Eye className="w-3.5 h-3.5" />
                             <span>Ver</span>
                           </button>
-                          <button
-                            type="button"
-                            onClick={() => onOpenEditProperty(prop)}
-                            className="px-3.5 py-2 text-xs font-semibold text-[#303638] bg-[#F8F6F1] border border-[#D5BFA0] rounded-xl hover:bg-white inline-flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
-                            title="Editar propiedad"
-                          >
-                            <Edit3 className="w-3.5 h-3.5" />
-                            <span>Editar</span>
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => onDeleteProperty(prop.id)}
-                            className="p-2 text-red-600 bg-red-50 border border-red-200 rounded-xl hover:bg-red-100 transition-colors cursor-pointer shadow-2xs"
-                            title="Eliminar propiedad"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
+                          {isConcretadaProp ? (
+                            <span className="text-[11px] font-semibold text-emerald-900 bg-emerald-50 border border-emerald-300 px-3 py-2 rounded-xl">
+                              {prop.operationType === 'alquiler' ? 'Alquiler Concretado · Solo Lectura' : 'Venta Concretada · Solo Lectura'}
+                            </span>
+                          ) : (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => onOpenEditProperty(prop)}
+                                className="px-3.5 py-2 text-xs font-semibold text-[#303638] bg-[#F8F6F1] border border-[#D5BFA0] rounded-xl hover:bg-white inline-flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+                                title="Editar propiedad"
+                              >
+                                <Edit3 className="w-3.5 h-3.5" />
+                                <span>Editar</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => onDeleteProperty(prop.id)}
+                                className="p-2 text-red-600 bg-red-50 border border-red-200 rounded-xl hover:bg-red-100 transition-colors cursor-pointer shadow-2xs"
+                                title="Eliminar propiedad"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </>
+                          )}
                         </div>
                       </div>
                     </div>
 
                     {/* Panel de Modalidad de Gestión y Estado de Solicitud de Agente */}
-                    <div
-                      className={`p-4 rounded-sm space-y-3 border ${
-                        status === 'rechazado'
+                    {isConcretadaProp ? (
+                      <div className="p-4 rounded-xl border border-emerald-300 bg-emerald-50 text-xs text-emerald-950 flex items-center gap-2.5">
+                        <ShieldCheck className="w-5 h-5 text-emerald-700 shrink-0" />
+                        <span>
+                          <strong>Propiedad Concretada:</strong> La operación de {prop.operationType === 'alquiler' ? 'alquiler' : 'venta'} de esta propiedad ha sido concretada exitosamente. Por normativa, el propietario y el agente a cargo no pueden modificar el estado de la publicación ni editar los datos de la propiedad.
+                        </span>
+                      </div>
+                    ) : (
+                      <div
+                        className={`p-4 rounded-sm space-y-3 border ${
+                          status === 'rechazado'
                           ? 'bg-red-50 border-red-300'
                           : status === 'pendiente_agente' || status === 'pendiente_admin'
                           ? 'bg-amber-50 border-amber-300'
@@ -2540,8 +2593,9 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
                         </div>
                       )}
                     </div>
-                  </div>
-                );
+                  )}
+                </div>
+              );
               })}
             </div>
           )}
@@ -2672,7 +2726,9 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[#D5BFA0]/60">
-                    {myAssignedProperties.map((prop) => (
+                    {myAssignedProperties.map((prop) => {
+                      const isConcretadaProp = isPropertyConcretada(prop, allOperations);
+                      return (
                       <tr key={prop.id}>
                         <td className="py-3.5 pr-4">
                           <div className="flex items-center gap-3">
@@ -2708,7 +2764,7 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
                         </td>
                         <td className="py-3.5 px-3 text-xs">
                           <span
-                            className={`inline-block text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-sm border ${getPublicationStatusBadgeClass(
+                            className={`inline-block text-[10px] uppercase tracking-wider font-bold px-2.5 py-0.5 rounded-sm border ${getPublicationStatusBadgeClass(
                               prop.publicationStatus
                             )}`}
                           >
@@ -2721,18 +2777,24 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
                           )}
                         </td>
                         <td className="py-3.5 px-3">
-                          <select
-                            value={prop.availability}
-                            onChange={(e) =>
-                              onUpdateAvailability(prop.id, e.target.value as AvailabilityStatus)
-                            }
-                            className="px-2.5 py-1.5 text-xs bg-white border border-[#D5BFA0] rounded-sm"
-                          >
-                            <option value="disponible">Disponible</option>
-                            <option value="reservada">Reservada</option>
-                            <option value="alquilada">Alquilada</option>
-                            <option value="vendida">Vendida</option>
-                          </select>
+                          {isConcretadaProp ? (
+                            <span className="px-2.5 py-1 text-xs font-bold bg-emerald-100 text-emerald-950 border border-emerald-400 rounded-sm inline-block">
+                              {prop.operationType === 'alquiler' ? 'Alquilada (Concretada)' : 'Vendida (Concretada)'}
+                            </span>
+                          ) : (
+                            <select
+                              value={prop.availability}
+                              onChange={(e) =>
+                                onUpdateAvailability(prop.id, e.target.value as AvailabilityStatus)
+                              }
+                              className="px-2.5 py-1.5 text-xs bg-white border border-[#D5BFA0] rounded-sm"
+                            >
+                              <option value="disponible">Disponible</option>
+                              <option value="reservada">Reservada</option>
+                              <option value="alquilada">Alquilada</option>
+                              <option value="vendida">Vendida</option>
+                            </select>
+                          )}
                         </td>
                         <td className="py-3.5 pl-3 text-right">
                           <div className="inline-flex items-center gap-1.5">
@@ -2745,19 +2807,26 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
                               <Eye className="w-3.5 h-3.5" />
                               Ver
                             </button>
-                            <button
-                              type="button"
-                              onClick={() => onOpenEditProperty(prop)}
-                              className="px-2.5 py-1.5 text-xs font-semibold text-[#FCFBF7] bg-[#B86F52] hover:bg-[#a35e42] rounded-sm inline-flex items-center gap-1 transition-colors"
-                              title="Editar datos de esta propiedad a mi cargo"
-                            >
-                              <Edit3 className="w-3.5 h-3.5" />
-                              Editar ficha
-                            </button>
+                            {isConcretadaProp ? (
+                              <span className="px-2 py-1 text-[11px] font-semibold text-emerald-900 bg-emerald-50 border border-emerald-300 rounded-sm">
+                                {prop.operationType === 'alquiler' ? 'Alquiler Concretado · Solo Lectura' : 'Venta Concretada · Solo Lectura'}
+                              </span>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => onOpenEditProperty(prop)}
+                                className="px-2.5 py-1.5 text-xs font-semibold text-[#FCFBF7] bg-[#B86F52] hover:bg-[#a35e42] rounded-sm inline-flex items-center gap-1 transition-colors"
+                                title="Editar datos de esta propiedad a mi cargo"
+                              >
+                                <Edit3 className="w-3.5 h-3.5" />
+                                Editar ficha
+                              </button>
+                            )}
                           </div>
                         </td>
                       </tr>
-                    ))}
+                    );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -2858,7 +2927,11 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
               </p>
             ) : (
               <div className="space-y-4">
-                {filteredVisits.map((v) => (
+                {filteredVisits.map((v) => {
+                  const visitProp = allProperties.find((p) => p.id === v.propertyId);
+                  const isPropConcretada = isPropertyConcretada(visitProp, allOperations);
+
+                  return (
                   <div
                     key={v.id}
                     className="card-floating p-5 bg-white border-2 border-[#D5BFA0] rounded-2xl flex flex-col lg:flex-row lg:items-center justify-between gap-4 shadow-2xs"
@@ -2898,7 +2971,14 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
                     </div>
 
                     <div className="flex flex-wrap items-center gap-2">
-                      {v.status === 'cancelada' ? (
+                      {isPropConcretada ? (
+                        <div className="p-3 bg-amber-50 border border-amber-300 rounded-xl text-xs text-amber-900 flex items-center gap-2">
+                          <AlertCircle className="w-4 h-4 text-amber-700 shrink-0" />
+                          <span className="font-semibold">
+                            No se permite realizar estas acciones porque la propiedad ya está concretada.
+                          </span>
+                        </div>
+                      ) : v.status === 'cancelada' ? (
                         <div className="px-3.5 py-2 bg-rose-100 text-rose-900 border border-rose-300 rounded-sm text-xs font-bold uppercase tracking-wider flex items-center gap-2 shadow-xs">
                           <XCircle className="w-4 h-4 text-rose-700 shrink-0" />
                           <span>CANCELADO POR EL CLIENTE</span>
@@ -2996,7 +3076,8 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
                       )}
                     </div>
                   </div>
-                ))}
+                );
+                })}
               </div>
             )}
           </div>
@@ -3041,7 +3122,7 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
                 }`}
               >
                 <Clock className="w-3.5 h-3.5 shrink-0" />
-                <span>En proceso</span>
+                <span>Pendiente</span>
               </button>
               <button
                 type="button"
@@ -3106,6 +3187,7 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
               }).map((op) => {
                 const isRental = op.operationType === 'alquiler';
                 const prop = allProperties.find((p) => p.id === op.propertyId);
+                const isPropConcretada = isPropertyConcretada(prop, allOperations);
                 const relatedContract = contracts.find((c) => c.operationId === op.id);
 
                 return (
@@ -3220,41 +3302,25 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
 
                     {/* Status-specific Action Buttons */}
                     <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-[#D5BFA0]/70">
-                      {(op.status === 'pendiente' || op.status === 'solicitada' || op.status === 'en_negociacion') && (
+                      {op.status !== 'concretada' && isPropConcretada ? (
+                        <div className="w-full p-3 bg-amber-50 border border-amber-300 rounded-sm text-xs text-amber-900 flex items-center gap-2">
+                          <AlertCircle className="w-4 h-4 text-amber-700 shrink-0" />
+                          <span className="font-semibold">
+                            No se permite realizar estas acciones porque la propiedad ya está concretada.
+                          </span>
+                        </div>
+                      ) : (
                         <>
-                          <button
-                            type="button"
-                            onClick={() => onUpdateOperation(op.id, 'aceptada')}
-                            className="px-3.5 py-2 text-xs font-semibold text-white bg-[#173B43] hover:bg-[#122e35] rounded-sm cursor-pointer inline-flex items-center gap-1.5"
-                          >
-                            <Check className="w-3.5 h-3.5" />
-                            Aceptar Propuesta
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setActiveCounterModalOp(op)}
-                            className="px-3.5 py-2 text-xs font-semibold text-amber-900 bg-amber-100 border border-amber-400 hover:bg-amber-200 rounded-sm cursor-pointer inline-flex items-center gap-1.5"
-                          >
-                            Proponer Otros Términos
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => onUpdateOperation(op.id, 'rechazada')}
-                            className="px-3.5 py-2 text-xs font-semibold text-red-700 bg-red-50 border border-red-300 hover:bg-red-100 rounded-sm cursor-pointer inline-flex items-center gap-1"
-                          >
-                            <X className="w-3.5 h-3.5" />
-                            Rechazar
-                          </button>
-                        </>
-                      )}
-
-                      {op.status === 'aceptada' && (
-                        <div className="flex flex-col gap-3 w-full">
-                          <div className="flex flex-wrap items-center justify-between gap-2">
-                            <span className="text-xs font-bold text-[#173B43] bg-[#D5BFA0]/30 px-3 py-1.5 rounded-sm border border-[#173B43]">
-                              Propuesta Aceptada · Condiciones Acordadas
-                            </span>
-                            <div className="flex flex-wrap items-center gap-2">
+                          {(op.status === 'pendiente' || op.status === 'solicitada' || op.status === 'en_negociacion') && (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => onUpdateOperation(op.id, 'aceptada')}
+                                className="px-3.5 py-2 text-xs font-semibold text-white bg-[#173B43] hover:bg-[#122e35] rounded-sm cursor-pointer inline-flex items-center gap-1.5"
+                              >
+                                <Check className="w-3.5 h-3.5" />
+                                Aceptar Propuesta
+                              </button>
                               <button
                                 type="button"
                                 onClick={() => setActiveCounterModalOp(op)}
@@ -3270,16 +3336,43 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
                                 <X className="w-3.5 h-3.5" />
                                 Rechazar
                               </button>
-                              <button
-                                type="button"
-                                onClick={() => setActiveContractModalOp(op)}
-                                className="px-4 py-2 text-xs uppercase tracking-wider font-semibold text-[#FCFBF7] bg-[#173B43] hover:bg-[#2c382d] rounded-sm transition-colors shadow-xs inline-flex items-center gap-1.5 cursor-pointer"
-                              >
-                                Concretar Operación y Registrar Contrato →
-                              </button>
+                            </>
+                          )}
+
+                          {op.status === 'aceptada' && (
+                            <div className="flex flex-col gap-3 w-full">
+                              <div className="flex flex-wrap items-center justify-between gap-2">
+                                <span className="text-xs font-bold text-[#173B43] bg-[#D5BFA0]/30 px-3 py-1.5 rounded-sm border border-[#173B43]">
+                                  Propuesta Aceptada · Condiciones Acordadas
+                                </span>
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => setActiveCounterModalOp(op)}
+                                    className="px-3.5 py-2 text-xs font-semibold text-amber-900 bg-amber-100 border border-amber-400 hover:bg-amber-200 rounded-sm cursor-pointer inline-flex items-center gap-1.5"
+                                  >
+                                    Proponer Otros Términos
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => onUpdateOperation(op.id, 'rechazada')}
+                                    className="px-3.5 py-2 text-xs font-semibold text-red-700 bg-red-50 border border-red-300 hover:bg-red-100 rounded-sm cursor-pointer inline-flex items-center gap-1"
+                                  >
+                                    <X className="w-3.5 h-3.5" />
+                                    Rechazar
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setActiveContractModalOp(op)}
+                                    className="px-4 py-2 text-xs uppercase tracking-wider font-semibold text-[#FCFBF7] bg-[#173B43] hover:bg-[#2c382d] rounded-sm transition-colors shadow-xs inline-flex items-center gap-1.5 cursor-pointer"
+                                  >
+                                    Concretar Operación y Registrar Contrato →
+                                  </button>
+                                </div>
+                              </div>
                             </div>
-                          </div>
-                        </div>
+                          )}
+                        </>
                       )}
 
                       {op.status === 'concretada' && (
@@ -4170,7 +4263,7 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
                 className="lg:col-span-4 space-y-3.5 bg-[#F8F6F1] p-5 rounded-sm border border-[#D5BFA0] shadow-xs"
               >
                 <div className="text-xs font-bold uppercase tracking-wider text-[#173B43]">
-                  + Enviar Nuevo Reclamo
+                  Enviar Nuevo Reclamo
                 </div>
                 <div>
                   <label className="block text-[11px] font-semibold text-[#173B43] mb-1">

@@ -16,6 +16,7 @@ import {
 import {
   PropertyItem,
   InquiryItem,
+  OperationItem,
   OperationTypeChoice,
   UserProfile,
   SCHEMA_LIMITS,
@@ -27,11 +28,14 @@ import {
   isUserOwnerOfProperty,
   isUserAssignedAgentOfProperty,
   getMinVisitDate,
+  isPropertyConcretada,
+  isPropertySoldConcretada,
 } from '../utils/propertyPermissions';
 
 interface PropertyDetailModalProps {
   property: PropertyItem;
   currentUser: UserProfile | null;
+  allOperations?: OperationItem[];
   isFavorite: boolean;
   isCompared: boolean;
   aiReason?: string;
@@ -73,6 +77,7 @@ const AVAILABLE_TIME_SLOTS = [
 export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
   property,
   currentUser,
+  allOperations,
   users,
   isFavorite,
   isCompared,
@@ -90,7 +95,9 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
   onRequestOperation,
   onNotify,
 }) => {
-  const canEdit = canUserEditProperty(property, currentUser, users);
+  const isSoldConcretada = isPropertySoldConcretada(property, allOperations);
+  const isConcretada = isPropertyConcretada(property, allOperations);
+  const canEdit = canUserEditProperty(property, currentUser, users, allOperations);
   const [activeImageIdx, setActiveImageIdx] = useState(0);
   const [activeTab, setActiveTab] = useState<'visita' | 'consulta' | 'operacion'>('visita');
   const [selectedInquiryId, setSelectedInquiryId] = useState<string | null>(null);
@@ -151,6 +158,14 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
 
   const handleVisitSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isConcretada) {
+      onNotify(
+        'error',
+        'Acción no permitida',
+        'No se permite realizar estas acciones porque la propiedad ya está concretada.'
+      );
+      return;
+    }
     if (!currentUser) {
       onNotify('info', 'Iniciá sesión para reservar', 'Debés iniciar sesión con tu cuenta para agendar una visita.');
       onRequireLogin();
@@ -195,6 +210,14 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
 
   const handleChatSubmit = async (e: React.FormEvent, threadIdToReply?: string) => {
     e.preventDefault();
+    if (isConcretada && !threadIdToReply && !myThread) {
+      onNotify(
+        'error',
+        'Acción no permitida',
+        'No se permite realizar estas acciones porque la propiedad ya está concretada.'
+      );
+      return;
+    }
     if (!currentUser) {
       onNotify('info', 'Iniciá sesión para consultar', 'Debés iniciar sesión para iniciar un chat con el propietario o agente.');
       onRequireLogin();
@@ -219,6 +242,14 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
 
   const handleOperationSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isConcretada) {
+      onNotify(
+        'error',
+        'Acción no permitida',
+        'No se permite realizar estas acciones porque la propiedad ya está concretada.'
+      );
+      return;
+    }
     if (!currentUser) {
       onNotify('info', 'Iniciá sesión para solicitar', 'Iniciá sesión para enviar una propuesta formal.');
       onRequireLogin();
@@ -288,7 +319,7 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
             <span>{property.availability}</span>
           </div>
           <div className="flex items-center gap-2.5">
-            {canEdit && onOpenEditProperty && (
+            {canEdit && onOpenEditProperty && !isConcretada && (
               <button
                 type="button"
                 onClick={() => {
@@ -302,7 +333,7 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
                 <span>Editar Propiedad</span>
               </button>
             )}
-            {(currentUser?.role === 'administrador' || isOwnerOfProperty) && onDeleteProperty && (
+            {(currentUser?.role === 'administrador' || (isOwnerOfProperty && !isConcretada)) && onDeleteProperty && (
               <button
                 type="button"
                 onClick={() => {
@@ -551,6 +582,29 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
                 </div>
               )} */}
 
+              {/* Cartel de Venta Concretada / Operación Concretada */}
+              {isSoldConcretada ? (
+                <div className="p-4 bg-emerald-50 border-2 border-emerald-400 rounded-sm text-emerald-950 space-y-1">
+                  <div className="font-bold flex items-center gap-2 text-xs uppercase tracking-wider text-emerald-900">
+                    <Check className="w-4 h-4 text-emerald-700" />
+                    <span>Venta Concretada · Operación Finalizada</span>
+                  </div>
+                  <p className="text-xs text-emerald-900/90 leading-relaxed font-medium">
+                    Esta propiedad ya fue vendida y la operación está concretada. Por normativa, no se reciben nuevos interesados, visitas ni ofertas de compra.
+                  </p>
+                </div>
+              ) : isConcretada ? (
+                <div className="p-4 bg-emerald-50 border-2 border-emerald-400 rounded-sm text-emerald-950 space-y-1">
+                  <div className="font-bold flex items-center gap-2 text-xs uppercase tracking-wider text-emerald-900">
+                    <Check className="w-4 h-4 text-emerald-700" />
+                    <span>Operación Concretada</span>
+                  </div>
+                  <p className="text-xs text-emerald-900/90 leading-relaxed font-medium">
+                    Esta propiedad ya cuenta con una operación concretada. No se reciben nuevos interesados ni solicitudes.
+                  </p>
+                </div>
+              ) : null}
+
               {/* Action Selector Tabs */}
               <div className="grid grid-cols-3 gap-1 p-1 bg-[#D5BFA0]/40 rounded-sm">
                 <button
@@ -599,7 +653,7 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
                       </div>
                       <p className="leading-relaxed">
                         {isOwnerOfProperty
-                          ? 'Sos el propietario titular de esta publicación. No podés agendar visitas sobre tu propia propiedad.'
+                           ? 'Sos el propietario titular de esta publicación. No podés agendar visitas sobre tu propia propiedad.'
                           : 'Sos el agente inmobiliario a cargo de esta publicación. No podés agendar visitas sobre esta propiedad.'}
                       </p>
                     </div>
@@ -617,7 +671,7 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
                     <input
                       type="date"
                       required
-                      disabled={isOwnerOrAgent}
+                      disabled={isOwnerOrAgent || isConcretada}
                       value={visitDate}
                       min={minVisitDate}
                       onChange={(e) => setVisitDate(e.target.value)}
@@ -633,7 +687,7 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
                       Franja horaria disponible
                     </label>
                     <select
-                      disabled={isOwnerOrAgent}
+                      disabled={isOwnerOrAgent || isConcretada}
                       value={visitSlot}
                       onChange={(e) => setVisitSlot(e.target.value)}
                       className="w-full px-3.5 py-2.5 text-sm bg-[#FCFBF7] border border-[#D5BFA0] rounded-sm focus:outline-none focus:border-[#173B43] disabled:opacity-60"
@@ -651,7 +705,7 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
                     </label>
                     <textarea
                       rows={2}
-                      disabled={isOwnerOrAgent}
+                      disabled={isOwnerOrAgent || isConcretada}
                       maxLength={SCHEMA_LIMITS.VISIT_NOTES_MAX}
                       value={visitNotes}
                       onChange={(e) => setVisitNotes(e.target.value)}
@@ -661,13 +715,15 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
                   </div>
                   <button
                     type="submit"
-                    disabled={submitting || isOwnerOrAgent || property.availability === 'alquilada' || property.availability === 'vendida'}
+                    disabled={submitting || isOwnerOrAgent || isConcretada || property.availability === 'alquilada' || property.availability === 'vendida'}
                     className="w-full py-3 px-4 text-xs uppercase tracking-widest font-semibold text-[#FCFBF7] bg-[#173B43] hover:bg-[#122e35] disabled:opacity-50 rounded-sm transition-colors cursor-pointer shadow-xs"
                   >
                     {submitting
                       ? 'Guardando reserva...'
                       : isOwnerOrAgent
                       ? 'No disponible (Propiedad propia)'
+                      : isConcretada
+                      ? 'No disponible (Propiedad ya concretada)'
                       : property.availability === 'disponible' || property.availability === 'reservada'
                       ? 'Confirmar Solicitud de Visita'
                       : 'Propiedad no disponible'}
@@ -820,13 +876,15 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
 
                   <button
                     type="submit"
-                    disabled={submitting || isOwnerOrAgent || property.availability === 'alquilada' || property.availability === 'vendida'}
+                    disabled={submitting || isOwnerOrAgent || isConcretada || property.availability === 'alquilada' || property.availability === 'vendida'}
                     className="w-full py-3 px-4 text-xs uppercase tracking-widest font-semibold text-[#FCFBF7] bg-[#B86F52] hover:bg-[#9e5b40] disabled:opacity-50 rounded-sm transition-colors cursor-pointer shadow-xs"
                   >
                     {submitting
                       ? 'Enviando propuesta...'
                       : isOwnerOrAgent
                       ? 'No disponible (Propiedad propia o a tu cargo)'
+                      : isConcretada
+                      ? 'No disponible (Propiedad ya concretada)'
                       : property.availability === 'disponible' || property.availability === 'reservada'
                       ? `Enviar Propuesta de ${property.operationType === 'alquiler' ? 'Alquiler' : 'Compra'}`
                       : 'Propiedad no disponible'}
@@ -880,28 +938,34 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
                         )}
                       </div>
 
-                      <form onSubmit={(e) => handleChatSubmit(e)} className="space-y-3 pt-2 border-t border-[#D5BFA0]">
-                        <label className="block text-xs font-semibold text-[#173B43]">
-                          Iniciar nueva consulta con {property.agentName || property.ownerName}
-                        </label>
-                        <textarea
-                          rows={3}
-                          required
-                          maxLength={SCHEMA_LIMITS.INQUIRY_MAX}
-                          value={chatText}
-                          onChange={(e) => setChatText(e.target.value)}
-                          placeholder="Escribí tu consulta sobre requisitos, expensas o visitas..."
-                          className="w-full px-3.5 py-2.5 text-sm bg-[#FCFBF7] border border-[#D5BFA0] rounded-sm focus:outline-none focus:border-[#173B43]"
-                        />
-                        <button
-                          type="submit"
-                          disabled={submitting}
-                          className="flex items-center justify-center gap-2 w-full py-3 px-4 text-xs uppercase tracking-widest font-semibold text-[#FCFBF7] bg-[#173B43] hover:bg-[#2c382d] disabled:opacity-50 rounded-sm transition-colors"
-                        >
-                          <Send className="w-3.5 h-3.5" />
-                          {submitting ? 'Enviando...' : 'Enviar Mensaje'}
-                        </button>
-                      </form>
+                      {isConcretada ? (
+                        <div className="p-3.5 bg-emerald-50 border border-emerald-300 rounded-sm text-xs text-emerald-950 font-medium">
+                          Esta publicación ya está concretada y no recibe nuevas consultas de interesados.
+                        </div>
+                      ) : (
+                        <form onSubmit={(e) => handleChatSubmit(e)} className="space-y-3 pt-2 border-t border-[#D5BFA0]">
+                          <label className="block text-xs font-semibold text-[#173B43]">
+                            Iniciar nueva consulta con {property.agentName || property.ownerName}
+                          </label>
+                          <textarea
+                            rows={3}
+                            required
+                            maxLength={SCHEMA_LIMITS.INQUIRY_MAX}
+                            value={chatText}
+                            onChange={(e) => setChatText(e.target.value)}
+                            placeholder="Escribí tu consulta sobre requisitos, expensas o visitas..."
+                            className="w-full px-3.5 py-2.5 text-sm bg-[#FCFBF7] border border-[#D5BFA0] rounded-sm focus:outline-none focus:border-[#173B43]"
+                          />
+                          <button
+                            type="submit"
+                            disabled={submitting}
+                            className="flex items-center justify-center gap-2 w-full py-3 px-4 text-xs uppercase tracking-widest font-semibold text-[#FCFBF7] bg-[#173B43] hover:bg-[#2c382d] disabled:opacity-50 rounded-sm transition-colors cursor-pointer"
+                          >
+                            <Send className="w-3.5 h-3.5" />
+                            {submitting ? 'Enviando...' : 'Enviar Mensaje'}
+                          </button>
+                        </form>
+                      )}
                     </>
                   ) : (
                     /* Individual Full Chat View inside modal */

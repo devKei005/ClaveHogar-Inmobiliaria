@@ -18,6 +18,7 @@ import {
   CheckCircle2,
   XCircle,
   Info,
+  Clock,
 } from 'lucide-react';
 import {
   onAuthStateChanged,
@@ -104,6 +105,8 @@ import {
   isUserOwnerOfProperty,
   isUserAssignedAgentOfProperty,
   getMinVisitDate,
+  isPropertyConcretada,
+  isPropertySoldConcretada,
 } from './utils/propertyPermissions';
 import {
   buildFlexibleSmartSearch,
@@ -1291,7 +1294,15 @@ export default function App() {
 
     // Verificar permisos de edición: propietario dueño, agente confirmado a cargo, o administrador
     if (isEdit && existingProp) {
-      const isAuthorized = canUserEditProperty(existingProp, currentUser, users);
+      if (isPropertyConcretada(existingProp, operations) && currentUser.role !== 'administrador') {
+        notify(
+          'error',
+          'Acción no permitida',
+          'No se permite realizar estas acciones porque la propiedad ya está concretada.'
+        );
+        return;
+      }
+      const isAuthorized = canUserEditProperty(existingProp, currentUser, users, operations);
       if (!isAuthorized) {
         notify(
           'error',
@@ -1436,6 +1447,14 @@ export default function App() {
   const handleDeleteProperty = async (propertyId: string) => {
     const target = properties.find((p) => p.id === propertyId);
     if (!currentUser || !target) return;
+    if (isPropertyConcretada(target, operations) && currentUser.role !== 'administrador') {
+      notify(
+        'error',
+        'Acción no permitida',
+        'No se permite realizar estas acciones porque la propiedad ya está concretada.'
+      );
+      return;
+    }
     const canDelete =
       currentUser.role === 'administrador' || isUserOwnerOfProperty(target, currentUser, users);
     if (!canDelete) {
@@ -1474,7 +1493,15 @@ export default function App() {
   const handleUpdateAvailability = async (propertyId: string, availability: AvailabilityStatus) => {
     const target = properties.find((p) => p.id === propertyId);
     if (!currentUser || !target) return;
-    const canModify = canUserEditProperty(target, currentUser, users);
+    if (isPropertyConcretada(target, operations) && currentUser.role !== 'administrador') {
+      notify(
+        'error',
+        'Acción no permitida',
+        'No se permite realizar estas acciones porque la propiedad ya está concretada.'
+      );
+      return;
+    }
+    const canModify = canUserEditProperty(target, currentUser, users, operations);
     if (!canModify) {
       notify('error', 'Sin permisos', 'No tenés permisos para modificar esta propiedad.');
       return;
@@ -1796,6 +1823,14 @@ export default function App() {
     notes: string
   ) => {
     if (!currentUser) return;
+    if (isPropertyConcretada(property, operations)) {
+      notify(
+        'error',
+        'Acción no permitida',
+        'No se permite realizar estas acciones porque la propiedad ya está concretada.'
+      );
+      return;
+    }
     const minDate = getMinVisitDate();
     if (date < minDate) {
       notify(
@@ -1869,6 +1904,20 @@ export default function App() {
     const existing = visits.find((v) => v.id === visitId);
     if (!existing) return;
 
+    const targetProp = properties.find((p) => p.id === existing.propertyId);
+    if (
+      targetProp &&
+      isPropertyConcretada(targetProp, operations) &&
+      currentUser?.role !== 'administrador'
+    ) {
+      notify(
+        'error',
+        'Acción no permitida',
+        'No se permite realizar estas acciones porque la propiedad ya está concretada.'
+      );
+      return;
+    }
+
     const updated: VisitItem = {
       ...existing,
       status,
@@ -1933,6 +1982,15 @@ export default function App() {
       : inquiries.find(
           (i) => i.propertyId === property.id && i.clientId === currentUser.uid
         );
+
+    if (!targetInquiry && isPropertySoldConcretada(property, operations)) {
+      notify(
+        'error',
+        'Acción no permitida',
+        'No se permite realizar estas acciones porque la propiedad ya está concretada.'
+      );
+      return;
+    }
 
     if (targetInquiry) {
       const updatedMessages = [...(targetInquiry.messages || []), newMsg];
@@ -2048,6 +2106,14 @@ export default function App() {
     }
   ) => {
     if (!currentUser) return;
+    if (isPropertyConcretada(property, operations)) {
+      notify(
+        'error',
+        'Acción no permitida',
+        'No se permite realizar estas acciones porque la propiedad ya está concretada.'
+      );
+      return;
+    }
     const opId = sanitizeId(`op_${Date.now()}`);
     const confirmedAgentId = isAgentConfirmedOnProperty(property) ? property.agentId || '' : '';
     const currency = extraData?.currency || property.currency || 'USD';
@@ -2110,6 +2176,20 @@ export default function App() {
   ) => {
     const existing = operations.find((o) => o.id === operationId);
     if (!existing) return;
+
+    const targetProp = properties.find((p) => p.id === existing.propertyId);
+    if (
+      targetProp &&
+      isPropertyConcretada(targetProp, operations) &&
+      currentUser?.role !== 'administrador'
+    ) {
+      notify(
+        'error',
+        'Acción no permitida',
+        'No se permite realizar estas acciones porque la propiedad ya está concretada.'
+      );
+      return;
+    }
 
     const updated: OperationItem = {
       ...existing,
@@ -2216,6 +2296,21 @@ export default function App() {
   ) => {
     const existing = operations.find((o) => o.id === operationId);
     if (!existing) return;
+
+    const targetProp = properties.find((p) => p.id === existing.propertyId);
+    if (
+      targetProp &&
+      existing.status !== 'concretada' &&
+      isPropertyConcretada(targetProp, operations) &&
+      currentUser?.role !== 'administrador'
+    ) {
+      notify(
+        'error',
+        'Acción no permitida',
+        'No se permite realizar estas acciones porque la propiedad ya está concretada.'
+      );
+      return;
+    }
 
     const updated: OperationItem = {
       ...existing,
@@ -2925,7 +3020,7 @@ export default function App() {
             key={t.id}
             className={`pointer-events-auto flex items-start gap-3 p-4 rounded-sm border-2 shadow-2xl backdrop-blur-md animate-fade-slide ${
               t.type === 'success'
-                ? 'bg-[#EBF9ED] text-[#0F4A1E] border-emerald-500 shadow-xl ring-2 ring-[#173B43]/20'
+                ? 'bg-emerald-50 text-emerald-950 border-emerald-600 shadow-xl ring-2 ring-emerald-600/20'
                 : t.type === 'error'
                 ? 'bg-[#FDF2F2] text-[#691C1C] border-red-500 shadow-red-950/15 ring-2 ring-red-500/20'
                 : 'bg-[#FEF9EE] text-[#5C3B00] border-amber-500 shadow-amber-950/15 ring-2 ring-amber-500/20'
@@ -2933,17 +3028,17 @@ export default function App() {
           >
             <div className="shrink-0 mt-0.5">
               {t.type === 'success' && (
-                <div className="w-7 h-7 rounded-full bg-[#F8F6F1]0 text-white flex items-center justify-center shadow-xs">
-                  <CheckCircle2 className="w-4 h-4 stroke-[2.5]" />
+                <div className="w-8 h-8 rounded-full bg-emerald-700 text-white flex items-center justify-center shadow-md ring-2 ring-emerald-600/30">
+                  <CheckCircle2 className="w-5 h-5 stroke-[2.5] text-white" />
                 </div>
               )}
               {t.type === 'error' && (
-                <div className="w-7 h-7 rounded-full bg-red-600 text-white flex items-center justify-center shadow-xs">
+                <div className="w-8 h-8 rounded-full bg-red-600 text-white flex items-center justify-center shadow-xs">
                   <XCircle className="w-4 h-4 stroke-[2.5]" />
                 </div>
               )}
               {t.type === 'info' && (
-                <div className="w-7 h-7 rounded-full bg-amber-500 text-white flex items-center justify-center shadow-xs">
+                <div className="w-8 h-8 rounded-full bg-amber-500 text-white flex items-center justify-center shadow-xs">
                   <Info className="w-4 h-4 stroke-[2.5]" />
                 </div>
               )}
@@ -3158,9 +3253,23 @@ export default function App() {
                                 className={`w-full text-left p-3 rounded-xl border text-xs space-y-1.5 transition-all cursor-pointer group ${cardColorClass}`}
                               >
                                 <div className="flex items-start justify-between gap-2">
-                                  <span className={`font-bold leading-snug ${titleColorClass}`}>
-                                    {n.title}
-                                  </span>
+                                  <div className="flex items-center gap-2">
+                                    {isRejectedOrError && (
+                                      <XCircle className="w-4 h-4 text-red-600 shrink-0" />
+                                    )}
+                                    {isSuccess && (
+                                      <CheckCircle2 className="w-4 h-4 text-emerald-700 shrink-0" />
+                                    )}
+                                    {isPendingOrReview && !isSuccess && (
+                                      <Clock className="w-4 h-4 text-amber-700 shrink-0" />
+                                    )}
+                                    {!isRejectedOrError && !isSuccess && !isPendingOrReview && (
+                                      <Info className="w-4 h-4 text-[#173B43] shrink-0" />
+                                    )}
+                                    <span className={`font-bold leading-snug ${titleColorClass}`}>
+                                      {n.title}
+                                    </span>
+                                  </div>
                                   <ArrowRight className="w-3.5 h-3.5 shrink-0 text-[#303638]/60 group-hover:text-[#303638] group-hover:translate-x-0.5 transition-all mt-0.5" />
                                 </div>
                                 <p className="text-[#303638]/85 leading-snug">{n.message}</p>
@@ -3452,8 +3561,8 @@ export default function App() {
               <div className="relative z-10 max-w-5xl mx-auto px-6 py-16 text-center space-y-8 w-full">
                 <div className="space-y-3 animate-fade-slide">
                   <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-white/10 backdrop-blur-md border border-white/20 text-[#D6CBB8] text-xs font-semibold uppercase tracking-[0.2em]">
-                    <span className="w-1.5 h-1.5 rounded-full bg-[#C87955]" />
-                    <span>Curaduría Inmobiliaria ClaveHogar</span>
+                    {/* <span className="w-1.5 h-1.5 rounded-full bg-[#C87955]" /> */}
+                    <span>La clave para encontrar tu lugar.</span>
                   </div>
 
                   <h1 className="text-3xl sm:text-5xl lg:text-6xl font-serif-display font-bold text-white tracking-tight leading-[1.1] max-w-3xl mx-auto drop-shadow-md">
@@ -3689,12 +3798,11 @@ export default function App() {
               <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 border-b border-[#D5BFA0]/70 pb-5">
                 <div>
                   <div className="flex items-center gap-2 mb-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-[#C87955]" />
                     <span className="text-[11px] uppercase tracking-[0.2em] text-[#C87955] font-semibold block">
                       Colección Residencial
                     </span>
                   </div>
-                  <h2 className="text-3xl sm:text-4xl font-serif-display font-semibold text-[#303638]">
+                  <h2 className="text-3xl sm:text-4xl font-serif-display font-semibold text-[#173B43]">
                     Propiedades Disponibles
                   </h2>
                 </div>
@@ -3847,7 +3955,7 @@ export default function App() {
                               <span className="text-[10px] uppercase tracking-wider text-[#303638]/50 font-bold block">
                                 Precio
                               </span>
-                              <span className="text-xl font-bold font-tabular text-[#303638]">
+                              <span className="text-xl font-bold font-tabular text-[#173B43]">
                                 {prop.currency} {prop.price.toLocaleString()}
                               </span>
                             </div>
@@ -3953,6 +4061,14 @@ export default function App() {
               setIsPropertyFormOpen(true);
             }}
             onOpenEditProperty={(prop) => {
+              if (isPropertyConcretada(prop, operations) && currentUser?.role !== 'administrador') {
+                notify(
+                  'error',
+                  'Acción no permitida',
+                  'No se permite realizar estas acciones porque la propiedad ya está concretada.'
+                );
+                return;
+              }
               setEditingProperty(prop);
               setIsPropertyFormOpen(true);
             }}
@@ -3991,6 +4107,7 @@ export default function App() {
           property={selectedProperty}
           currentUser={currentUser}
           users={users}
+          allOperations={operations}
           isFavorite={favoriteIds.includes(selectedProperty.id)}
           isCompared={comparedIds.includes(selectedProperty.id)}
           aiReason={
@@ -4002,6 +4119,14 @@ export default function App() {
           inquiries={inquiries}
           onClose={() => setSelectedProperty(null)}
           onOpenEditProperty={(prop) => {
+            if (isPropertyConcretada(prop, operations) && currentUser?.role !== 'administrador') {
+              notify(
+                'error',
+                'Acción no permitida',
+                'No se permite realizar estas acciones porque la propiedad ya está concretada.'
+              );
+              return;
+            }
             setSelectedProperty(null);
             setEditingProperty(prop);
             setIsPropertyFormOpen(true);
