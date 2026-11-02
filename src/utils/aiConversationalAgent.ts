@@ -305,6 +305,11 @@ export function setKnownCatalogProperties(properties: PropertyItem[]) {
  * Diccionario canónico de localidades con formato y tildes oficiales
  */
 const CANONICAL_LOCALITY_NAMES: Record<string, string> = {
+  'mar del plata': 'Mar del Plata',
+  'san carlos de bariloche': 'San Carlos de Bariloche',
+  cordoba: 'Córdoba',
+  neuquen: 'Neuquén',
+  'bahia blanca': 'Bahía Blanca',
   // CABA
   palermo: 'Palermo',
   belgrano: 'Belgrano',
@@ -917,16 +922,13 @@ export function parseBudgetAndCurrency(query: string): {
   let isAmbiguousOrUnrealistic = false;
   let unrealisticReason: string | undefined = undefined;
 
-  if (maxPrice !== null && maxPrice > 0) {
+  // Un importe con moneda explícita se contrasta con el catálogo real, sin
+  // descartarlo por estimaciones del mercado ajenas a las publicaciones.
+  if (maxPrice !== null && maxPrice > 0 && !currency) {
     const wantsVenta = qNorm.includes('comprar') || qNorm.includes('venta') || qNorm.includes('compro');
     const wantsAlquiler = qNorm.includes('alquilar') || qNorm.includes('alquiler') || qNorm.includes('alquilo');
 
-    if (currency === 'ARS') {
-      if (maxPrice <= 50000) {
-        isAmbiguousOrUnrealistic = true;
-        unrealisticReason = `Un presupuesto de ${maxPrice} pesos no es realista para alquilar ni comprar una propiedad en el mercado actual.`;
-      }
-    } else if (wantsAlquiler) {
+    if (wantsAlquiler) {
       if (maxPrice < 50) {
         isAmbiguousOrUnrealistic = true;
         unrealisticReason = `El monto de ${maxPrice} es demasiado bajo para un alquiler.`;
@@ -1458,6 +1460,18 @@ export function verifyPropertiesAgainstCriteria(
  * Extractor semántico local que comprende lenguaje natural, dinero, números escritos en palabras,
  * sinónimos y búsqueda por cercanía
  */
+// Separa el nombre de lugar/dirección de los requisitos que siguen. No corta
+// «de», «del», «la» o «y» dentro de nombres como Mar del Plata o 9 de Julio.
+function cleanLocationPhrase(value: string): string {
+  const boundary = /\s+(?:que\b|donde\b|con\b|sin\b|para\b|por\b|hasta\b|desde\b|pero\b|preferentemente\b|necesito\b|quiero\b|busco\b|buscando\b|tenga\b|tengan\b|cuente\b|incluya\b|presupuesto\b|entre\s+(?:los\s+)?\d|y\s+(?:que\b|con\b|sin\b|para\b|un\b|una\b|tenga\b|necesito\b|quiero\b|\d+\s*(?:habitaciones|dormitorios|ambientes|banos))|(?:\d+|dos|tres|cuatro)\s+(?:habitaciones|dormitorios|ambientes|banos)\b)/i;
+  // Buscar sobre texto normalizado mantiene las posiciones y admite tildes.
+  const index = normalizeText(value).search(boundary);
+  return (index >= 0 ? value.slice(0, index) : value)
+    .split(/[;!?\n]/)[0]
+    .replace(/^[\s,:"“”]+|[\s,.:"“”]+$/g, '')
+    .trim();
+}
+
 export function extractCriteriaLocally(
   query: string,
   _prevCriteria?: ExtractedSearchCriteria
@@ -1471,11 +1485,12 @@ export function extractCriteriaLocally(
   // Detección de texto o números entre paréntesis (ej. (Quilmes), (3))
   const parenMatch = query.match(/\(([^)]+)\)/);
   if (parenMatch) {
-    const parenContent = parenMatch[1].trim();
+    const parenContent = cleanLocationPhrase(parenMatch[1].trim());
     const parenNum = parseSpanishNumber(parenContent);
     if (parenNum !== null && parenNum > 0) {
       if (!updated.minBedrooms) updated.minBedrooms = parenNum;
-    } else if (parenContent.length >= 2) {
+    } else if (parenContent.length >= 2 &&
+      !/^(?:con|sin|que|patio|pileta|cochera|garage|jardin|habitaciones|dormitorios|presupuesto|usd|pesos)\b/.test(normalizeText(parenContent))) {
       const cleanParen = parenContent.charAt(0).toUpperCase() + parenContent.slice(1);
       if (!updated.locations) updated.locations = [];
       if (!updated.locations.includes(cleanParen)) {
@@ -1574,9 +1589,19 @@ export function extractCriteriaLocally(
     ];
 
     const foundLocs: string[] = [];
-    for (const loc of knownLocations) {
-      const rx = loc.includes(' ') ? new RegExp(loc, 'i') : new RegExp(`\\b${loc}\\b`, 'i');
-      if (rx.test(qNorm)) {
+    // Priorizar nombres completos antes de sus alias (por ejemplo Solano).
+    const matchedSpans: { start: number; end: number }[] = [];
+    for (const loc of [...new Set(knownLocations)].sort((a, b) => b.length - a.length)) {
+      const escaped = normalizeText(loc).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const rx = new RegExp(`\\b${escaped}\\b`, 'g');
+      const matches = [...qNorm.matchAll(rx)];
+      if (matches.some((match) => {
+        const start = match.index!;
+        const end = start + match[0].length;
+        if (matchedSpans.some(span => start >= span.start && end <= span.end)) return false;
+        matchedSpans.push({ start, end });
+        return true;
+      })) {
         if (loc === 'caba' || loc === 'capital federal' || loc === 'capital') {
           if (new RegExp(`\\b${loc}\\b`, 'i').test(qNorm)) {
             foundLocs.push('CABA');
@@ -1593,10 +1618,10 @@ export function extractCriteriaLocally(
 
     // Detección de direcciones puntuales con calle / avenida y altura
     const streetAddressMatch = query.match(
-      /\b(?:en\s+)?(?:av\.?|avenida|calle|pasaje|bv\.?|bulevar)\s+([A-Za-z0-9áéíóúñÁÉÍÓÚÑ\s\.]+?)(?=\s+(?:un|una|unos|unas|el|la|los|las|por|hasta|con|para|de|alquiler|venta|casa|depto|departamento|ph)|\s*$)/i
+      /\b(?:en\s+)?(?:av\.?|avenida|calle|pasaje|bv\.?|bulevar)\s+([^;!?\n]+)/i
     );
     if (streetAddressMatch) {
-      const cleanAddr = streetAddressMatch[0].replace(/^en\s+/i, '').trim();
+      const cleanAddr = cleanLocationPhrase(streetAddressMatch[0].replace(/^en\s+/i, ''));
       if (cleanAddr.length > 3) {
         updated.requestedAddress = cleanAddr;
         if (!foundLocs.some((l) => cleanAddr.toLowerCase().includes(l.toLowerCase()))) {
@@ -1608,10 +1633,10 @@ export function extractCriteriaLocally(
     // Detección genérica de "en [Lugar/Dirección]" cuando no se identificó por listas
     if (foundLocs.length === 0) {
       const genericEnMatch = query.match(
-        /\ben\s+([A-ZÁÉÍÓÚÑa-záéíóúñ0-9\s\.\,]+?)(?=\s+(?:un|una|unos|unas|el|la|los|las|por|hasta|con|para|de|alquiler|venta|casa|depto|departamento|sin|y|\?|\!|\.)|\s*$)/i
+        /\b(?:en|cerca de|alrededores de)\s+(?:la\s+(?:zona|localidad|ciudad)\s+de\s+|el\s+barrio\s+de\s+)?([^;!?\n]+)/i
       );
       if (genericEnMatch) {
-        const rawPlace = genericEnMatch[1].trim();
+        const rawPlace = cleanLocationPhrase(genericEnMatch[1].trim());
         const cleanPlaceNorm = normalizeText(rawPlace);
         const stopWords = [
           'alquiler',
@@ -1628,9 +1653,15 @@ export function extractCriteriaLocally(
           'el momento',
           'cuanto',
           'donde',
+          'busqueda',
+          'un lugar',
+          'una zona',
+          'lo posible',
         ];
-        if (!stopWords.includes(cleanPlaceNorm) && rawPlace.length >= 3 && rawPlace.length <= 40) {
+        const isRequirement = /^(?:que|con|sin|patio|pileta|cochera|garage|jardin|habitaciones|dormitorios|presupuesto|usd|dolares|pesos|ars|cuotas|efectivo|alquiler|venta)\b/.test(cleanPlaceNorm);
+        if (!isRequirement && !stopWords.includes(cleanPlaceNorm) && rawPlace.length >= 3 && rawPlace.length <= 80) {
           foundLocs.push(rawPlace.charAt(0).toUpperCase() + rawPlace.slice(1));
+          if (/\d/.test(rawPlace)) updated.requestedAddress = rawPlace;
         }
       }
     }
@@ -1962,7 +1993,7 @@ export function hasSufficientCriteriaToSearch(criteria: ExtractedSearchCriteria)
 export function getMissingCriteriaQuestion(criteria: ExtractedSearchCriteria): string | null {
   const hasOperation = Boolean(criteria.operationType);
   const hasLocation = Boolean(
-    (criteria.locations && criteria.locations.length > 0) || criteria.isProximitySearch
+    (criteria.locations && criteria.locations.length > 0) || criteria.isProximitySearch || criteria.requestedAddress
   );
 
   if (!hasOperation && !hasLocation) {
@@ -1977,6 +2008,18 @@ export function getMissingCriteriaQuestion(criteria: ExtractedSearchCriteria): s
     return `¡Perfecto! Para buscarte opciones de ${typeName} para ${criteria.operationType}: ¿en qué localidad o barrio preferís que esté ubicada?`;
   }
   return null;
+}
+
+/** Evita que la redacción de IA vuelva a pedir datos ya reconocidos. */
+export function asksForKnownSearchCriteria(message: string, criteria: ExtractedSearchCriteria): boolean {
+  const questions = normalizeText(message).split(/[¿?\n]/);
+  const hasLocation = Boolean(criteria.locations?.length || criteria.requestedAddress || criteria.isProximitySearch);
+  return questions.some((question) => {
+    const asksLocation = /\b(?:zona|barrio|direccion|localidad|donde)\b/.test(question);
+    const asksOperation = /\b(?:comprar|alquilar|compra|alquiler|operacion)\b/.test(question);
+    const asks = /\b(?:indica\w*|deci\w*|decir\w*|prefer\w*|busca\w*|busque\w*|quere\w*|queres|quiere\w*|en que|cual|donde|confirma\w*)\b/.test(question);
+    return asks && ((hasLocation && asksLocation) || (Boolean(criteria.operationType) && asksOperation));
+  });
 }
 
 /**
@@ -2642,8 +2685,9 @@ export function mergeConversationalCriteria(
     merged.maxPrice = prev.maxPrice;
     merged.minPrice = prev.minPrice ?? null;
     merged.currency = prev.currency;
-    merged.isAmbiguousOrUnrealisticBudget = prev.isAmbiguousOrUnrealisticBudget;
-    merged.unrealisticBudgetReason = prev.unrealisticBudgetReason;
+    // Recuperar también conversaciones guardadas por la validación anterior.
+    merged.isAmbiguousOrUnrealisticBudget = prev.currency ? false : prev.isAmbiguousOrUnrealisticBudget;
+    merged.unrealisticBudgetReason = prev.currency ? undefined : prev.unrealisticBudgetReason;
   }
 
   // 5. Dormitorios y baños

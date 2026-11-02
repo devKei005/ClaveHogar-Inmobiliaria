@@ -25,6 +25,7 @@ import {
   analyzeOffTopicIntent,
   shouldSuppressPropertyCards,
   setKnownCatalogProperties,
+  asksForKnownSearchCriteria,
 } from '../utils/aiConversationalAgent';
 
 interface AIChatAssistantProps {
@@ -208,7 +209,13 @@ export const AIChatAssistant: React.FC<AIChatAssistantProps> = ({
 
         if (response.ok) {
           const json = await response.json();
-          if (json && json.assistantMessage) {
+          const recognizedCriteria = mergeConversationalCriteria(
+            currentCriteria, text, extractCriteriaLocally(text, currentCriteria)
+          );
+          // Si el servidor vuelve a pedir datos ya dados, usar la búsqueda
+          // local sobre el mismo catálogo de Firestore en lugar de repetirlos.
+          if (json && json.assistantMessage &&
+              !asksForKnownSearchCriteria(json.assistantMessage, recognizedCriteria)) {
             serverResponseData = json;
           }
         }

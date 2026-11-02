@@ -23,6 +23,7 @@ import {
   isPropertyDetailOrProceduralInquiry,
   shouldSuppressPropertyCards,
   extractAvailableLocationsSummary,
+  asksForKnownSearchCriteria,
   ExtractedSearchCriteria,
 } from './src/utils/aiConversationalAgent';
 import { PropertyItem } from './src/types';
@@ -196,8 +197,8 @@ async function startServer() {
         const missingQuestion = getMissingCriteriaQuestion(preliminaryCriteria);
         res.json({
           assistantMessage:
-            missingQuestion ||
-            '¿Podrías indicarme la zona, barrio o dirección y si preferís comprar o alquilar?',
+            (preliminaryCriteria.isAmbiguousOrUnrealisticBudget ? localFallbackReply.message : missingQuestion) ||
+            localFallbackReply.message,
           criteria: preliminaryCriteria,
           exactMatches: [],
           alternativeMatches: [],
@@ -344,14 +345,16 @@ REGLAS OBLIGATORIAS:
 
       const parsed = JSON.parse(raw.trim());
 
-      const finalCriteria = mergeConversationalCriteria(currentCriteria, latestUserMessage, {
-        ...localNewExtraction,
-        ...(parsed.extractedCriteria || {}),
-      });
+      // La IA redacta sobre los criterios que ya se usaron para verificar el
+      // catálogo. No puede borrarlos ni cambiarlos después de esa búsqueda.
+      const finalCriteria = preliminaryCriteria;
 
       const finalVerification = verifyPropertiesAgainstCriteria(properties, finalCriteria);
 
       let finalAssistantMessage = parsed.assistantMessage || localFallbackReply.message;
+      if (asksForKnownSearchCriteria(finalAssistantMessage, finalCriteria)) {
+        finalAssistantMessage = localFallbackReply.message;
+      }
 
       if (
         finalCriteria.mentionedOtherCurrency &&
