@@ -343,7 +343,6 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
   onSelectClaimId,
   onUpdateUserAdmin,
   onAddCategory,
-  onToggleCategory,
   onDeleteCategory,
 }) => {
   const [categoryToDelete, setCategoryToDelete] = useState<CategoryConfigItem | null>(null);
@@ -2981,7 +2980,7 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
                   return (
                   <div
                     key={v.id}
-                    className="card-floating p-5 bg-white border-2 border-[#D5BFA0] rounded-2xl flex flex-col lg:flex-row lg:items-center justify-between gap-4 shadow-2xs"
+                    className="card-floating p-5 bg-white border-2 border-[#D5BFA0] rounded-2xl flex flex-col min-w-0 gap-4 shadow-2xs"
                   >
                     <div className="space-y-1.5">
                       <div className="flex flex-wrap items-center gap-2 text-xs text-[#173B43]/80">
@@ -3017,7 +3016,7 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
                       {v.notes && <div className="text-xs text-[#173B43]/75">Nota: {v.notes}</div>}
                     </div>
 
-                    <div className="flex flex-wrap items-center gap-2">
+                    <div className="flex flex-nowrap items-center gap-2 w-full min-w-0 overflow-x-auto pb-1 [&>button]:shrink-0">
                       {isPropConcretada ? (
                         <div className="p-3 bg-amber-50 border border-amber-300 rounded-xl text-xs text-amber-900 flex items-center gap-2">
                           <AlertCircle className="w-4 h-4 text-amber-700 shrink-0" />
@@ -3045,7 +3044,7 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
                           <span>Editar Acción</span>
                         </button>
                       ) : (
-                        <div className="flex flex-wrap items-center gap-2">
+                        <div className="flex flex-nowrap items-center gap-2 min-w-max [&_button]:h-9 [&_button]:inline-flex [&_button]:items-center [&_button]:justify-center [&_button]:whitespace-nowrap [&_button]:shrink-0 [&_input]:h-9">
                           <button
                             type="button"
                             onClick={() => {
@@ -3066,7 +3065,7 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
                           >
                             Rechazar
                           </button>
-                          <div className="flex items-center gap-1.5">
+                          <div className="flex flex-nowrap items-center gap-1.5 shrink-0">
                             <input
                               type="date"
                               min={getMinVisitDate()}
@@ -4185,11 +4184,17 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
       )}
 
       {activeSubView === 'admin_categorias' && currentUser.role === 'administrador' && (
-        <div className="bg-[#FCFBF7] border border-[#D5BFA0] rounded-sm p-6 space-y-4">
-          <h2 className="text-2xl font-serif-display font-semibold text-[#173B43]">
-            Gestión de Tipos de Inmueble y Características
-          </h2>
-          <form onSubmit={handleAddCategorySubmit} className="flex flex-wrap gap-2.5">
+        <div className="category-panel p-4 sm:p-6 space-y-5">
+          <div className="category-heading">
+            <div>
+              <span className="category-eyebrow">Administración · Catálogo</span>
+              <h2 className="text-2xl sm:text-3xl font-serif-display font-semibold text-[#173B43]">
+                Tipos de inmueble y características
+              </h2>
+            </div>
+            <span className="category-count">{categories.length} registros</span>
+          </div>
+          <form onSubmit={handleAddCategorySubmit} className="category-form flex flex-wrap gap-2.5">
             <input
               type="text"
               required
@@ -4213,36 +4218,28 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
               + Agregar al Catálogo
             </button>
           </form>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+          <div className="category-grid">
             {categories.map((cat) => (
               <div
                 key={cat.id}
-                className="p-3 bg-[#F8F6F1] border border-[#D5BFA0] rounded-sm flex flex-wrap items-center justify-between gap-2 text-xs"
+                className="category-tile"
               >
-                <div>
-                  <div className="font-semibold text-[#1F241F]">{cat.name}</div>
-                  <div className="text-[11px] text-[#173B43]/70">
+                <span className={`category-symbol ${cat.kind === 'tipo_inmueble' ? 'category-symbol-building' : ''}`}>
+                  {cat.kind === 'tipo_inmueble' ? <Building2 className="w-4 h-4" /> : <Tag className="w-4 h-4" />}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div title={cat.name} className="font-semibold text-[#1F241F] line-clamp-2 break-words">{cat.name}</div>
+                  <div className="text-[10px] text-[#173B43]/65 mt-0.5">
                     {cat.kind === 'tipo_inmueble' ? 'Tipo inmueble' : 'Característica'}
                   </div>
                 </div>
                 <div className="flex items-center gap-1 shrink-0 ml-auto">
                 <button
                   type="button"
-                  onClick={() => onToggleCategory(cat.id, !cat.active)}
-                  className={`h-8 text-[11px] font-bold px-2 rounded-sm border ${
-                    cat.active
-                      ? 'bg-[#D5BFA0]/30 text-[#173B43] border-[#173B43]'
-                      : 'bg-red-100 text-red-800 border-red-400'
-                  }`}
-                >
-                  {cat.active ? 'Activo' : 'Inactivo'}
-                </button>
-                <button
-                  type="button"
                   onClick={() => setCategoryToDelete(cat)}
                   aria-label={`Eliminar ${cat.name}`}
                   title={`Eliminar ${cat.name}`}
-                  className="h-8 w-8 inline-flex items-center justify-center text-red-700 hover:bg-red-50 rounded-sm cursor-pointer"
+                  className="category-delete h-8 w-8 inline-flex items-center justify-center cursor-pointer"
                 >
                   <Trash2 className="w-4 h-4" />
                 </button>
@@ -4429,7 +4426,8 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
                             {claimCode}
                           </span>
                           <span className="text-[#173B43]/75">
-                            Reportado por <strong className="text-[#1F241F]">{clm.reporterName}</strong> ({clm.reporterEmail})
+                            Reportado por <strong className="text-[#1F241F]">{clm.reporterName}</strong>
+                            {clm.reporterEmail && <span> · {clm.reporterEmail}</span>}
                           </span>
                           <span className="uppercase text-[10px] bg-[#173B43]/10 text-[#173B43] px-2 py-0.5 rounded-sm font-semibold">
                             {getClaimCategoryLabel(clm.targetType)}
