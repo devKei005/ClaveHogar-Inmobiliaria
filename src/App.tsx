@@ -81,7 +81,6 @@ import {
 import {
   HERO_IMAGE,
   INITIAL_CATEGORIES,
-  INITIAL_CLAIMS,
   INITIAL_INQUIRIES,
   INITIAL_NOTIFICATIONS,
   INITIAL_OPERATIONS,
@@ -218,7 +217,7 @@ export default function App() {
   const [visits, setVisits] = useState<VisitItem[]>(INITIAL_VISITS);
   const [inquiries, setInquiries] = useState<InquiryItem[]>(INITIAL_INQUIRIES);
   const [operations, setOperations] = useState<OperationItem[]>(INITIAL_OPERATIONS);
-  const [claims, setClaims] = useState<ClaimItem[]>(INITIAL_CLAIMS);
+  const [claims, setClaims] = useState<ClaimItem[]>([]);
   const [categories, setCategories] = useState<CategoryConfigItem[]>(INITIAL_CATEGORIES);
   const [notifications, setNotifications] = useState<NotificationItem[]>(INITIAL_NOTIFICATIONS);
   const [contracts, setContracts] = useState<ContractItem[]>([]);
@@ -366,9 +365,6 @@ export default function App() {
           }
           for (const op of INITIAL_OPERATIONS) {
             await setDoc(doc(db, 'operations', op.id), op);
-          }
-          for (const clm of INITIAL_CLAIMS) {
-            await setDoc(doc(db, 'claims', clm.id), clm);
           }
           for (const cat of INITIAL_CATEGORIES) {
             await setDoc(doc(db, 'categories', cat.id), cat);
@@ -536,9 +532,7 @@ export default function App() {
       collection(db, 'claims'),
       (snap) => {
         if (!mounted) return;
-        if (!snap.empty) {
-          setClaims(snap.docs.map((d) => d.data() as ClaimItem));
-        }
+        setClaims(snap.docs.map((d) => ({ ...d.data(), id: d.id }) as ClaimItem));
       },
       (err) => handleFirestoreError(err, OperationType.GET, 'claims')
     );
@@ -546,8 +540,8 @@ export default function App() {
     const unsubCategories = onSnapshot(
       collection(db, 'categories'),
       (snap) => {
-        if (!mounted || snap.empty) return;
-        setCategories(snap.docs.map((d) => d.data() as CategoryConfigItem));
+        if (!mounted) return;
+        setCategories(snap.docs.map((d) => ({ ...d.data(), id: d.id }) as CategoryConfigItem));
       },
       (err) => handleFirestoreError(err, OperationType.GET, 'categories')
     );
@@ -1455,10 +1449,9 @@ export default function App() {
       );
       return;
     }
-    const canDelete =
-      currentUser.role === 'administrador' || isUserOwnerOfProperty(target, currentUser, users);
+    const canDelete = currentUser.role !== 'administrador' && isUserOwnerOfProperty(target, currentUser, users);
     if (!canDelete) {
-      notify('error', 'Sin permisos', 'Solo el propietario titular o el administrador pueden eliminar esta publicación.');
+      notify('error', 'Sin permisos', 'Solo el propietario titular puede eliminar esta publicación.');
       return;
     }
     setPropertyToDelete(target);
@@ -1466,6 +1459,7 @@ export default function App() {
 
   const handleConfirmDeleteProperty = async () => {
     if (!propertyToDelete || !currentUser) return;
+    if (currentUser.role === 'administrador' || !isUserOwnerOfProperty(propertyToDelete, currentUser, users)) return;
     const propertyId = propertyToDelete.id;
     const title = propertyToDelete.title;
     setIsDeletingProperty(true);
@@ -2655,6 +2649,20 @@ export default function App() {
       notify('info', 'Catálogo actualizado', `"${target.name}" ahora está ${active ? 'activo' : 'inactivo'}.`);
     } catch (err) {
       handleFirestoreError(err, OperationType.UPDATE, `categories/${categoryId}`);
+    }
+  };
+
+  const handleDeleteCategory = async (categoryId: string) => {
+    if (currentUser?.role !== 'administrador') return;
+    const target = categories.find((category) => category.id === categoryId);
+    if (!target) return;
+    try {
+      await deleteDoc(doc(db, 'categories', categoryId));
+      setCategories((prev) => prev.filter((category) => category.id !== categoryId));
+      notify('success', 'Categoría eliminada', `Se eliminó "${target.name}" del catálogo.`);
+    } catch {
+      notify('error', 'No se pudo eliminar', 'Intentá nuevamente.');
+      throw new Error('No se pudo eliminar la categoría.');
     }
   };
 
@@ -4094,6 +4102,7 @@ export default function App() {
             onUpdateUserAdmin={handleUpdateUserAdmin}
             onAddCategory={handleAddCategory}
             onToggleCategory={handleToggleCategory}
+            onDeleteCategory={handleDeleteCategory}
             onNotify={notify}
           />
         )}

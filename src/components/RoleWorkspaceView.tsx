@@ -172,6 +172,7 @@ interface RoleWorkspaceViewProps {
   onUpdateUserAdmin: (uid: string, role: UserRole, active: boolean) => Promise<void>;
   onAddCategory: (name: string, kind: 'tipo_inmueble' | 'caracteristica') => Promise<void>;
   onToggleCategory: (categoryId: string, active: boolean) => Promise<void>;
+  onDeleteCategory: (categoryId: string) => Promise<void>;
 }
 
 export {
@@ -343,7 +344,10 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
   onUpdateUserAdmin,
   onAddCategory,
   onToggleCategory,
+  onDeleteCategory,
 }) => {
+  const [categoryToDelete, setCategoryToDelete] = useState<CategoryConfigItem | null>(null);
+  const [isDeletingCategory, setIsDeletingCategory] = useState(false);
   const [activeCounterModalOp, setActiveCounterModalOp] = useState<OperationItem | null>(null);
   const [activeContractModalOp, setActiveContractModalOp] = useState<OperationItem | null>(null);
   const [selectedChatId, setSelectedChatId] = useState<string | null>(null);
@@ -3653,9 +3657,15 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
                   </strong>
                 </div>
                 <div className="flex justify-between">
-                  <span>Reclamos resueltos:</span>
+                  <span>En revisión:</span>
                   <strong className="font-tabular text-[#173B43]">
-                    {claims.filter((c) => c.status === 'resuelto').length}
+                    {adminRevisionClaims.length}
+                  </strong>
+                </div>
+                <div className="flex justify-between">
+                  <span>Solucionados:</span>
+                  <strong className="font-tabular text-[#173B43]">
+                    {adminSolvedClaims.length}
                   </strong>
                 </div>
 
@@ -3868,14 +3878,6 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
                               <X className="w-3.5 h-3.5" />
                               Rechazar
                             </button>
-                            <button
-                              type="button"
-                              onClick={() => onDeleteProperty(prop.id)}
-                              className="px-3.5 py-2 text-xs font-bold text-red-700 bg-white border border-red-300 rounded-sm hover:bg-red-50 cursor-pointer inline-flex items-center gap-1.5"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                              Eliminar
-                            </button>
                           </>
                         ) : (
                           <>
@@ -3889,14 +3891,6 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
                             >
                               <Eye className="w-3.5 h-3.5" />
                               Revisar Ficha
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => onDeleteProperty(prop.id)}
-                              className="px-3.5 py-2 text-xs font-bold text-red-700 bg-white border border-red-300 rounded-sm hover:bg-red-50 cursor-pointer inline-flex items-center gap-1.5"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                              Eliminar
                             </button>
                           </>
                         )}
@@ -4068,14 +4062,6 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
                             Cambiar a Rechazada
                           </button>
                         )}
-                        <button
-                          type="button"
-                          onClick={() => onDeleteProperty(prop.id)}
-                          className="px-3.5 py-2 text-xs font-bold text-red-700 bg-white border border-red-300 rounded-sm hover:bg-red-50 cursor-pointer inline-flex items-center gap-1.5"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                          Eliminar
-                        </button>
 
                         <div className="flex flex-wrap items-center gap-2 ml-auto">
                           <select
@@ -4231,7 +4217,7 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
             {categories.map((cat) => (
               <div
                 key={cat.id}
-                className="p-3 bg-[#F8F6F1] border border-[#D5BFA0] rounded-sm flex items-center justify-between text-xs"
+                className="p-3 bg-[#F8F6F1] border border-[#D5BFA0] rounded-sm flex flex-wrap items-center justify-between gap-2 text-xs"
               >
                 <div>
                   <div className="font-semibold text-[#1F241F]">{cat.name}</div>
@@ -4239,10 +4225,11 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
                     {cat.kind === 'tipo_inmueble' ? 'Tipo inmueble' : 'Característica'}
                   </div>
                 </div>
+                <div className="flex items-center gap-1 shrink-0 ml-auto">
                 <button
                   type="button"
                   onClick={() => onToggleCategory(cat.id, !cat.active)}
-                  className={`text-[11px] font-bold px-2 py-0.5 rounded-sm border ${
+                  className={`h-8 text-[11px] font-bold px-2 rounded-sm border ${
                     cat.active
                       ? 'bg-[#D5BFA0]/30 text-[#173B43] border-[#173B43]'
                       : 'bg-red-100 text-red-800 border-red-400'
@@ -4250,6 +4237,16 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
                 >
                   {cat.active ? 'Activo' : 'Inactivo'}
                 </button>
+                <button
+                  type="button"
+                  onClick={() => setCategoryToDelete(cat)}
+                  aria-label={`Eliminar ${cat.name}`}
+                  title={`Eliminar ${cat.name}`}
+                  className="h-8 w-8 inline-flex items-center justify-center text-red-700 hover:bg-red-50 rounded-sm cursor-pointer"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+                </div>
               </div>
             ))}
           </div>
@@ -4804,6 +4801,28 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
           }}
           onNotify={onNotify || (() => {})}
         />
+      )}
+      {categoryToDelete && currentUser.role === 'administrador' && (
+        <div className="fixed inset-0 z-[100] bg-black/50 flex items-center justify-center p-4">
+          <div role="dialog" aria-modal="true" aria-labelledby="delete-category-title" className="w-full max-w-md bg-[#FCFBF7] rounded-xl p-6 shadow-xl space-y-4">
+            <h2 id="delete-category-title" className="text-xl font-semibold text-[#173B43]">¿Eliminar {categoryToDelete.kind === 'tipo_inmueble' ? 'tipo de inmueble' : 'característica'}?</h2>
+            <p className="text-sm text-[#303638]">Se eliminará “{categoryToDelete.name}” del catálogo. Esta acción no se puede deshacer. Las propiedades ya publicadas conservarán sus datos.</p>
+            <div className="flex justify-end gap-3">
+              <button type="button" disabled={isDeletingCategory} onClick={() => setCategoryToDelete(null)} className="px-4 py-2 border border-[#D5BFA0] rounded-sm disabled:opacity-50 cursor-pointer">Cancelar</button>
+              <button type="button" disabled={isDeletingCategory} onClick={async () => {
+                setIsDeletingCategory(true);
+                try {
+                  await onDeleteCategory(categoryToDelete.id);
+                  setCategoryToDelete(null);
+                } catch {
+                  // El aviso de error se muestra desde el controlador; permitir reintentar.
+                } finally {
+                  setIsDeletingCategory(false);
+                }
+              }} className="px-4 py-2 bg-red-600 text-white rounded-sm disabled:opacity-50 cursor-pointer">{isDeletingCategory ? 'Eliminando…' : 'Eliminar'}</button>
+            </div>
+          </div>
+        </div>
       )}
     </section>
   );

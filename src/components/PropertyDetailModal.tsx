@@ -333,7 +333,7 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
                 <span>Editar Propiedad</span>
               </button>
             )}
-            {(currentUser?.role === 'administrador' || (isOwnerOfProperty && !isConcretada)) && onDeleteProperty && (
+            {currentUser?.role !== 'administrador' && isOwnerOfProperty && !isConcretada && onDeleteProperty && (
               <button
                 type="button"
                 onClick={() => {
