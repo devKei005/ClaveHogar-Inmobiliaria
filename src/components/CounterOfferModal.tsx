@@ -24,8 +24,7 @@ export const CounterOfferModal: React.FC<CounterOfferModalProps> = ({
     operation.counterOffer?.currency || operation.currency || 'USD'
   );
   const [counterConditions, setCounterConditions] = useState<string>(
-    operation.counterOffer?.conditions ||
-      'Se proponen los siguientes ajustes en el valor y condiciones...'
+    operation.counterOffer?.conditions || ''
   );
   const [isSubmitting, setIsSubmitting] = useState(false);
 
