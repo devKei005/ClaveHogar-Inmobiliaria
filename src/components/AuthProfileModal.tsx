@@ -272,15 +272,15 @@ export const AuthProfileModal: React.FC<AuthProfileModalProps> = ({
     : false;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#1F241F]/60 p-4 overflow-y-auto">
-      <div className="relative w-full max-w-md bg-[#FCFBF7] border border-[#D5BFA0] rounded-md overflow-hidden my-8">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#1F241F]/60 p-3 sm:p-4 overflow-y-auto">
+      <div className="relative w-full max-w-md bg-[#FCFBF7] border border-[#D5BFA0] rounded-md overflow-hidden my-4 sm:my-8 max-h-[92dvh] flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-5 bg-[#173B43] text-[#FCFBF7]">
-          <div>
+        <div className="flex items-center justify-between px-4 sm:px-6 py-4 sm:py-5 bg-[#173B43] text-[#FCFBF7] shrink-0">
+          <div className="min-w-0">
             <span className="text-[10px] uppercase tracking-[0.2em] text-[#D5BFA0] font-semibold block">
               ClaveHogar
             </span>
-            <h2 className="text-xl font-serif-display font-semibold text-white">
+            <h2 className="text-lg sm:text-xl font-serif-display font-semibold text-white truncate">
               {mode === 'login' && 'Iniciar sesión'}
               {mode === 'register' && 'Crear cuenta'}
               {mode === 'recover' && 'Recuperar contraseña'}
@@ -293,13 +293,13 @@ export const AuthProfileModal: React.FC<AuthProfileModalProps> = ({
               clearAuthForms();
               onClose();
             }}
-            className="p-1.5 text-[#D5BFA0] hover:text-[#FCFBF7] rounded-sm hover:bg-white/10 transition-colors"
+            className="p-1.5 text-[#D5BFA0] hover:text-[#FCFBF7] rounded-sm hover:bg-white/10 transition-colors shrink-0"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        <div className="p-6 max-h-[82vh] overflow-y-auto">
+        <div className="p-4 sm:p-6 overflow-y-auto flex-1">
           {/* SCREEN 1: INICIAR SESIÓN */}
           {mode === 'login' && (
             <div className="space-y-5">
@@ -403,7 +403,7 @@ export const AuthProfileModal: React.FC<AuthProfileModalProps> = ({
                     className="w-full px-3.5 py-2 text-sm bg-white border border-[#D5BFA0] rounded-sm focus:outline-none focus:border-[#173B43]"
                   />
                 </div>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-semibold text-[#173B43] mb-1">
                       Teléfono *
@@ -532,7 +532,7 @@ export const AuthProfileModal: React.FC<AuthProfileModalProps> = ({
             <div className="space-y-4">
               {/* Foto de perfil propia */}
               <div className="p-4 bg-[#F8F6F1] border border-[#D5BFA0] rounded-sm flex items-center gap-4">
-                <div className="relative w-16 h-16 rounded-full overflow-hidden bg-[#173B43] text-[#FCFBF7] border-2 border-[#D5BFA0] flex items-center justify-center shrink-0">
+                <div className="relative w-16 h-16 rounded-full overflow-hidden bg-[#173B43] text-[#FCFBF7] border-0 sm:border-2 sm:border-[#D5BFA0] flex items-center justify-center shrink-0">
                   {profPhotoUrl ? (
                     <img
                       src={profPhotoUrl}
@@ -598,7 +598,7 @@ export const AuthProfileModal: React.FC<AuthProfileModalProps> = ({
                     className="w-full px-3.5 py-2 text-sm bg-white border border-[#D5BFA0] rounded-sm"
                   />
                 </div>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-semibold text-[#173B43] mb-1">
                       Teléfono *
@@ -691,7 +691,7 @@ export const AuthProfileModal: React.FC<AuthProfileModalProps> = ({
                     {busy ? 'Guardando...' : 'Guardar Datos Personales'}
                   </button>
 
-                  <div className="flex items-center justify-between gap-2 pt-2 border-t border-[#D5BFA0]">
+                  <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-[#D5BFA0]">
                     <button
                       type="button"
                       disabled={busy}

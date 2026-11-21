@@ -19,6 +19,7 @@ import {
   XCircle,
   Info,
   Clock,
+  Home,
 } from 'lucide-react';
 import {
   onAuthStateChanged,
@@ -3019,11 +3020,11 @@ export default function App() {
   }, [claims, currentUser]);
 
   return (
-    <div className={activeSection === 'buscador_ia' ? "h-screen flex flex-col bg-[#FCFBF7] text-[#1F241F] overflow-hidden" : "min-h-screen flex flex-col bg-[#FCFBF7] text-[#1F241F]"}>
+    <div className={activeSection === 'buscador_ia' ? "fixed inset-0 flex flex-col bg-[#FCFBF7] text-[#1F241F] overflow-hidden" : "min-h-screen flex flex-col bg-[#FCFBF7] text-[#1F241F]"}>
       {/* =====================================================================
           TOAST NOTIFICATIONS (Capa principal superior sobre cualquier modal)
          ===================================================================== */}
-      <div className="fixed bottom-5 right-4 sm:bottom-6 sm:right-6 z-[99999] flex flex-col gap-2.5 max-w-md w-full pointer-events-none px-2 sm:px-0">
+      <div className="fixed bottom-4 left-3 right-3 sm:left-auto sm:bottom-6 sm:right-6 z-[99999] flex flex-col gap-2.5 sm:max-w-md sm:w-full pointer-events-none">
         {toasts.map((t) => (
           <div
             key={t.id}
@@ -3076,38 +3077,39 @@ export default function App() {
           MINIMALIST ARCHITECTURAL HEADER WITH INTEGRATED HAMBURGER MENU
          ===================================================================== */}
       <header className="site-header sticky top-0 z-40 bg-[#F8F6F1]/95 backdrop-blur-md border-b border-[#D5BFA0]">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 h-20 flex items-center justify-between gap-4">
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 h-14 sm:h-20 flex items-center justify-between gap-2 sm:gap-4">
           {/* Left: Hamburger Menu Button + Brand Wordmark */}
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 sm:gap-4 min-w-0">
             <button
               type="button"
               onClick={() => setIsSideMenuOpen((prev) => !prev)}
-              className="p-2.5 text-[#303638] hover:bg-white/60 border border-[#D5BFA0] rounded-xl transition-colors flex items-center justify-center cursor-pointer shadow-2xs"
+              className="p-2 sm:p-2.5 min-h-[40px] min-w-[40px] text-[#303638] hover:bg-white/60 border border-[#D5BFA0] rounded-xl transition-colors flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs shrink-0"
               aria-label="Abrir menú de navegación"
             >
               <Menu className="w-5 h-5" />
+              <span className="hidden sm:inline lg:hidden text-xs font-semibold">Menú</span>
             </button>
 
             <button
               type="button"
               onClick={() => setActiveSection('catalogo')}
-              className="text-left cursor-pointer group"
+              className="text-left cursor-pointer group min-w-0"
             >
-              <span className="text-lg sm:text-xl font-serif-display font-normal tracking-tight text-[#303638] block leading-none">
+              <span className="text-lg sm:text-xl font-serif-display font-normal tracking-tight text-[#303638] block leading-none truncate">
                 ClaveHogar
               </span>
-              <span className="text-[9px] uppercase tracking-[0.2em] font-medium text-[#303638]/70 block mt-0.5">
+              <span className="text-[8px] sm:text-[9px] uppercase tracking-[0.12em] sm:tracking-[0.2em] font-medium text-[#303638]/70 block mt-0.5 truncate">
                 Alquileres &amp; Ventas
               </span>
             </button>
           </div>
 
-          {/* Center: Clean Editorial Navigation Links (Matching Image 1 & 2 pills) */}
-          <nav className="hidden md:flex items-center gap-2 bg-white/60 p-1.5 rounded-full border border-[#D5BFA0] shadow-2xs">
+          {/* Center: Clean Editorial Navigation Links (Desktop >=1024px) */}
+          <nav className="hidden lg:flex items-center gap-2 bg-white/60 p-1.5 rounded-full border border-[#D5BFA0] shadow-2xs">
             <button
               type="button"
               onClick={() => setActiveSection('catalogo')}
-              className={`text-xs font-semibold px-4 py-2 rounded-full transition-all cursor-pointer ${
+              className={`text-xs font-semibold px-4 py-2 rounded-full transition-all cursor-pointer whitespace-nowrap ${
                 activeSection === 'catalogo'
                   ? 'bg-[#173B43] text-[#F8F6F1] shadow-xs'
                   : 'text-[#303638]/75 hover:text-[#303638] hover:bg-white/80'
@@ -3118,7 +3120,7 @@ export default function App() {
             <button
               type="button"
               onClick={() => setActiveSection('buscador_ia')}
-              className={`text-xs font-semibold px-4 py-2 rounded-full transition-all flex items-center gap-1.5 cursor-pointer ${
+              className={`text-xs font-semibold px-4 py-2 rounded-full transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
                 activeSection === 'buscador_ia'
                   ? 'bg-[#173B43] text-[#F8F6F1] shadow-xs'
                   : 'text-[#303638]/75 hover:text-[#303638] hover:bg-white/80'
@@ -3130,7 +3132,7 @@ export default function App() {
             <button
               type="button"
               onClick={() => setActiveSection('comparador')}
-              className={`text-xs font-semibold px-4 py-2 rounded-full transition-all cursor-pointer ${
+              className={`text-xs font-semibold px-4 py-2 rounded-full transition-all cursor-pointer whitespace-nowrap ${
                 activeSection === 'comparador'
                   ? 'bg-[#173B43] text-[#F8F6F1] shadow-xs'
                   : 'text-[#303638]/75 hover:text-[#303638] hover:bg-white/80'
@@ -3142,7 +3144,7 @@ export default function App() {
               <button
                 type="button"
                 onClick={() => setActiveSection('panel_rol')}
-                className={`text-xs font-semibold px-4 py-2 rounded-full transition-all cursor-pointer ${
+                className={`text-xs font-semibold px-4 py-2 rounded-full transition-all cursor-pointer whitespace-nowrap ${
                   activeSection === 'panel_rol'
                     ? 'bg-[#173B43] text-[#F8F6F1] shadow-xs'
                     : 'text-[#303638]/75 hover:text-[#303638] hover:bg-white/80'
@@ -3154,26 +3156,26 @@ export default function App() {
           </nav>
 
           {/* Right: Auth & User Actions */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
             {!currentUser ? (
               <>
                 <button
                   type="button"
                   onClick={() => openAuthModal('login')}
-                  className="px-4 py-2 text-xs uppercase tracking-wider font-semibold text-[#303638] border border-[#D5BFA0] hover:bg-white rounded-xl transition-colors cursor-pointer"
+                  className="px-2.5 sm:px-4 py-2 text-[11px] sm:text-xs uppercase tracking-wider font-semibold text-[#303638] border border-[#D5BFA0] hover:bg-white rounded-xl transition-colors cursor-pointer whitespace-nowrap"
                 >
-                  Iniciar sesión
+                  Ingresar
                 </button>
                 <button
                   type="button"
                   onClick={() => openAuthModal('register')}
-                  className="px-4 py-2 text-xs uppercase tracking-wider font-semibold text-white bg-[#173B43] hover:bg-[#122e35] rounded-xl transition-colors cursor-pointer shadow-xs"
+                  className="hidden sm:inline-flex px-4 py-2 text-xs uppercase tracking-wider font-semibold text-white bg-[#173B43] hover:bg-[#122e35] rounded-xl transition-colors cursor-pointer shadow-xs whitespace-nowrap"
                 >
                   Registrarse
                 </button>
               </>
             ) : (
-              <div className="flex items-center gap-2.5">
+              <div className="flex items-center gap-1.5 sm:gap-2.5">
                 {/* Notifications Bell */}
                 <div className="relative">
                   <button
@@ -3184,7 +3186,7 @@ export default function App() {
                         markAllNotificationsRead();
                       }
                     }}
-                    className="relative p-2.5 text-[#303638] hover:bg-white border border-[#D5BFA0] rounded-xl transition-colors cursor-pointer shadow-2xs"
+                    className="relative p-2 sm:p-2.5 min-h-[40px] min-w-[40px] flex items-center justify-center text-[#303638] hover:bg-white border border-[#D5BFA0] rounded-xl transition-colors cursor-pointer shadow-2xs"
                     title="Notificaciones"
                   >
                     <Bell className="w-4 h-4" />
@@ -3196,7 +3198,7 @@ export default function App() {
                   </button>
 
                   {showNotifDropdown && (
-                    <div className="absolute right-0 mt-2 w-84 sm:w-96 bg-white text-[#303638] border border-[#D5BFA0] rounded-2xl shadow-xl p-4 z-50 space-y-3">
+                    <div className="fixed sm:absolute left-3 right-3 sm:left-auto sm:right-0 top-[70px] sm:top-auto sm:mt-2 w-auto sm:w-96 bg-white text-[#303638] border border-[#D5BFA0] rounded-2xl shadow-xl p-3.5 sm:p-4 z-50 space-y-3">
                       <div className="flex items-center justify-between border-b border-[#D5BFA0] pb-2.5">
                         <div>
                           <span className="text-xs uppercase tracking-wider font-bold text-[#173B43] block">
@@ -3305,9 +3307,9 @@ export default function App() {
                 <button
                   type="button"
                   onClick={() => openAuthModal('profile')}
-                  className="flex items-center gap-2.5 px-3 py-1.5 bg-white/70 hover:bg-white border border-[#D5BFA0] rounded-full text-left transition-colors cursor-pointer shadow-2xs"
+                  className="flex items-center gap-0 sm:gap-2.5 p-0 sm:px-3 sm:py-1.5 bg-transparent sm:bg-white/70 sm:hover:bg-white border-0 sm:border sm:border-[#D5BFA0] rounded-full text-left transition-colors cursor-pointer sm:shadow-2xs"
                 >
-                  <div className="w-7 h-7 rounded-full overflow-hidden bg-[#173B43] text-white flex items-center justify-center shrink-0">
+                  <div className="w-9 h-9 sm:w-7 sm:h-7 rounded-full overflow-hidden bg-[#173B43] text-white flex items-center justify-center shrink-0">
                     {currentUser.photoUrl ? (
                       <img
                         src={currentUser.photoUrl}
@@ -3315,7 +3317,7 @@ export default function App() {
                         className="w-full h-full object-cover"
                       />
                     ) : (
-                      <User className="w-3.5 h-3.5 text-white" />
+                      <User className="w-4 h-4 sm:w-3.5 sm:h-3.5 text-white" />
                     )}
                   </div>
                   <div className="hidden sm:block">
@@ -3334,7 +3336,7 @@ export default function App() {
                 <button
                   type="button"
                   onClick={handleLogout}
-                  className="p-2.5 text-[#303638] hover:text-[#C87955] hover:bg-white border border-[#D5BFA0] rounded-xl transition-colors cursor-pointer shadow-2xs"
+                  className="p-2 sm:p-2.5 min-h-[40px] min-w-[40px] flex items-center justify-center text-[#303638] hover:text-[#C87955] hover:bg-white border border-[#D5BFA0] rounded-xl transition-colors cursor-pointer shadow-2xs"
                   title="Cerrar sesión"
                 >
                   <LogOut className="w-4 h-4" />
@@ -3546,8 +3548,8 @@ export default function App() {
       <main
         className={
           activeSection === 'buscador_ia'
-            ? 'flex-1 flex flex-col h-[calc(100vh-80px)] overflow-hidden'
-            : 'flex-1'
+            ? 'flex-1 min-h-0 flex flex-col overflow-hidden'
+            : 'flex-1 pb-16 lg:pb-0'
         }
       >
         {/* ===================================================================
@@ -3556,7 +3558,7 @@ export default function App() {
         {activeSection === 'catalogo' && (
           <div>
             {/* Full-width Banner Image Hero with AI Search & Slogan Overlay */}
-            <section className="catalog-hero relative w-full min-h-[520px] lg:min-h-[600px] flex items-center justify-center overflow-hidden bg-[#173B43]">
+            <section className="catalog-hero relative w-full min-h-[440px] sm:min-h-[520px] lg:min-h-[600px] flex items-center justify-center overflow-hidden bg-[#173B43]">
               <div className="absolute inset-0 z-0">
                 <img
                   src={HERO_IMAGE}
@@ -3567,7 +3569,7 @@ export default function App() {
                 <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/45 to-black/30" />
               </div>
 
-              <div className="relative z-10 max-w-5xl mx-auto px-6 py-16 text-center space-y-8 w-full">
+              <div className="relative z-10 max-w-5xl mx-auto px-4 sm:px-6 py-10 sm:py-16 text-center space-y-6 sm:space-y-8 w-full">
                 <div className="space-y-3 animate-fade-slide">
                   <div className="hero-tagline">
                     <span>La clave para encontrar tu lugar.</span>
@@ -3585,11 +3587,11 @@ export default function App() {
                 {/* Floating AI Search Box on top of the banner image */}
                 <form
                   onSubmit={(e) => handleRunAISearch(e)}
-                  className="card-floating bg-white/95 backdrop-blur-md p-5 sm:p-6 rounded-2xl border-2 border-[#D5BFA0] shadow-2xl max-w-3xl mx-auto text-left space-y-3.5 animate-fade-slide"
+                  className="card-floating bg-white/95 backdrop-blur-md p-4 sm:p-6 rounded-2xl border-2 border-[#D5BFA0] shadow-2xl max-w-3xl mx-auto text-left space-y-3.5 animate-fade-slide"
                 >
-                  <div className="flex items-center justify-between border-b border-[#D5BFA0]/60 pb-2.5">
-                    <div className="flex items-center gap-2 text-xs uppercase tracking-wider font-bold text-[#173B43]">
-                      <Sparkles className="w-4 h-4 text-[#C87955]" />
+                  <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#D5BFA0]/60 pb-2.5">
+                    <div className="flex items-center gap-2 text-[11px] sm:text-xs uppercase tracking-wider font-bold text-[#173B43]">
+                      <Sparkles className="w-4 h-4 text-[#C87955] shrink-0" />
                       <span>Buscador Inteligente con Asistente IA</span>
                     </div>
                     <span className="text-[11px] text-[#303638]/60 font-semibold font-tabular">Clave v2.4</span>
@@ -3644,8 +3646,8 @@ export default function App() {
             </section>
 
             {/* Floating Filter & Search Bar matching Image 1 */}
-            <section className="max-w-7xl mx-auto px-6 pt-10">
-              <div className="card-floating bg-white border border-[#D5BFA0] rounded-2xl p-4 sm:p-5 space-y-4 shadow-sm">
+            <section className="max-w-7xl mx-auto px-4 sm:px-6 pt-8 sm:pt-10">
+              <div className="card-floating bg-white border border-[#D5BFA0] rounded-2xl p-3.5 sm:p-5 space-y-4 shadow-sm">
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3 items-center">
                   <div className="lg:col-span-4 relative">
                     <Search className="w-4 h-4 text-[#303638]/50 absolute left-3.5 top-3.5" />
@@ -3802,20 +3804,20 @@ export default function App() {
             </section>
 
             {/* Editorial Properties Catalog Grid matching Image 1 */}
-            <section className="max-w-7xl mx-auto px-6 py-14 space-y-8">
-              <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 border-b border-[#D5BFA0]/70 pb-5">
+            <section className="max-w-7xl mx-auto px-3 sm:px-6 py-8 sm:py-14 space-y-5 sm:space-y-8">
+              <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 sm:gap-4 border-b border-[#D5BFA0]/70 pb-4 sm:pb-5">
                 <div>
                   <div className="flex items-center gap-2 mb-1">
-                    <span className="text-[11px] uppercase tracking-[0.2em] text-[#C87955] font-semibold block">
+                    <span className="text-[10px] sm:text-[11px] uppercase tracking-[0.2em] text-[#C87955] font-semibold block">
                       Colección Residencial
                     </span>
                   </div>
-                  <h2 className="text-3xl sm:text-4xl font-serif-display font-semibold text-[#173B43]">
+                  <h2 className="text-xl sm:text-4xl font-serif-display font-semibold text-[#173B43]">
                     Propiedades Disponibles
                   </h2>
                 </div>
 
-                <div className="flex items-center gap-4">
+                <div className="flex flex-wrap items-center gap-2.5 sm:gap-4">
                   <div className="flex items-center gap-1.5 text-xs text-[#303638]/75 font-tabular">
                     <span className="w-2 h-2 rounded-full bg-[#173B43] inline-block" />
                     <span>{filteredProperties.length} Inmuebles verificados</span>
@@ -3831,7 +3833,7 @@ export default function App() {
                           setEditingProperty(null);
                           setIsPropertyFormOpen(true);
                         }}
-                        className="px-4 py-2.5 text-xs uppercase tracking-wider font-semibold text-white bg-[#173B43] hover:bg-[#122e35] rounded-xl transition-all cursor-pointer shadow-xs"
+                        className="px-3.5 sm:px-4 py-2 sm:py-2.5 text-[11px] sm:text-xs uppercase tracking-wider font-semibold text-white bg-[#173B43] hover:bg-[#122e35] rounded-xl transition-all cursor-pointer shadow-xs"
                       >
                         + Publicar Propiedad
                       </button>
@@ -3843,7 +3845,7 @@ export default function App() {
                     <button
                       type="button"
                       onClick={handleEnableOwnerRole}
-                      className="px-4 py-2.5 text-xs uppercase tracking-wider font-semibold text-white bg-[#C87955] hover:bg-[#b56b49] rounded-xl transition-all cursor-pointer shadow-xs"
+                      className="px-3.5 sm:px-4 py-2 sm:py-2.5 text-[11px] sm:text-xs uppercase tracking-wider font-semibold text-white bg-[#C87955] hover:bg-[#b56b49] rounded-xl transition-all cursor-pointer shadow-xs"
                     >
                       Quiero publicar mi propiedad
                     </button>
@@ -3852,8 +3854,8 @@ export default function App() {
               </div>
 
               {filteredProperties.length === 0 ? (
-                <div className="card-floating bg-white border border-[#D5BFA0] rounded-2xl p-12 text-center space-y-4 shadow-sm">
-                  <p className="text-lg font-serif-display font-semibold text-[#303638]">
+                <div className="card-floating bg-white border border-[#D5BFA0] rounded-2xl p-8 sm:p-12 text-center space-y-4 shadow-sm">
+                  <p className="text-base sm:text-lg font-serif-display font-semibold text-[#303638]">
                     No se encontraron propiedades con los filtros seleccionados.
                   </p>
                   <button
@@ -3865,7 +3867,7 @@ export default function App() {
                   </button>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                <div className="grid grid-cols-2 lg:grid-cols-3 gap-2.5 sm:gap-5">
                   {filteredProperties.map((prop) => {
                     const isFav = favoriteIds.includes(prop.id);
                     const isComp = comparedIds.includes(prop.id);
@@ -3891,48 +3893,48 @@ export default function App() {
                               className="w-full h-full object-cover group-hover:scale-104 transition-transform duration-700"
                             />
 
-                            <div className="absolute top-3 left-3 bg-white/95 backdrop-blur-xs text-[#303638] px-3 py-1 text-[10px] uppercase tracking-wider font-bold rounded-lg border border-[#D5BFA0]/60 shadow-2xs">
+                            <div className="absolute top-1.5 left-1.5 sm:top-3 sm:left-3 bg-white/95 backdrop-blur-xs text-[#303638] px-1.5 py-0.5 sm:px-3 sm:py-1 text-[8px] sm:text-[10px] uppercase tracking-wider font-bold rounded sm:rounded-lg border border-[#D5BFA0]/60 shadow-2xs max-w-[56%] sm:max-w-none truncate">
                               {prop.operationType === 'alquiler' ? 'Alquiler' : 'Venta'} · {prop.propertyType}
                             </div>
 
                             <div
-                              className="absolute top-3 right-3 flex items-center gap-1.5"
+                              className="absolute top-1.5 right-1.5 sm:top-3 sm:right-3 flex items-center gap-1 sm:gap-1.5"
                               onClick={(e) => e.stopPropagation()}
                             >
                               <button
                                 type="button"
                                 onClick={() => handleToggleCompare(prop.id)}
                                 title="Comparar propiedad"
-                                className={`p-2 rounded-full transition-colors shadow-2xs cursor-pointer ${
+                                className={`p-1.5 sm:p-2 rounded-full transition-colors shadow-2xs cursor-pointer ${
                                   isComp
                                     ? 'bg-[#173B43] text-white'
                                     : 'bg-white/90 text-[#303638] hover:bg-white'
                                 }`}
                               >
-                                <ArrowLeftRight className="w-3.5 h-3.5" />
+                                <ArrowLeftRight className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
                               </button>
                               <button
                                 type="button"
                                 onClick={() => handleToggleFavorite(prop.id)}
                                 title="Guardar en favoritos"
-                                className={`p-2 rounded-full transition-colors shadow-2xs cursor-pointer ${
+                                className={`p-1.5 sm:p-2 rounded-full transition-colors shadow-2xs cursor-pointer ${
                                   isFav
                                     ? 'bg-[#C87955] text-white'
                                     : 'bg-white/90 text-[#303638] hover:bg-white'
                                 }`}
                               >
-                                <Heart className={`w-3.5 h-3.5 ${isFav ? 'fill-current' : ''}`} />
+                                <Heart className={`w-3 h-3 sm:w-3.5 sm:h-3.5 ${isFav ? 'fill-current' : ''}`} />
                               </button>
                             </div>
                           </div>
 
-                          <div className="property-card-info p-5 space-y-3">
-                            <div className="flex items-center justify-between text-xs">
-                              <span className="uppercase tracking-wider text-[#303638]/60 font-semibold truncate text-[11px]">
+                          <div className="property-card-info p-2.5 sm:p-5 space-y-1.5 sm:space-y-3">
+                            <div className="flex items-center justify-between text-xs gap-1 sm:gap-2">
+                              <span className="uppercase tracking-wider text-[#303638]/60 font-semibold truncate text-[9px] sm:text-[11px]">
                                 {prop.location}
                               </span>
                               <span
-                                className={`text-[10px] uppercase tracking-wider font-bold px-2.5 py-0.5 rounded-full border ${
+                                className={`text-[8px] sm:text-[10px] uppercase tracking-wider font-bold px-1.5 sm:px-2.5 py-0.5 rounded-full border shrink-0 ${
                                   prop.availability === 'disponible'
                                     ? 'bg-[#E5ECE4] text-[#173B43] border-[#C6D6C4]'
                                     : prop.availability === 'reservada'
@@ -3946,41 +3948,41 @@ export default function App() {
 
                             <h3
                               onClick={() => setSelectedProperty(prop)}
-                              className="text-base sm:text-lg font-serif-display font-semibold text-[#303638] group-hover:text-[#173B43] transition-colors line-clamp-2 cursor-pointer leading-snug"
+                              className="text-xs sm:text-lg font-serif-display font-semibold text-[#303638] group-hover:text-[#173B43] transition-colors line-clamp-2 cursor-pointer leading-tight sm:leading-snug"
                             >
                               {prop.title}
                             </h3>
 
-                            <p className="text-xs text-[#303638]/75 line-clamp-2 leading-relaxed">
+                            <p className="hidden sm:block text-xs text-[#303638]/75 line-clamp-2 leading-relaxed">
                               {prop.description}
                             </p>
                           </div>
                         </div>
 
-                        <div className="property-card-footer px-5 pb-5 pt-4 border-t border-[#D5BFA0]/50 space-y-4">
-                          <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-2">
-                            <div>
-                              <span className="text-[10px] uppercase tracking-wider text-[#303638]/50 font-bold block">
+                        <div className="property-card-footer px-2.5 pb-2.5 pt-2 sm:px-5 sm:pb-5 sm:pt-4 border-t border-[#D5BFA0]/50 space-y-2 sm:space-y-4">
+                          <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-baseline justify-between gap-0.5 sm:gap-x-3 sm:gap-y-2">
+                            <div className="min-w-0">
+                              <span className="hidden sm:block text-[10px] uppercase tracking-wider text-[#303638]/50 font-bold">
                                 Precio
                               </span>
-                              <span className="text-lg font-bold font-tabular text-[#173B43]">
+                              <span className="text-xs sm:text-lg font-bold font-tabular text-[#173B43] block truncate">
                                 {prop.currency} {prop.price.toLocaleString()}
                               </span>
                             </div>
-                            <span className="text-xs text-[#303638]/70 font-tabular">
+                            <span className="text-[9.5px] sm:text-xs text-[#303638]/70 font-tabular truncate">
                               {prop.bedrooms} dorm. · {prop.bathrooms} baños · {prop.surface} m²
                             </span>
                           </div>
 
                           {canUserEditProperty(prop, currentUser, users) ? (
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-1 sm:gap-2">
                               <button
                                 type="button"
                                 onClick={() => setSelectedProperty(prop)}
-                                className="flex-1 py-2 px-3 text-xs uppercase tracking-wider font-semibold text-[#303638] bg-[#F8F6F1] hover:bg-[#173B43] hover:text-white border border-[#D5BFA0] rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                                className="flex-1 py-1.5 sm:py-2 px-1.5 sm:px-3 text-[10px] sm:text-xs uppercase tracking-wide sm:tracking-wider font-semibold text-[#303638] bg-[#F8F6F1] hover:bg-[#173B43] hover:text-white border border-[#D5BFA0] rounded-lg sm:rounded-xl transition-all flex items-center justify-center gap-1 sm:gap-1.5 cursor-pointer"
                               >
                                 <span>Ver</span>
-                                <ArrowRight className="w-3.5 h-3.5" />
+                                <ArrowRight className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
                               </button>
                               <button
                                 type="button"
@@ -3989,10 +3991,10 @@ export default function App() {
                                   setEditingProperty(prop);
                                   setIsPropertyFormOpen(true);
                                 }}
-                                className="flex-1 py-2 px-3 text-xs uppercase tracking-wider font-semibold text-white bg-[#173B43] hover:bg-[#122e35] rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
+                                className="flex-1 py-1.5 sm:py-2 px-1.5 sm:px-3 text-[10px] sm:text-xs uppercase tracking-wide sm:tracking-wider font-semibold text-white bg-[#173B43] hover:bg-[#122e35] rounded-lg sm:rounded-xl transition-all flex items-center justify-center gap-1 sm:gap-1.5 cursor-pointer shadow-xs"
                                 title="Editar ficha de esta propiedad"
                               >
-                                <Edit3 className="w-3.5 h-3.5" />
+                                <Edit3 className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
                                 <span>Editar</span>
                               </button>
                             </div>
@@ -4000,10 +4002,10 @@ export default function App() {
                             <button
                               type="button"
                               onClick={() => setSelectedProperty(prop)}
-                              className="w-full py-2 px-4 text-xs uppercase tracking-wider font-semibold text-[#303638] bg-[#F8F6F1] hover:bg-[#173B43] hover:text-white border border-[#D5BFA0] rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer shadow-2xs"
+                              className="w-full py-1.5 sm:py-2 px-2 sm:px-4 text-[10px] sm:text-xs uppercase tracking-wide sm:tracking-wider font-semibold text-[#303638] bg-[#F8F6F1] hover:bg-[#173B43] hover:text-white border border-[#D5BFA0] rounded-lg sm:rounded-xl transition-all flex items-center justify-center gap-1 sm:gap-2 cursor-pointer shadow-2xs"
                             >
                               <span>Ver Propiedad</span>
-                              <ArrowRight className="w-3.5 h-3.5" />
+                              <ArrowRight className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
                             </button>
                           )}
                         </div>
@@ -4239,6 +4241,81 @@ export default function App() {
         onEnableOwnerRole={handleEnableOwnerRole}
         onQuickRoleLogin={handleQuickRoleLogin}
       />
+
+      {/* Mobile App Bottom Tab Navigation (solo celular y tablet <lg; oculta en buscador_ia para no tapar el chat) */}
+      {activeSection !== 'buscador_ia' && (
+        <nav
+          aria-label="Navegación móvil"
+          className="lg:hidden fixed bottom-0 left-0 right-0 z-30 bg-[#F8F6F1]/95 backdrop-blur-md border-t border-[#D5BFA0] shadow-[0_-4px_20px_rgba(23,59,67,0.08)]"
+        >
+          <div className="grid grid-cols-4 h-14 items-center max-w-xl mx-auto">
+            <button
+              type="button"
+              onClick={() => setActiveSection('catalogo')}
+              className={`h-full flex flex-col items-center justify-center gap-0.5 text-[10px] font-semibold transition-colors cursor-pointer ${
+                activeSection === 'catalogo' ? 'text-[#173B43]' : 'text-[#303638]/60'
+              }`}
+            >
+              <Home className={`w-4 h-4 ${activeSection === 'catalogo' ? 'text-[#C87955]' : ''}`} />
+              <span>Catálogo</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveSection('buscador_ia')}
+              className="h-full flex flex-col items-center justify-center gap-0.5 text-[10px] font-semibold transition-colors cursor-pointer text-[#303638]/60"
+            >
+              <Sparkles className="w-4 h-4 text-[#C87955]" />
+              <span>Asistente IA</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveSection('comparador')}
+              className={`relative h-full flex flex-col items-center justify-center gap-0.5 text-[10px] font-semibold transition-colors cursor-pointer ${
+                activeSection === 'comparador' ? 'text-[#173B43]' : 'text-[#303638]/60'
+              }`}
+            >
+              <div className="relative">
+                <ArrowLeftRight className={`w-4 h-4 ${activeSection === 'comparador' ? 'text-[#C87955]' : ''}`} />
+                {comparedIds.length > 0 && (
+                  <span className="absolute -top-1.5 -right-2.5 min-w-[15px] h-[15px] px-1 rounded-full bg-[#173B43] text-white text-[9px] font-bold flex items-center justify-center">
+                    {comparedIds.length}
+                  </span>
+                )}
+              </div>
+              <span>Comparar</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                if (currentUser) {
+                  setActiveSection('panel_rol');
+                } else {
+                  openAuthModal('login');
+                }
+              }}
+              className={`h-full flex flex-col items-center justify-center gap-0.5 text-[10px] font-semibold transition-colors cursor-pointer ${
+                activeSection === 'panel_rol' ? 'text-[#173B43]' : 'text-[#303638]/60'
+              }`}
+            >
+              {currentUser?.photoUrl ? (
+                <div className="w-5 h-5 rounded-full overflow-hidden shrink-0">
+                  <img
+                    src={currentUser.photoUrl}
+                    alt={currentUser.displayName}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+              ) : (
+                <User className={`w-4 h-4 ${activeSection === 'panel_rol' ? 'text-[#C87955]' : ''}`} />
+              )}
+              <span>{currentUser ? 'Mi Espacio' : 'Ingresar'}</span>
+            </button>
+          </div>
+        </nav>
+      )}
     </div>
   );
 }

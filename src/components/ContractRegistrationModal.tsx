@@ -195,17 +195,17 @@ export const ContractRegistrationModal: React.FC<ContractRegistrationModalProps>
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[#1F241F]/70 p-4 overflow-y-auto backdrop-blur-xs">
-      <div className="relative w-full max-w-3xl bg-[#FCFBF7] border-2 border-[#173B43] rounded-md overflow-hidden my-8 shadow-2xl flex flex-col max-h-[92vh]">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[#1F241F]/70 p-0 sm:p-4 overflow-y-auto backdrop-blur-xs">
+      <div className="relative w-full max-w-3xl bg-[#FCFBF7] border-0 sm:border-2 border-[#173B43] rounded-none sm:rounded-md overflow-hidden my-0 sm:my-8 shadow-2xl flex flex-col h-[100dvh] sm:h-auto max-h-[100dvh] sm:max-h-[92vh]">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 bg-[#173B43] text-[#FCFBF7] shrink-0">
-          <div className="flex items-center gap-2.5">
-            <FileCheck className="w-6 h-6 text-[#D5BFA0]" />
-            <div>
-              <h2 className="text-xl font-serif-display font-semibold text-white">
+        <div className="flex items-center justify-between gap-3 px-4 sm:px-6 py-3.5 sm:py-4 bg-[#173B43] text-[#FCFBF7] shrink-0">
+          <div className="flex items-center gap-2.5 min-w-0 flex-1">
+            <FileCheck className="w-5 h-5 sm:w-6 sm:h-6 text-[#D5BFA0] shrink-0" />
+            <div className="min-w-0">
+              <h2 className="text-base sm:text-xl font-serif-display font-semibold text-white truncate">
                 Registrar Contrato Definitivo y Concretar Operación
               </h2>
-              <p className="text-xs text-[#D5BFA0]">
+              <p className="text-xs text-[#D5BFA0] truncate">
                 Documentación formal de {isRental ? 'Alquiler' : 'Compraventa'} · {operation.propertyTitle}
               </p>
             </div>
@@ -214,14 +214,14 @@ export const ContractRegistrationModal: React.FC<ContractRegistrationModalProps>
             type="button"
             onClick={onClose}
             disabled={isSubmitting}
-            className="p-2 text-[#D5BFA0] hover:text-[#FCFBF7] hover:bg-white/10 rounded-sm transition-colors"
+            className="p-2 text-[#D5BFA0] hover:text-[#FCFBF7] hover:bg-white/10 rounded-sm transition-colors shrink-0"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Scrollable Form Body */}
-        <form onSubmit={handleSubmit} className="overflow-y-auto p-6 space-y-6 flex-1">
+        <form onSubmit={handleSubmit} className="overflow-y-auto p-4 sm:p-6 space-y-5 sm:space-y-6 flex-1">
           {renderProposalSummary()}
           {/* Information Notice */}
           <div className="p-4 bg-[#F8F6F1] border border-[#D5BFA0] rounded-sm flex items-start gap-3">

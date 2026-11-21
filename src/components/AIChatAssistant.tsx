@@ -332,52 +332,52 @@ export const AIChatAssistant: React.FC<AIChatAssistantProps> = ({
     Boolean(currentCriteria.requiredFeatures && currentCriteria.requiredFeatures.length > 0);
 
   return (
-    <div className="w-full h-full flex flex-col bg-[#F8F6F1] overflow-hidden">
+    <div className="w-full h-full min-h-0 flex flex-col bg-[#F8F6F1] overflow-hidden">
       {/* 1. Header Superior Full-Width Diferenciado del Nav */}
-      <header className="bg-[#173B43] text-[#F4EFE6] border-b border-[#D5BFA0]/50 px-4 sm:px-8 py-3.5 flex items-center justify-between gap-4 shrink-0 shadow-md">
-        <div className="flex items-center gap-3.5">
-          <div className="relative">
-           <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-full overflow-hidden bg-[#F8F6F1] flex items-center justify-center shadow-sm shrink-0">
-        <img 
-          src={CLARA_AVATAR_URL} 
-          alt="Clara Asesora" 
-          className="w-full h-full object-cover" // <-- Estas clases ajustan la imagen
-        />
-      </div>
+      <header className="bg-[#173B43] text-[#F4EFE6] border-b border-[#D5BFA0]/50 px-3 sm:px-8 py-2.5 sm:py-3.5 flex items-center justify-between gap-2 sm:gap-4 shrink-0 shadow-md">
+        <div className="flex items-center gap-2.5 sm:gap-3.5 min-w-0 flex-1">
+          <div className="relative shrink-0">
+            <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-full overflow-hidden bg-[#F8F6F1] flex items-center justify-center shadow-sm shrink-0">
+              <img 
+                src={CLARA_AVATAR_URL} 
+                alt="Clara Asesora" 
+                className="w-full h-full object-cover"
+              />
+            </div>
             <span
-              className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-emerald-400 border-2 border-[#173B43] rounded-full"
+              className="absolute bottom-0 right-0 w-3 h-3 sm:w-3.5 sm:h-3.5 bg-emerald-400 border-2 border-[#173B43] rounded-full"
               title="En línea · Asesoramiento en tiempo real"
             />
           </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-lg sm:text-2xl font-serif-display font-semibold text-[#F4EFE6]">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2 min-w-0">
+              <h1 className="text-sm sm:text-xl md:text-2xl font-serif-display font-semibold text-[#F4EFE6] truncate">
                 Clara · Asesora Inmobiliaria
               </h1>
-              <span className="text-[10px] bg-[#2B2B2B]/40 text-emerald-200 border border-emerald-500/50 px-2 py-0.5 rounded-full font-medium hidden sm:inline">
+              <span className="text-[10px] bg-[#2B2B2B]/40 text-emerald-200 border border-emerald-500/50 px-2 py-0.5 rounded-full font-medium hidden md:inline shrink-0">
                 En línea
               </span>
             </div>
-            <p className="text-xs text-[#F4EFE6]/80 line-clamp-1">
+            <p className="hidden sm:block text-xs text-[#F4EFE6]/80 truncate">
               Asesoramiento personalizado en tiempo real · Consultá propiedades, zonas, requisitos y visitas
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+        <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
           <button
             type="button"
             onClick={handleResetConversation}
-            className="px-3 py-2 text-xs uppercase tracking-wider font-semibold text-[#F4EFE6] bg-[#173B43] hover:bg-[#3d4538] border border-[#D5BFA0]/60 rounded-sm transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs"
+            className="px-2.5 sm:px-3 py-2 min-h-[38px] text-[11px] sm:text-xs uppercase tracking-wider font-semibold text-[#F4EFE6] bg-[#173B43] hover:bg-[#3d4538] border border-[#D5BFA0]/60 rounded-sm transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs whitespace-nowrap"
             title="Reiniciar diálogo"
           >
-            <RotateCcw className="w-3.5 h-3.5" />
+            <RotateCcw className="w-3.5 h-3.5 shrink-0" />
             <span className="hidden sm:inline">Nueva charla</span>
           </button>
           <button
             type="button"
             onClick={onGoToCatalog}
-            className="px-3.5 py-2 text-xs uppercase tracking-wider font-semibold text-[#173B43] bg-[#F8F6F1] hover:bg-[#D6CBB8] rounded-sm transition-colors cursor-pointer shadow-xs"
+            className="px-2.5 sm:px-3.5 py-2 min-h-[38px] text-[11px] sm:text-xs uppercase tracking-wider font-semibold text-[#173B43] bg-[#F8F6F1] hover:bg-[#D6CBB8] rounded-sm transition-colors cursor-pointer shadow-xs whitespace-nowrap"
           >
             Catálogo
           </button>
@@ -386,10 +386,10 @@ export const AIChatAssistant: React.FC<AIChatAssistantProps> = ({
 
       {/* 2. Barra de Preferencias Recordadas (Full-Width, compacta) */}
       {hasActiveCriteria && (
-        <div className="bg-[#F8F6F1] border-b border-[#D5BFA0] px-4 sm:px-8 py-2.5 text-xs flex flex-wrap items-center justify-between gap-2 shrink-0 animate-fade-slide">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="font-semibold text-[#173B43] uppercase tracking-wider text-[11px] flex items-center gap-1.5">
-              <Info className="w-3.5 h-3.5 text-[#C87955]" />
+        <div className="bg-[#F8F6F1] border-b border-[#D5BFA0] px-3 sm:px-8 py-2 text-xs flex flex-wrap items-center justify-between gap-2 shrink-0 max-h-24 overflow-y-auto animate-fade-slide">
+          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 min-w-0">
+            <span className="font-semibold text-[#173B43] uppercase tracking-wider text-[10px] sm:text-[11px] flex items-center gap-1.5">
+              <Info className="w-3.5 h-3.5 text-[#C87955] shrink-0" />
               Preferencias activas:
             </span>
             {currentCriteria.operationType && (
@@ -430,17 +430,17 @@ export const AIChatAssistant: React.FC<AIChatAssistantProps> = ({
       )}
 
       {/* 3. Área Principal de Mensajes en Pantalla Completa (Scrollable) */}
-      <div className="flex-1 overflow-y-auto px-4 sm:px-8 py-6 w-full">
-        <div className="max-w-4xl mx-auto space-y-6">
+      <div className="flex-1 min-h-0 overflow-y-auto px-3 sm:px-8 py-4 sm:py-6 w-full">
+        <div className="max-w-4xl mx-auto space-y-4 sm:space-y-6">
           {messages.map((msg) => {
             const isUser = msg.role === 'user';
             return (
               <div
                 key={msg.id}
-                className={`flex gap-3.5 ${isUser ? 'justify-end' : 'justify-start'}`}
+                className={`flex gap-2 sm:gap-3.5 min-w-0 ${isUser ? 'justify-end' : 'justify-start'}`}
               >
                 {!isUser && (
-                  <div className="w-9 h-9 rounded-full overflow-hidden border border-[#D5BFA0] shrink-0 shadow-xs mt-1 bg-[#173B43]">
+                  <div className="w-7 h-7 sm:w-9 sm:h-9 rounded-full overflow-hidden border border-[#D5BFA0] shrink-0 shadow-xs mt-1 bg-[#173B43]">
                     <img
                       src={CLARA_AVATAR_URL}
                       alt="Clara Asesora"
@@ -450,20 +450,20 @@ export const AIChatAssistant: React.FC<AIChatAssistantProps> = ({
                 )}
 
                 <div
-                  className={`space-y-3 w-full max-w-[92%] sm:max-w-[85%] ${
+                  className={`space-y-3 min-w-0 w-full max-w-[90%] sm:max-w-[85%] ${
                     isUser ? 'items-end' : 'items-start'
                   }`}
                 >
                   {/* Globo de Texto */}
                   <div
-                    className={`rounded-2xl p-4 sm:p-5 text-sm leading-relaxed transition-all ${
+                    className={`rounded-2xl p-3.5 sm:p-5 text-sm leading-relaxed transition-all break-words [overflow-wrap:anywhere] ${
                       isUser
                         ? 'bg-[#173B43] text-white shadow-xs ml-auto'
                         : 'bg-white text-[#303638] border border-[#D5BFA0] shadow-2xs'
                     }`}
                   >
                     {!isUser && (
-                      <div className="flex items-center justify-between gap-2 pb-1.5 border-b border-[#D5BFA0]/50 mb-2">
+                      <div className="flex flex-wrap items-center justify-between gap-2 pb-1.5 border-b border-[#D5BFA0]/50 mb-2">
                         <span className="text-[11px] font-bold uppercase tracking-wider text-[#173B43]">
                           Clara · Asesora Inmobiliaria
                         </span>
@@ -473,7 +473,7 @@ export const AIChatAssistant: React.FC<AIChatAssistantProps> = ({
                       </div>
                     )}
 
-                    <div className="whitespace-pre-line text-[14.5px]">
+                    <div className="whitespace-pre-line text-[13.5px] sm:text-[14.5px]">
                       {msg.content}
                     </div>
 
@@ -486,15 +486,15 @@ export const AIChatAssistant: React.FC<AIChatAssistantProps> = ({
 
                   {/* 1. SECCIÓN DE COINCIDENCIAS DESTACADAS */}
                   {!isUser && msg.exactMatches && msg.exactMatches.length > 0 && (
-                    <div className="space-y-3 pt-2">
-                      <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-[#173B43] bg-[#F8F6F1] border border-[#D5BFA0] px-3.5 py-2 rounded-sm">
+                    <div className="space-y-3 pt-1 sm:pt-2 min-w-0">
+                      <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-[#173B43] bg-[#F8F6F1] border border-[#D5BFA0] px-3 py-2 rounded-sm">
                         <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
                         <span>
                           Coincidencias encontradas ({msg.exactMatches.length})
                         </span>
                       </div>
 
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                         {msg.exactMatches.map((prop) => (
                           <div
                             key={prop.id}
@@ -574,15 +574,15 @@ export const AIChatAssistant: React.FC<AIChatAssistantProps> = ({
 
                   {/* 2. SECCIÓN DE OPCIONES SUGERIDAS (Alternativas con nota humana) */}
                   {!isUser && msg.alternativeMatches && msg.alternativeMatches.length > 0 && (
-                    <div className="space-y-3 pt-2">
-                      <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-amber-900 bg-amber-50 border border-amber-300 px-3.5 py-2 rounded-sm">
+                    <div className="space-y-3 pt-1 sm:pt-2 min-w-0">
+                      <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-amber-900 bg-amber-50 border border-amber-300 px-3 py-2 rounded-sm">
                         <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
                         <span>
                           Opciones sugeridas para tener en cuenta ({msg.alternativeMatches.length})
                         </span>
                       </div>
 
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                         {msg.alternativeMatches.map((alt) => {
                           const prop = alt.property;
                           return (
@@ -690,36 +690,36 @@ export const AIChatAssistant: React.FC<AIChatAssistantProps> = ({
       </div>
 
       {/* 4. Barra de Entrada Destacada con Fondo Elegante */}
-      <footer className="w-full bg-gradient-to-t from-[#EAE2D5] via-[#F4EFE6] to-[#F4EFE6] border-t-2 border-[#D5BFA0] p-4 sm:p-5 shrink-0 sticky bottom-0 z-10 shadow-lg">
-        <div className="max-w-4xl mx-auto space-y-2.5">
+      <footer className="w-full bg-gradient-to-t from-[#EAE2D5] via-[#F4EFE6] to-[#F4EFE6] border-t-2 border-[#D5BFA0] px-3 py-2.5 sm:p-5 shrink-0 z-10 shadow-lg">
+        <div className="max-w-4xl mx-auto space-y-2">
           <form
             onSubmit={(e) => {
               e.preventDefault();
               handleSendMessage();
             }}
-            className="card-floating bg-white border-2 border-[#D5BFA0] hover:border-[#173B43]/60 focus-within:border-[#173B43] focus-within:ring-4 focus-within:ring-[#173B43]/15 rounded-2xl p-2 sm:p-2.5 shadow-md flex items-center gap-3 transition-all"
+            className="card-floating bg-white border-2 border-[#D5BFA0] hover:border-[#173B43]/60 focus-within:border-[#173B43] focus-within:ring-4 focus-within:ring-[#173B43]/15 rounded-xl sm:rounded-2xl p-1.5 sm:p-2.5 shadow-md flex items-center gap-2 sm:gap-3 transition-all"
           >
             <input
               ref={inputRef}
               type="text"
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
-              placeholder="Escribile a Clara (ej: Busco casa en alquiler en Belgrano de aprox 2000 usd)..."
+              placeholder="Escribile a Clara (ej: casa en Belgrano)..."
               disabled={isLoading}
-              className="flex-1 px-3 py-2 text-sm bg-transparent text-[#303638] focus:outline-none placeholder:text-[#303638]/50 font-medium disabled:opacity-60"
+              className="flex-1 min-w-0 px-2.5 sm:px-3 py-2 text-base sm:text-sm bg-transparent text-[#303638] focus:outline-none placeholder:text-[#303638]/50 font-medium disabled:opacity-60"
             />
             <button
               type="submit"
               disabled={isLoading || !inputValue.trim()}
-              className="px-6 py-3 text-xs uppercase tracking-wider font-bold text-white bg-[#173B43] hover:bg-[#122e35] rounded-xl transition-all flex items-center gap-2 shrink-0 cursor-pointer disabled:opacity-40 shadow-xs"
+              className="px-3.5 sm:px-6 py-2.5 sm:py-3 min-h-[42px] text-xs uppercase tracking-wider font-bold text-white bg-[#173B43] hover:bg-[#122e35] rounded-lg sm:rounded-xl transition-all flex items-center gap-1.5 sm:gap-2 shrink-0 cursor-pointer disabled:opacity-40 shadow-xs"
             >
-              <span>Enviar</span>
-              <Send className="w-3.5 h-3.5" />
+              <span className="hidden xs:inline sm:inline">Enviar</span>
+              <Send className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
             </button>
           </form>
-          <div className="flex items-center justify-between text-[11px] text-[#303638]/75 px-1.5 font-medium">
+          <div className="hidden sm:flex items-center justify-between text-[11px] text-[#303638]/75 px-1.5 font-medium">
             <span>Presioná Enter para enviar. Consultale sobre características, barrios, visitas y presupuestos.</span>
-            <span className="hidden sm:inline text-[#173B43] font-semibold">Curaduría ClaveHogar · Clara</span>
+            <span className="text-[#173B43] font-semibold">Curaduría ClaveHogar · Clara</span>
           </div>
         </div>
       </footer>

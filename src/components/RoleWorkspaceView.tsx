@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import {
   Plus,
@@ -351,6 +351,10 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
   const [activeContractModalOp, setActiveContractModalOp] = useState<OperationItem | null>(null);
   const [selectedChatId, setSelectedChatId] = useState<string | null>(null);
   const [isChatFullscreen, setIsChatFullscreen] = useState(false);
+  const [isMobileViewport, setIsMobileViewport] = useState<boolean>(() =>
+    typeof window !== 'undefined' ? window.innerWidth < 768 : false
+  );
+  const chatMessagesContainerRef = useRef<HTMLDivElement | null>(null);
   const [replyDrafts, setReplyDrafts] = useState<Record<string, string>>({});
   const [rescheduleDates, setRescheduleDates] = useState<Record<string, string>>({});
   const [rescheduleSlots, setRescheduleSlots] = useState<Record<string, string>>({});
@@ -489,6 +493,64 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
       i.agentId === currentUser.uid &&
       myAssignedProperties.some((p) => p.id === i.propertyId)
   );
+
+  const isChatViewActive =
+    activeSubView === 'cliente_consultas' ||
+    activeSubView === 'propietario_consultas' ||
+    activeSubView === 'agente_consultas';
+
+  const activeChatThread = isChatViewActive && selectedChatId
+    ? (activeSubView === 'cliente_consultas'
+        ? clientInquiries
+        : activeSubView === 'propietario_consultas'
+        ? ownerInquiries
+        : agentInquiries
+      ).find((t) => t.id === selectedChatId) || null
+    : null;
+
+  const isAnyFullscreenChatActive = Boolean(
+    activeChatThread && (isChatFullscreen || isMobileViewport)
+  );
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.matchMedia) return;
+    const mq = window.matchMedia('(max-width: 767px)');
+    const update = () => setIsMobileViewport(mq.matches);
+    update();
+    mq.addEventListener('change', update);
+    return () => mq.removeEventListener('change', update);
+  }, []);
+
+  useEffect(() => {
+    if (!isChatViewActive) {
+      setSelectedChatId(null);
+      setIsChatFullscreen(false);
+    }
+  }, [isChatViewActive]);
+
+  useEffect(() => {
+    if (!isAnyFullscreenChatActive || typeof document === 'undefined') return;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [isAnyFullscreenChatActive]);
+
+  const activeChatMessageCount = activeChatThread
+    ? activeChatThread.messages?.length || (activeChatThread.reply ? 2 : 1)
+    : 0;
+
+  useEffect(() => {
+    if (!activeChatThread) return;
+    const id = window.requestAnimationFrame(() => {
+      const container = chatMessagesContainerRef.current;
+      if (container) {
+        container.scrollTop = container.scrollHeight;
+      }
+    });
+    return () => window.cancelAnimationFrame(id);
+  }, [activeChatThread?.id, activeChatMessageCount, isChatFullscreen, isMobileViewport]);
 
   const clientOperations = allOperations.filter((o) => o.clientId === currentUser.uid);
   const ownerOperations = allOperations.filter((o) => o.ownerId === currentUser.uid);
@@ -638,53 +700,60 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
                 : []),
             ];
 
-      return (
+      const useFullscreenChat = isChatFullscreen || isMobileViewport;
+
+      const chatPanel = (
         <div
           className={
-            isChatFullscreen
-              ? 'fixed inset-0 z-50 bg-[#F8F6F1] p-4 sm:p-8 flex flex-col animate-fade-slide'
-              : 'card-floating bg-white border-2 border-[#D5BFA0] rounded-2xl overflow-hidden flex flex-col min-h-[580px] shadow-sm'
+            useFullscreenChat
+              ? 'fixed inset-0 z-50 w-full bg-[#F8F6F1] p-0 md:p-6 flex flex-col overflow-hidden'
+              : 'card-floating bg-white border-2 border-[#D5BFA0] rounded-2xl overflow-hidden flex flex-col h-[78dvh] min-h-[420px] max-h-[680px] shadow-sm'
           }
         >
-          <div className="px-6 py-4 bg-[#173B43] text-white flex flex-wrap items-center justify-between gap-4 shrink-0 rounded-t-xl">
-            <div className="flex items-center gap-4">
+          <div
+            className={`px-3 md:px-6 py-2.5 md:py-4 bg-[#173B43] text-white flex items-center justify-between gap-2 md:gap-4 shrink-0 ${
+              useFullscreenChat ? 'rounded-none md:rounded-t-xl' : 'rounded-t-xl'
+            }`}
+          >
+            <div className="flex items-center gap-2 md:gap-4 min-w-0 flex-1">
               <button
                 type="button"
                 onClick={() => {
                   setSelectedChatId(null);
                   setIsChatFullscreen(false);
                 }}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-white/10 hover:bg-white/20 text-white rounded-xl border border-white/20 transition-colors cursor-pointer"
+                className="inline-flex items-center gap-1.5 px-2.5 md:px-3 py-1.5 min-h-[38px] text-xs font-semibold bg-white/10 hover:bg-white/20 text-white rounded-xl border border-white/20 transition-colors cursor-pointer shrink-0"
               >
-                <ArrowLeft className="w-4 h-4" />
-                Volver a conversaciones
+                <ArrowLeft className="w-4 h-4 shrink-0" />
+                <span className="md:hidden">Volver</span>
+                <span className="hidden md:inline">Volver a conversaciones</span>
               </button>
-              <div>
-                <div className="text-[11px] uppercase tracking-wider text-[#D6CBB8]">
+              <div className="min-w-0 flex-1">
+                <div className="text-[10px] md:text-[11px] uppercase tracking-wider text-[#D6CBB8] truncate">
                   {counterpartRoleLabel} · {activeInquiry.propertyTitle}
                 </div>
-                <h2 className="text-lg font-serif-display font-semibold text-white">
+                <h2 className="text-sm md:text-lg font-serif-display font-semibold text-white truncate">
                   Conversación con {counterpartName}
                 </h2>
               </div>
             </div>
 
-            <div className="flex items-center gap-2.5">
-              {/* Fullscreen toggle button requested by user */}
+            <div className="flex items-center gap-2 shrink-0">
+              {/* Opción de Normal / Pantalla completa solo disponible en tablet y PC */}
               <button
                 type="button"
                 onClick={() => setIsChatFullscreen((prev) => !prev)}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-white/10 hover:bg-white/20 text-white rounded-xl border border-white/20 transition-colors cursor-pointer"
+                className="hidden md:inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-white/10 hover:bg-white/20 text-white rounded-xl border border-white/20 transition-colors cursor-pointer"
                 title={isChatFullscreen ? 'Volver a vista normal' : 'Hablar en pantalla completa'}
               >
                 {isChatFullscreen ? (
                   <>
-                    <Minimize2 className="w-3.5 h-3.5" />
+                    <Minimize2 className="w-3.5 h-3.5 shrink-0" />
                     <span>Volver a vista normal</span>
                   </>
                 ) : (
                   <>
-                    <Maximize2 className="w-3.5 h-3.5" />
+                    <Maximize2 className="w-3.5 h-3.5 shrink-0" />
                     <span>Pantalla completa</span>
                   </>
                 )}
@@ -694,35 +763,35 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
                 <button
                   type="button"
                   onClick={() => onSelectProperty(prop)}
-                  className="px-3.5 py-1.5 text-xs font-semibold bg-[#C87955] hover:bg-[#b56b49] text-white rounded-xl transition-colors cursor-pointer shadow-xs"
+                  className="px-2.5 md:px-3.5 py-1.5 min-h-[38px] text-xs font-semibold bg-[#C87955] hover:bg-[#b56b49] text-white rounded-xl transition-colors cursor-pointer shadow-xs shrink-0"
                 >
-                  Ver Ficha de la Propiedad
+                  <span className="md:hidden">Ver ficha</span>
+                  <span className="hidden md:inline">Ver Ficha de la Propiedad</span>
                 </button>
               )}
             </div>
           </div>
 
           <div
-            className={`flex-1 p-6 space-y-4 overflow-y-auto bg-[#F8F6F1]/40 ${
-              isChatFullscreen ? 'min-h-0' : 'max-h-[480px]'
-            }`}
+            ref={chatMessagesContainerRef}
+            className="flex-1 min-h-0 p-3 md:p-6 space-y-3 md:space-y-4 overflow-y-auto overscroll-contain bg-[#F8F6F1]/40"
           >
             {messagesList.map((msg) => {
               const isMine = msg.senderId === currentUser.uid;
               return (
                 <div
                   key={msg.id}
-                  className={`flex flex-col ${isMine ? 'items-end' : 'items-start'}`}
+                  className={`flex flex-col min-w-0 ${isMine ? 'items-end' : 'items-start'}`}
                 >
                   <div
-                    className={`max-w-xl p-4 rounded-2xl text-sm space-y-1.5 shadow-2xs ${
+                    className={`max-w-[88%] sm:max-w-xl min-w-0 p-3 sm:p-4 rounded-2xl text-sm space-y-1.5 shadow-2xs ${
                       isMine
                         ? 'bg-[#173B43] text-white'
                         : 'bg-white border-2 border-[#D5BFA0] text-[#303638]'
                     }`}
                   >
                     <div
-                      className={`flex items-center justify-between gap-6 text-[11px] ${
+                      className={`flex flex-wrap items-center justify-between gap-x-4 gap-y-0.5 text-[11px] ${
                         isMine ? 'text-[#D6CBB8]' : 'text-[#303638]/70'
                       }`}
                     >
@@ -731,7 +800,9 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
                       </span>
                       <span className="font-tabular">{msg.timestamp}</span>
                     </div>
-                    <p className="leading-relaxed">{msg.text}</p>
+                    <p className="leading-relaxed break-words [overflow-wrap:anywhere] whitespace-pre-wrap">
+                      {msg.text}
+                    </p>
                   </div>
                 </div>
               );
@@ -756,7 +827,9 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
               await onSendChatMessage(targetProp, txt, activeInquiry.id);
               setReplyDrafts((prev) => ({ ...prev, [activeInquiry.id]: '' }));
             }}
-            className="p-4 bg-white border-t border-[#D5BFA0] flex gap-3 shrink-0"
+            className={`w-full p-2.5 md:p-4 bg-white border-t border-[#D5BFA0] flex items-center gap-2 md:gap-3 shrink-0 z-20 ${
+              useFullscreenChat ? 'md:rounded-b-xl' : ''
+            }`}
           >
             <input
               type="text"
@@ -765,37 +838,43 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
                 setReplyDrafts((prev) => ({ ...prev, [activeInquiry.id]: e.target.value }))
               }
               placeholder={`Escribir mensaje a ${counterpartName}...`}
-              className="flex-1 px-4 py-2.5 text-sm bg-[#F8F6F1]/60 border border-[#D5BFA0] rounded-xl text-[#303638] focus:outline-none focus:border-[#173B43]"
+              className="min-w-0 flex-1 px-3 md:px-4 py-2.5 text-base md:text-sm bg-[#F8F6F1]/60 border border-[#D5BFA0] rounded-xl text-[#303638] focus:outline-none focus:border-[#173B43]"
             />
             <button
               type="submit"
-              className="inline-flex items-center gap-2 px-6 py-2.5 text-xs uppercase tracking-wider font-semibold text-white bg-[#173B43] hover:bg-[#122e35] rounded-xl transition-colors cursor-pointer shadow-xs"
+              className="inline-flex items-center justify-center gap-1.5 md:gap-2 px-3.5 md:px-6 py-2.5 min-h-[42px] text-xs uppercase tracking-wider font-semibold text-white bg-[#173B43] hover:bg-[#122e35] rounded-xl transition-colors cursor-pointer shadow-xs shrink-0"
             >
-              <Send className="w-3.5 h-3.5" />
-              Enviar
+              <Send className="w-3.5 h-3.5 shrink-0" />
+              <span>Enviar</span>
             </button>
           </form>
         </div>
       );
+
+      if (useFullscreenChat && typeof document !== 'undefined') {
+        return createPortal(chatPanel, document.body);
+      }
+
+      return chatPanel;
     }
 
     return (
-      <div className="bg-[#FCFBF7] border border-[#D5BFA0] rounded-sm p-6 space-y-6">
+      <div className="bg-[#FCFBF7] border border-[#D5BFA0] rounded-sm p-4 sm:p-6 space-y-5 sm:space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#D5BFA0] pb-4">
           <div>
             <span className="text-[11px] uppercase tracking-[0.2em] text-[#B86F52] font-semibold block">
               Bandeja de Mensajes
             </span>
-            <h2 className="text-2xl font-serif-display font-semibold text-[#173B43]">
+            <h2 className="text-xl sm:text-2xl font-serif-display font-semibold text-[#173B43]">
               {isManagerView
                 ? 'Clientes y Consultas Recibidas'
                 : 'Mis Conversaciones con Propietarios y Agentes'}
             </h2>
             <p className="text-xs text-[#173B43]/75 mt-0.5">
-              Seleccioná una persona o consulta de la lista para abrir la pantalla completa del chat.
+              Seleccioná una persona o consulta de la lista para abrir el chat.
             </p>
           </div>
-          <span className="text-xs font-tabular text-[#173B43]/70">
+          <span className="text-xs font-tabular text-[#173B43]/70 shrink-0">
             {threads.length} {threads.length === 1 ? 'conversación' : 'conversaciones'}
           </span>
         </div>
@@ -848,10 +927,10 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
                     setSelectedChatId(inq.id);
                     setIsChatFullscreen(true);
                   }}
-                  className="w-full p-5 text-left hover:bg-[#F8F6F1] transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-4 group"
+                  className="w-full p-3.5 sm:p-5 text-left hover:bg-[#F8F6F1] transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 group min-w-0"
                 >
-                  <div className="flex items-start gap-4 min-w-0">
-                    <div className="w-11 h-11 rounded-full overflow-hidden bg-[#173B43] text-[#FCFBF7] flex items-center justify-center font-serif-display font-semibold text-lg shrink-0">
+                  <div className="flex items-start gap-3 sm:gap-4 min-w-0 flex-1">
+                    <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-full overflow-hidden bg-[#173B43] text-[#FCFBF7] flex items-center justify-center font-serif-display font-semibold text-base sm:text-lg shrink-0">
                       {personProfile?.photoUrl ? (
                         <img
                           src={personProfile.photoUrl}
@@ -862,12 +941,12 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
                         personName.charAt(0).toUpperCase()
                       )}
                     </div>
-                    <div className="space-y-1 min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="text-base font-semibold text-[#1F241F] group-hover:text-[#173B43]">
+                    <div className="space-y-1 min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+                        <span className="text-sm sm:text-base font-semibold text-[#1F241F] group-hover:text-[#173B43]">
                           {personName}
                         </span>
-                        <span className="text-[11px] uppercase tracking-wider px-2 py-0.5 bg-[#F8F6F1] border border-[#D5BFA0] text-[#173B43] rounded-sm">
+                        <span className="text-[10px] sm:text-[11px] uppercase tracking-wider px-2 py-0.5 bg-[#F8F6F1] border border-[#D5BFA0] text-[#173B43] rounded-sm">
                           {personRole}
                         </span>
                         <span
@@ -879,18 +958,18 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
                         >
                           {inq.status === 'respondida' ? 'Respondida' : 'En revisión / Pendiente'}
                         </span>
-                        <span className="text-xs text-[#B86F52] font-medium truncate">
+                        <span className="text-xs text-[#B86F52] font-medium truncate max-w-full">
                           · {inq.propertyTitle}
                         </span>
                       </div>
-                      <p className="text-xs text-[#173B43]/80 line-clamp-1">
+                      <p className="text-xs text-[#173B43]/80 line-clamp-2 sm:line-clamp-1 break-words">
                         Último mensaje: “{lastMessage.text}”
                       </p>
                     </div>
                   </div>
 
-                  <div className="flex items-center justify-between sm:justify-end gap-4 shrink-0 border-t sm:border-t-0 pt-2 sm:pt-0 border-[#D5BFA0]/40">
-                    <div className="text-right">
+                  <div className="flex items-center justify-between sm:justify-end gap-4 shrink-0 border-t sm:border-t-0 pt-2.5 sm:pt-0 border-[#D5BFA0]/40">
+                    <div className="text-left sm:text-right">
                       <div className="text-[11px] font-tabular text-[#173B43]/70">
                         {lastMessage.timestamp}
                       </div>
@@ -939,7 +1018,7 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
       <div
         className={`${
           isFullPage
-            ? 'bg-[#FCFBF7] border border-[#D5BFA0] rounded-sm p-6 space-y-6'
+            ? 'bg-[#FCFBF7] border border-[#D5BFA0] rounded-sm p-4 sm:p-6 space-y-5 sm:space-y-6'
             : 'pt-6 border-t border-[#D5BFA0] space-y-6'
         }`}
       >
@@ -948,7 +1027,7 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
             <span className="text-[11px] uppercase tracking-[0.2em] text-[#B86F52] font-semibold block">
               Supervisión de Transacciones
             </span>
-            <h2 className="text-2xl font-serif-display font-semibold text-[#173B43]">
+            <h2 className="text-xl sm:text-2xl font-serif-display font-semibold text-[#173B43]">
               Historial y Detalles de Operaciones
             </h2>
             <p className="text-xs text-[#173B43]/75 mt-0.5">
@@ -957,11 +1036,11 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
           </div>
 
           {/* Botones de filtro de propiedades por estado de operación ubicados debajo del texto */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 w-full">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-1.5 sm:gap-2 w-full">
             <button
               type="button"
               onClick={() => setAdminOpFilter('todos')}
-              className={`px-3 py-2.5 text-xs font-bold rounded-sm border transition-colors flex items-center justify-center gap-1.5 cursor-pointer text-center ${
+              className={`px-2 py-1.5 sm:px-3 sm:py-2.5 text-[11px] sm:text-xs font-bold rounded-lg sm:rounded-sm border transition-colors flex items-center justify-center gap-1 sm:gap-1.5 cursor-pointer text-center ${
                 adminOpFilter === 'todos'
                   ? 'bg-[#173B43] text-[#FCFBF7] border-[#173B43] shadow-xs'
                   : 'bg-[#F8F6F1] text-[#173B43] border-[#D5BFA0] hover:bg-[#D5BFA0]/40'
@@ -972,49 +1051,49 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
             <button
               type="button"
               onClick={() => setAdminOpFilter('concretadas')}
-              className={`px-3 py-2.5 text-xs font-bold rounded-sm border transition-colors flex items-center justify-center gap-1.5 cursor-pointer text-center ${
+              className={`px-2 py-1.5 sm:px-3 sm:py-2.5 text-[11px] sm:text-xs font-bold rounded-lg sm:rounded-sm border transition-colors flex items-center justify-center gap-1 sm:gap-1.5 cursor-pointer text-center ${
                 adminOpFilter === 'concretadas'
                   ? 'bg-[#173B43] text-white border-[#173B43] shadow-xs'
                   : 'bg-[#F8F6F1] text-[#173B43] border-[#D5BFA0] hover:bg-[#D5BFA0]/30'
               }`}
             >
-              <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+              <CheckCircle2 className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0" />
               <span className="truncate">Concretadas ({adminConcretadas.length})</span>
             </button>
             <button
               type="button"
               onClick={() => setAdminOpFilter('aceptadas')}
-              className={`px-3 py-2.5 text-xs font-bold rounded-sm border transition-colors flex items-center justify-center gap-1.5 cursor-pointer text-center ${
+              className={`px-2 py-1.5 sm:px-3 sm:py-2.5 text-[11px] sm:text-xs font-bold rounded-lg sm:rounded-sm border transition-colors flex items-center justify-center gap-1 sm:gap-1.5 cursor-pointer text-center ${
                 adminOpFilter === 'aceptadas'
                   ? 'bg-amber-600 text-white border-amber-700 shadow-xs'
                   : 'bg-amber-50 text-amber-900 border-amber-300 hover:bg-amber-100'
               }`}
             >
-              <Check className="w-3.5 h-3.5 shrink-0" />
+              <Check className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0" />
               <span className="truncate">Propuesta Aceptada ({adminAceptadas.length})</span>
             </button>
             <button
               type="button"
               onClick={() => setAdminOpFilter('negociacion')}
-              className={`px-3 py-2.5 text-xs font-bold rounded-sm border transition-colors flex items-center justify-center gap-1.5 cursor-pointer text-center ${
+              className={`px-2 py-1.5 sm:px-3 sm:py-2.5 text-[11px] sm:text-xs font-bold rounded-lg sm:rounded-sm border transition-colors flex items-center justify-center gap-1 sm:gap-1.5 cursor-pointer text-center ${
                 adminOpFilter === 'negociacion'
                   ? 'bg-sky-700 text-white border-sky-800 shadow-xs'
                   : 'bg-sky-50 text-sky-900 border-sky-300 hover:bg-sky-100'
               }`}
             >
-              <Clock className="w-3.5 h-3.5 shrink-0" />
+              <Clock className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0" />
               <span className="truncate">En negociación ({adminNegociacion.length})</span>
             </button>
             <button
               type="button"
               onClick={() => setAdminOpFilter('rechazadas')}
-              className={`px-3 py-2.5 text-xs font-bold rounded-sm border transition-colors flex items-center justify-center gap-1.5 cursor-pointer text-center ${
+              className={`col-span-2 sm:col-span-1 px-2 py-1.5 sm:px-3 sm:py-2.5 text-[11px] sm:text-xs font-bold rounded-lg sm:rounded-sm border transition-colors flex items-center justify-center gap-1 sm:gap-1.5 cursor-pointer text-center ${
                 adminOpFilter === 'rechazadas'
                   ? 'bg-rose-700 text-white border-rose-800 shadow-xs'
                   : 'bg-rose-50 text-rose-900 border-rose-300 hover:bg-rose-100'
               }`}
             >
-              <XCircle className="w-3.5 h-3.5 shrink-0" />
+              <XCircle className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0" />
               <span className="truncate">Rechazadas ({adminRechazadas.length})</span>
             </button>
           </div>
@@ -1040,10 +1119,10 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
               return (
                 <div
                   key={op.id}
-                  className="p-5 bg-white border border-[#D5BFA0] rounded-sm space-y-3.5 shadow-xs"
+                  className="p-4 sm:p-5 bg-white border border-[#D5BFA0] rounded-sm space-y-3.5 shadow-xs"
                 >
                   <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 border-b border-[#D5BFA0]/60 pb-3">
-                    <div className="flex items-start gap-3.5">
+                    <div className="flex flex-col sm:flex-row items-start gap-3 sm:gap-3.5 min-w-0">
                       {prop && (
                         <img
                           src={resolvePropertyImageUrl(prop.images[0])}
@@ -1054,10 +1133,10 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
                               e.currentTarget.src = HERO_IMAGE;
                             }
                           }}
-                          className="w-20 h-16 rounded-sm object-cover bg-[#D5BFA0] shrink-0"
+                          className="w-full sm:w-20 h-36 sm:h-16 rounded-sm object-cover bg-[#D5BFA0] shrink-0"
                         />
                       )}
-                      <div className="space-y-1">
+                      <div className="space-y-1 min-w-0">
                         <div className="flex flex-wrap items-center gap-2">
                           <span className="text-[11px] font-bold text-[#B86F52] uppercase tracking-wider">
                             Propuesta de {op.operationType}
@@ -1098,8 +1177,8 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
                       </div>
                     </div>
 
-                    <div className="flex flex-col sm:items-end gap-1">
-                      <div className="text-right">
+                    <div className="flex flex-col sm:items-end gap-1.5">
+                      <div className="text-left sm:text-right">
                         <span className="text-[10px] text-[#173B43]/70 uppercase font-semibold block">
                           Monto Acordado / Propuesto
                         </span>
@@ -1112,7 +1191,7 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
                         <button
                           type="button"
                           onClick={() => onSelectProperty(prop)}
-                          className="px-3 py-1.5 text-xs font-semibold text-[#173B43] bg-[#F8F6F1] border border-[#D5BFA0] hover:bg-[#D5BFA0]/40 rounded-sm inline-flex items-center gap-1 cursor-pointer"
+                          className="px-3 py-1.5 text-xs font-semibold text-[#173B43] bg-[#F8F6F1] border border-[#D5BFA0] hover:bg-[#D5BFA0]/40 rounded-sm inline-flex items-center gap-1 cursor-pointer self-start sm:self-end"
                         >
                           <Eye className="w-3.5 h-3.5" />
                           Ver Ficha de la Propiedad
@@ -1163,7 +1242,7 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
                   {/* Contrato Registrado (Únicamente si la operación está CONCRETADA) */}
                   {normCat === 'concretada' && (op.contractCode || relatedContract) && (
                     <div className="p-3.5 bg-[#F8F6F1] border border-[#D5BFA0] rounded-sm text-xs space-y-1 text-[#173B43]">
-                      <div className="font-bold font-tabular flex items-center justify-between">
+                      <div className="font-bold font-tabular flex flex-wrap items-center justify-between gap-2">
                         <span>
                           Contrato Registrado: #{op.contractCode || relatedContract?.contractCode}
                         </span>
@@ -1177,7 +1256,7 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
                         Fecha de Cierre: {relatedContract?.closingDate || op.createdAtIso.slice(0, 10)}
                       </div>
                       {relatedContract?.signedContractDocRef && (
-                        <div className="text-[11px] font-mono text-[#173B43]">
+                        <div className="text-[11px] font-mono text-[#173B43] break-all">
                           Documento: {relatedContract.signedContractDocRef}
                         </div>
                       )}
@@ -1187,7 +1266,7 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
                   {/* Estado Propuesta Aceptada: sólo se acordó la propuesta, sin contrato definitivo aún */}
                   {normCat === 'aceptada' && (
                     <div className="p-3.5 bg-amber-50/80 border border-amber-300 rounded-sm text-xs space-y-1.5 text-amber-950">
-                      <div className="font-bold flex items-center justify-between">
+                      <div className="font-bold flex flex-wrap items-center justify-between gap-2">
                         <span className="flex items-center gap-1.5 text-amber-900">
                           <Check className="w-3.5 h-3.5 text-amber-700" />
                           Propuesta Aceptada por las Partes
@@ -1211,19 +1290,19 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
   };
 
   return (
-    <section className="max-w-7xl mx-auto px-6 py-10 space-y-8">
+    <section className="max-w-7xl mx-auto px-3.5 sm:px-6 py-6 sm:py-10 space-y-6 sm:space-y-8">
       {/* Role Header Banner ("Mi Espacio") matching Image 2 */}
-      <div className="bg-[#173B43] rounded-2xl p-6 sm:p-8 text-white flex flex-col lg:flex-row lg:items-center justify-between gap-6 shadow-sm relative overflow-hidden">
+      <div className="bg-[#173B43] rounded-2xl p-4 sm:p-8 text-white flex flex-col lg:flex-row lg:items-center justify-between gap-5 sm:gap-6 shadow-sm relative overflow-hidden">
         {/* Subtle decorative background graphic */}
         <div className="absolute -right-16 -top-16 w-80 h-80 rounded-full border border-white/5 pointer-events-none" />
         <div className="absolute -right-24 -top-24 w-96 h-96 rounded-full border border-white/5 pointer-events-none" />
 
-        <div className="flex items-start sm:items-center gap-5 relative z-10">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-5 relative z-10 min-w-0">
           <button
             type="button"
             onClick={onOpenProfileModal}
             title="Hacé clic para cambiar tu foto o editar tu perfil"
-            className="group relative w-18 h-18 rounded-full overflow-hidden bg-[#173B43] text-white border-2 border-white/30 flex items-center justify-center shrink-0 cursor-pointer shadow-sm"
+            className="group relative w-14 h-14 sm:w-18 sm:h-18 rounded-full overflow-hidden bg-[#173B43] text-white border-0 sm:border-2 sm:border-white/30 flex items-center justify-center shrink-0 cursor-pointer shadow-sm"
           >
             {currentUser.photoUrl ? (
               <img
@@ -1232,14 +1311,14 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
                 className="w-full h-full object-cover"
               />
             ) : (
-              <User className="w-8 h-8 text-white" />
+              <User className="w-7 h-7 sm:w-8 sm:h-8 text-white" />
             )}
             <span className="absolute inset-0 bg-black/45 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
               <Camera className="w-5 h-5 text-white" />
             </span>
           </button>
 
-          <div className="space-y-1.5">
+          <div className="space-y-1.5 min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#D6CBB8]">
                 Mi Espacio ·{' '}
@@ -1258,7 +1337,7 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
                 </button>
               )}
             </div>
-            <h1 className="text-2xl sm:text-3xl font-serif-display font-semibold text-white">
+            <h1 className="text-xl sm:text-3xl font-serif-display font-semibold text-white">
               {currentUser.displayName}
             </h1>
             <p className="text-xs sm:text-sm text-[#F4EFE6]/80 max-w-2xl leading-relaxed">
@@ -1275,9 +1354,9 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
           </div>
         </div>
 
-        <div className="relative z-10 shrink-0">
+        <div className="relative z-10 w-full lg:w-auto lg:shrink-0">
           {currentUser.role === 'cliente' && !canActAsOwner && (
-            <div className="bg-white/10 border border-white/20 rounded-xl p-4 max-w-xs space-y-2.5">
+            <div className="bg-white/10 border border-white/20 rounded-xl p-4 w-full lg:max-w-xs space-y-2.5">
               <div className="text-xs font-semibold text-[#D6CBB8]">
                 ¿Querés vender o alquilar tu casa?
               </div>
@@ -1298,7 +1377,7 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
             <button
               type="button"
               onClick={onOpenNewProperty}
-              className="flex items-center gap-2 px-6 py-3.5 text-xs uppercase tracking-wider font-bold text-white bg-[#C87955] hover:bg-[#b56b49] rounded-xl transition-all shadow-sm cursor-pointer whitespace-nowrap"
+              className="w-full sm:w-auto flex items-center justify-center gap-2 px-5 sm:px-6 py-3 sm:py-3.5 text-xs uppercase tracking-wider font-bold text-white bg-[#C87955] hover:bg-[#b56b49] rounded-xl transition-all shadow-sm cursor-pointer whitespace-nowrap"
             >
               <Plus className="w-4 h-4" />
               <span>Publicar en Mis propiedades</span>
@@ -1308,7 +1387,7 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
       </div>
 
       {/* Módulos de Gestión Diferenciados por Rol (Sin scroll horizontal) */}
-      <div className="card-floating bg-white border-2 border-[#D5BFA0] rounded-2xl p-5 sm:p-6 space-y-4 shadow-sm">
+      <div className="card-floating bg-white border-2 border-[#D5BFA0] rounded-2xl p-4 sm:p-6 space-y-4 shadow-sm">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#D5BFA0]/60 pb-3">
           <div>
             <span className="text-[10px] uppercase tracking-[0.2em] text-[#C87955] font-bold block">
@@ -1325,17 +1404,17 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
 
         {/* Si el usuario es Administrador: Panel de Administración arriba justo debajo del título */}
         {currentUser.role === 'administrador' && (
-          <div className="bg-[#F8F6F1]/70 border-2 border-[#D5BFA0] rounded-xl p-4 sm:p-5 space-y-3">
-            <div className="flex items-center justify-between">
+          <div className="bg-[#F8F6F1]/70 border-2 border-[#D5BFA0] rounded-xl p-3.5 sm:p-5 space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-[#173B43]">
-                <ShieldCheck className="w-4 h-4 text-[#173B43]" />
+                <ShieldCheck className="w-4 h-4 text-[#173B43] shrink-0" />
                 <span>Supervisión y Administración General</span>
               </div>
               <span className="text-[10px] font-semibold text-[#173B43]/70 uppercase">
                 Panel de Control ClaveHogar
               </span>
             </div>
-            <div className="flex flex-wrap gap-2.5">
+            <div className="grid grid-cols-2 gap-1.5 sm:flex sm:flex-wrap sm:gap-2.5">
               {[
                 { id: 'admin_dashboard', label: 'Reportes y Métricas' },
                 {
@@ -1371,27 +1450,14 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
                       setSelectedChatId(null);
                       onChangeSubView(item.id as WorkspaceSubView);
                     }}
-                    className={`px-4 py-2.5 text-xs rounded-xl transition-all cursor-pointer flex items-center gap-2 ${
+                    className={`px-2 py-2 sm:px-4 sm:py-2.5 text-[11px] sm:text-xs rounded-lg sm:rounded-xl transition-all cursor-pointer flex items-center justify-center sm:justify-start text-center sm:text-left gap-1.5 sm:gap-2 min-h-[38px] sm:min-h-0 leading-tight ${
                       active
                         ? 'bg-[#173B43] text-white font-semibold shadow-xs border border-[#173B43]'
-                        : 'bg-white hover:bg-[#F8F6F1] text-[#303638] border-2 border-[#D5BFA0] font-medium shadow-2xs'
+                        : 'bg-white hover:bg-[#F8F6F1] text-[#303638] border sm:border-2 border-[#D5BFA0] font-medium shadow-2xs'
                     }`}
                   >
-                    {/* <span>{item.label}</span>
-                    {item.count !== undefined && item.count > 0 && (
-                      <span
-                        className={`text-[10px] font-tabular px-1.5 py-0.2 rounded-full border ${
-                          active
-                            ? 'bg-white/20 text-white border-white/30'
-                            : item.badgeColor || 'bg-[#F8F6F1] text-[#173B43] font-bold border-[#D5BFA0]'
-                        }`}
-                      >
-                        {item.count}
-                      </span>
-                    )}
-                  </button> */}
                    <span>{item.label}</span>
-                      </button>
+                  </button>
                 );
               })}
             </div>
@@ -1400,17 +1466,17 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
 
         {/* Si el usuario es Agente: Gestión Inmobiliaria arriba justo debajo del título */}
         {currentUser.role === 'agente' && (
-          <div className="bg-[#F8F6F1]/70 border-2 border-[#D5BFA0] rounded-xl p-4 sm:p-5 space-y-3">
-            <div className="flex items-center justify-between">
+          <div className="bg-[#F8F6F1]/70 border-2 border-[#D5BFA0] rounded-xl p-3 sm:p-5 space-y-2.5 sm:space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-[#173B43]">
-                <Briefcase className="w-4 h-4 text-[#173B43]" />
+                <Briefcase className="w-4 h-4 text-[#173B43] shrink-0" />
                 <span>Gestión Inmobiliaria</span>
               </div>
               <span className="text-[10px] font-semibold text-[#173B43]/70 uppercase">
                 Cartera y Clientes a Mi Cargo
               </span>
             </div>
-            <div className="flex flex-wrap gap-2.5">
+            <div className="grid grid-cols-2 gap-1.5 sm:flex sm:flex-wrap sm:gap-2">
               {[
                 {
                   id: 'agente_cartera',
@@ -1432,27 +1498,14 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
                       setSelectedChatId(null);
                       onChangeSubView(item.id as WorkspaceSubView);
                     }}
-                    className={`px-4 py-2.5 text-xs rounded-xl transition-all cursor-pointer flex items-center gap-2 ${
+                    className={`px-2 py-2 sm:px-4 sm:py-2.5 text-[11px] sm:text-xs rounded-lg sm:rounded-xl transition-all cursor-pointer flex items-center justify-center sm:justify-start text-center sm:text-left gap-1.5 sm:gap-2 min-h-[38px] sm:min-h-0 leading-tight ${
                       active
                         ? 'bg-[#173B43] text-white font-semibold shadow-xs border border-[#173B43]'
-                        : 'bg-white hover:bg-[#F8F6F1] text-[#303638] border-2 border-[#D5BFA0] font-medium shadow-2xs'
+                        : 'bg-white hover:bg-[#F8F6F1] text-[#303638] border sm:border-2 border-[#D5BFA0] font-medium shadow-2xs'
                     }`}
                   >
-                    {/* <span>{item.label}</span>
-                    {item.count !== undefined && item.count > 0 && (
-                      <span
-                        className={`text-[10px] font-tabular px-1.5 py-0.2 rounded-full border ${
-                          active
-                            ? 'bg-white/20 text-white border-white/30'
-                            : item.badgeColor || 'bg-[#F8F6F1] text-[#173B43] font-bold border-[#D5BFA0]'
-                        }`}
-                      >
-                        {item.badgeLabel || item.count}
-                      </span>
-                    )}
-                  </button> */}
                      <span>{item.label}</span>
-                      </button>
+                  </button>
                 );
               })}
             </div>
@@ -1461,20 +1514,20 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
 
         {/* Funciones de Cliente y Propietario */}
         {(canActAsClient || canActAsOwner) && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4">
             {/* Funciones de Cliente */}
             {canActAsClient && (
-              <div className="bg-[#F8F6F1]/70 border-2 border-[#D5BFA0] rounded-xl p-4 space-y-3">
-                <div className="flex items-center justify-between">
+              <div className="bg-[#F8F6F1]/70 border-2 border-[#D5BFA0] rounded-xl p-3 sm:p-4 space-y-2.5 sm:space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
                   <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-[#173B43]">
-                    <User className="w-3.5 h-3.5 text-[#173B43]" />
+                    <User className="w-3.5 h-3.5 text-[#173B43] shrink-0" />
                     <span>Funciones de Cliente</span>
                   </div>
                   <span className="text-[10px] font-semibold text-[#173B43]/70 uppercase">
                     Búsquedas y Solicitudes
                   </span>
                 </div>
-                <div className="flex flex-wrap gap-2">
+                <div className="grid grid-cols-2 gap-1.5 sm:flex sm:flex-wrap sm:gap-2">
                   {[
                     { id: 'cliente_favoritos', label: 'Mis Favoritos', count: favoriteProperties.length },
                     { id: 'cliente_visitas', label: 'Mis Visitas', count: clientVisits.length },
@@ -1490,25 +1543,12 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
                           setSelectedChatId(null);
                           onChangeSubView(item.id as WorkspaceSubView);
                         }}
-                        className={`px-3.5 py-2 text-xs rounded-xl transition-all cursor-pointer flex items-center gap-2 ${
+                        className={`px-2 py-2 sm:px-3.5 sm:py-2 text-[11px] sm:text-xs rounded-lg sm:rounded-xl transition-all cursor-pointer flex items-center justify-center sm:justify-start text-center sm:text-left gap-1.5 sm:gap-2 min-h-[38px] sm:min-h-0 leading-tight ${
                           active
                             ? 'bg-[#173B43] text-white font-semibold shadow-xs border border-[#173B43]'
-                            : 'bg-white hover:bg-[#F8F6F1] text-[#303638] border-2 border-[#D5BFA0] font-medium shadow-2xs'
+                            : 'bg-white hover:bg-[#F8F6F1] text-[#303638] border sm:border-2 border-[#D5BFA0] font-medium shadow-2xs'
                         }`}
                       >
-                        {/* <span>{item.label}</span>
-                        {item.count > 0 && (
-                          <span
-                            className={`text-[10px] font-tabular px-1.5 py-0.2 rounded-full ${
-                              active
-                                ? 'bg-white/20 text-white'
-                                : 'bg-[#F8F6F1] text-[#173B43] font-bold border border-[#D5BFA0]'
-                            }`}
-                          >
-                            {item.count}
-                          </span>
-                        )}
-                      </button> */}
                        <span>{item.label}</span>
                       </button>
                     );
@@ -1519,17 +1559,17 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
 
             {/* Funciones de Propietario */}
             {canActAsOwner && (
-              <div className="bg-[#F8F6F1]/70 border-2 border-[#D5BFA0] rounded-xl p-4 space-y-3">
-                <div className="flex items-center justify-between">
+              <div className="bg-[#F8F6F1]/70 border-2 border-[#D5BFA0] rounded-xl p-3 sm:p-4 space-y-2.5 sm:space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
                   <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-[#C87955]">
-                    <Building2 className="w-3.5 h-3.5 text-[#C87955]" />
+                    <Building2 className="w-3.5 h-3.5 text-[#C87955] shrink-0" />
                     <span>Funciones de Propietario</span>
                   </div>
                   <span className="text-[10px] font-semibold text-[#C87955]/80 uppercase">
                     Inmuebles y Ofertas
                   </span>
                 </div>
-                <div className="flex flex-wrap gap-2">
+                <div className="grid grid-cols-2 gap-1.5 sm:flex sm:flex-wrap sm:gap-2">
                   {[
                     { id: 'propietario_inmuebles', label: 'Mis propiedades', count: myOwnedProperties.length },
                     { id: 'propietario_visitas', label: 'Visitas Recibidas', count: ownerVisits.length },
@@ -1545,25 +1585,12 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
                           setSelectedChatId(null);
                           onChangeSubView(item.id as WorkspaceSubView);
                         }}
-                        className={`px-3.5 py-2 text-xs rounded-xl transition-all cursor-pointer flex items-center gap-2 ${
+                        className={`px-2 py-2 sm:px-3.5 sm:py-2 text-[11px] sm:text-xs rounded-lg sm:rounded-xl transition-all cursor-pointer flex items-center justify-center sm:justify-start text-center sm:text-left gap-1.5 sm:gap-2 min-h-[38px] sm:min-h-0 leading-tight ${
                           active
                             ? 'bg-[#173B43] text-white font-semibold shadow-xs border border-[#173B43]'
-                            : 'bg-white hover:bg-[#F8F6F1] text-[#303638] border-2 border-[#D5BFA0] font-medium shadow-2xs'
+                            : 'bg-white hover:bg-[#F8F6F1] text-[#303638] border sm:border-2 border-[#D5BFA0] font-medium shadow-2xs'
                         }`}
                       >
-                        {/* <span>{item.label}</span>
-                        {item.count > 0 && (
-                          <span
-                            className={`text-[10px] font-tabular px-1.5 py-0.2 rounded-full ${
-                              active
-                                ? 'bg-white/20 text-white'
-                                : 'bg-[#F8F6F1] text-[#C87955] font-bold border border-[#D5BFA0]'
-                            }`}
-                          >
-                            {item.count}
-                          </span>
-                        )}
-                      </button> */}
                       <span>{item.label}</span>
                       </button>
                     );
@@ -1576,8 +1603,8 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
 
         {/* Soporte para usuarios no admin */}
         {currentUser.role !== 'administrador' && (
-          <div className="flex items-center gap-2 pt-2 border-t border-[#D5BFA0]/60 text-xs">
-            <span className="text-[11px] uppercase tracking-wider text-[#303638]/70 font-semibold">
+          <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-1.5 sm:gap-2 pt-2 border-t border-[#D5BFA0]/60 text-xs">
+            <span className="text-[10px] sm:text-[11px] uppercase tracking-wider text-[#303638]/70 font-semibold">
               Atención y Soporte:
             </span>
             <button
@@ -1586,10 +1613,10 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
                 setSelectedChatId(null);
                 onChangeSubView('reclamos_usuario');
               }}
-              className={`px-3.5 py-1.5 text-xs rounded-xl transition-all cursor-pointer flex items-center gap-1.5 ${
+              className={`w-full sm:w-auto justify-center sm:justify-start px-3 sm:px-3.5 py-2 sm:py-1.5 text-[11px] sm:text-xs rounded-lg sm:rounded-xl transition-all cursor-pointer flex items-center gap-1.5 ${
                 activeSubView === 'reclamos_usuario'
                   ? 'bg-[#173B43] text-white font-semibold shadow-xs'
-                  : 'bg-white text-[#303638] border-2 border-[#D5BFA0] font-medium shadow-2xs hover:bg-[#F8F6F1]'
+                  : 'bg-white text-[#303638] border sm:border-2 border-[#D5BFA0] font-medium shadow-2xs hover:bg-[#F8F6F1]'
               }`}
             >
               <AlertCircle className="w-3.5 h-3.5 text-[#C87955]" />
@@ -1603,9 +1630,9 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
           CLIENTE SCREENS
          ===================================================================== */}
       {activeSubView === 'cliente_favoritos' && canActAsClient && (
-        <div className="card-floating bg-white border-2 border-[#D5BFA0] rounded-2xl p-6 sm:p-8 space-y-6 shadow-sm">
-          <div className="flex items-center justify-between border-b border-[#D5BFA0]/60 pb-4">
-            <h2 className="text-2xl font-serif-display font-semibold text-[#303638]">
+        <div className="card-floating bg-white border-2 border-[#D5BFA0] rounded-2xl p-4 sm:p-8 space-y-5 sm:space-y-6 shadow-sm">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#D5BFA0]/60 pb-4">
+            <h2 className="text-xl sm:text-2xl font-serif-display font-semibold text-[#303638]">
               Mis Propiedades Favoritas
             </h2>
             <span className="text-xs text-[#303638]/70 font-tabular bg-[#F8F6F1] px-3 py-1 rounded-full border border-[#D5BFA0]">
@@ -1617,11 +1644,11 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
               Aún no tenés propiedades guardadas en Favoritos.
             </p>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-2 lg:grid-cols-3 gap-2.5 sm:gap-6">
               {favoriteProperties.map((prop) => (
                 <div
                   key={prop.id}
-                  className="card-floating border-2 border-[#D5BFA0] rounded-2xl overflow-hidden bg-white shadow-2xs flex flex-col justify-between"
+                  className="card-floating border sm:border-2 border-[#D5BFA0] rounded-xl sm:rounded-2xl overflow-hidden bg-white shadow-2xs flex flex-col justify-between min-w-0"
                 >
                   <div>
                     <div className="aspect-[4/3] bg-[#F8F6F1]">
@@ -1637,35 +1664,35 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
                         className="w-full h-full object-cover"
                       />
                     </div>
-                    <div className="p-4 space-y-1.5">
-                      <div className="text-[11px] uppercase tracking-wider text-[#B86F52] font-semibold">
+                    <div className="p-2.5 sm:p-4 space-y-1 sm:space-y-1.5">
+                      <div className="text-[9px] sm:text-[11px] uppercase tracking-wider text-[#B86F52] font-semibold truncate">
                         {prop.propertyType} · {prop.location}
                       </div>
                       <button
                         type="button"
                         onClick={() => onSelectProperty(prop)}
-                        className="text-base font-serif-display font-semibold text-[#1F241F] hover:text-[#173B43] hover:underline text-left line-clamp-1 cursor-pointer block w-full"
+                        className="text-xs sm:text-base font-serif-display font-semibold text-[#1F241F] hover:text-[#173B43] hover:underline text-left line-clamp-2 sm:line-clamp-1 cursor-pointer block w-full leading-tight"
                         title="Ver ficha completa de la propiedad"
                       >
                         {prop.title}
                       </button>
-                      <div className="text-base font-tabular font-semibold text-[#173B43]">
+                      <div className="text-xs sm:text-base font-tabular font-semibold text-[#173B43] truncate">
                         {prop.currency} {prop.price.toLocaleString()}
                       </div>
                     </div>
                   </div>
-                  <div className="px-4 pb-4 flex items-center gap-2">
+                  <div className="px-2.5 pb-2.5 sm:px-4 sm:pb-4 flex items-center gap-1.5 sm:gap-2">
                     <button
                       type="button"
                       onClick={() => onSelectProperty(prop)}
-                      className="flex-1 py-2 px-3 text-xs font-semibold text-[#FCFBF7] bg-[#173B43] rounded-sm hover:bg-[#2c382d]"
+                      className="flex-1 py-1.5 sm:py-2 px-2 sm:px-3 text-[10px] sm:text-xs font-semibold text-[#FCFBF7] bg-[#173B43] rounded-lg sm:rounded-sm hover:bg-[#2c382d] truncate"
                     >
                       Ver Ficha
                     </button>
                     <button
                       type="button"
                       onClick={() => onToggleFavorite(prop.id)}
-                      className="py-2 px-3 text-xs font-semibold text-red-700 bg-red-50 border border-red-300 rounded-sm hover:bg-red-100"
+                      className="py-1.5 sm:py-2 px-2 sm:px-3 text-[10px] sm:text-xs font-semibold text-red-700 bg-red-50 border border-red-300 rounded-lg sm:rounded-sm hover:bg-red-100 shrink-0"
                     >
                       Quitar
                     </button>
@@ -1678,9 +1705,9 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
       )}
 
       {activeSubView === 'cliente_visitas' && canActAsClient && (
-        <div className="card-floating bg-white border-2 border-[#D5BFA0] rounded-2xl p-6 sm:p-8 space-y-5 shadow-sm">
-          <div className="flex items-center justify-between border-b border-[#D5BFA0]/60 pb-4">
-            <h2 className="text-2xl font-serif-display font-semibold text-[#303638]">
+        <div className="card-floating bg-white border-2 border-[#D5BFA0] rounded-2xl p-4 sm:p-8 space-y-5 shadow-sm">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#D5BFA0]/60 pb-4">
+            <h2 className="text-xl sm:text-2xl font-serif-display font-semibold text-[#303638]">
               Mis Solicitudes de Visita
             </h2>
             <span className="text-xs text-[#303638]/70 font-tabular bg-[#F8F6F1] px-3 py-1 rounded-full border border-[#D5BFA0]">
@@ -1692,58 +1719,64 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
               No tenés visitas solicitadas por el momento.
             </p>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse text-sm">
-                <thead>
-                  <tr className="border-b border-[#D5BFA0] text-xs uppercase tracking-wider text-[#173B43]/70">
-                    <th className="py-3 pr-4">Propiedad</th>
-                    <th className="py-3 px-4">Fecha y Horario</th>
-                    <th className="py-3 px-4">Estado</th>
-                    <th className="py-3 px-4">Notas</th>
-                    <th className="py-3 pl-4 text-right">Acción</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[#D5BFA0]/60">
-                  {clientVisits.map((v) => (
-                    <tr key={v.id}>
-                      <td className="py-3.5 pr-4">
-                        {(() => {
-                          const vp = allProperties.find((p) => p.id === v.propertyId);
-                          return vp ? (
+            <>
+              {/* Vista móvil en tarjetas completas sin scroll horizontal */}
+              <div className="md:hidden space-y-3">
+                {clientVisits.map((v) => {
+                  const vp = allProperties.find((p) => p.id === v.propertyId);
+                  return (
+                    <div
+                      key={v.id}
+                      className="p-3.5 bg-[#F8F6F1]/70 border border-[#D5BFA0] rounded-xl space-y-2.5 min-w-0"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0 flex-1">
+                          {vp ? (
                             <button
                               type="button"
                               onClick={() => onSelectProperty(vp)}
-                              className="font-semibold text-[#1F241F] hover:text-[#173B43] hover:underline text-left cursor-pointer block"
+                              className="font-semibold text-sm text-[#1F241F] hover:text-[#173B43] hover:underline text-left cursor-pointer block break-words"
                               title="Ver ficha completa de la propiedad"
                             >
                               {v.propertyTitle}
                             </button>
                           ) : (
-                            <div className="font-semibold text-[#1F241F]">{v.propertyTitle}</div>
-                          );
-                        })()}
-                        {v.status === 'reprogramada' && (
-                          <span className="text-[11px] font-semibold text-amber-900 bg-amber-100/90 px-2 py-0.5 rounded-sm inline-block mt-1 border border-amber-300">
-                            Propietario reprogramó fecha/horario. Por favor aceptá o rechazá.
-                          </span>
-                        )}
-                      </td>
-                      <td className="py-3.5 px-4 font-tabular text-xs text-[#173B43]">
-                        {v.date} · {v.timeSlot}
-                      </td>
-                      <td className="py-3.5 px-4">
+                            <div className="font-semibold text-sm text-[#1F241F] break-words">
+                              {v.propertyTitle}
+                            </div>
+                          )}
+                        </div>
                         <span
-                          className={`inline-block text-[11px] uppercase tracking-wider font-bold px-2.5 py-1 rounded-sm border ${getVisitStatusBadgeClass(
+                          className={`inline-block shrink-0 text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-sm border ${getVisitStatusBadgeClass(
                             v.status
                           )}`}
                         >
                           {v.status}
                         </span>
-                      </td>
-                      <td className="py-3.5 px-4 text-xs text-[#173B43]/75">{v.notes || '—'}</td>
-                      <td className="py-3.5 pl-4 text-right">
+                      </div>
+
+                      {v.status === 'reprogramada' && (
+                        <div className="text-[11px] font-semibold text-amber-900 bg-amber-100/90 px-2.5 py-1.5 rounded-lg border border-amber-300">
+                          Propietario reprogramó fecha/horario. Por favor aceptá o rechazá.
+                        </div>
+                      )}
+
+                      <div className="grid grid-cols-1 gap-1.5 text-xs bg-white p-2.5 rounded-lg border border-[#D5BFA0]/60">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-[#173B43]/70 font-medium">Fecha y horario:</span>
+                          <span className="font-tabular font-semibold text-[#173B43]">
+                            {v.date} · {v.timeSlot}
+                          </span>
+                        </div>
+                        <div className="text-[#173B43]/80 break-words">
+                          <span className="text-[#173B43]/70 font-medium">Notas: </span>
+                          {v.notes || '—'}
+                        </div>
+                      </div>
+
+                      <div className="pt-0.5">
                         {v.status === 'reprogramada' ? (
-                          <div className="flex flex-col sm:flex-row items-end sm:items-center justify-end gap-1.5">
+                          <div className="grid grid-cols-2 gap-2">
                             <button
                               type="button"
                               onClick={() =>
@@ -1755,7 +1788,7 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
                                   'Reprogramación aceptada por el cliente'
                                 )
                               }
-                              className="px-3 py-1.5 text-xs font-bold text-white bg-[#173B43] hover:bg-[#122e35] rounded-sm cursor-pointer shadow-xs flex items-center gap-1.5"
+                              className="w-full px-3 py-2 text-xs font-bold text-white bg-[#173B43] hover:bg-[#122e35] rounded-lg cursor-pointer shadow-xs flex items-center justify-center gap-1.5"
                             >
                               <Check className="w-3.5 h-3.5 shrink-0" />
                               <span>Aceptar</span>
@@ -1771,18 +1804,22 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
                                   'Reprogramación rechazada por el cliente'
                                 )
                               }
-                              className="px-3 py-1.5 text-xs font-bold text-rose-700 bg-rose-50 border border-rose-300 hover:bg-rose-100 rounded-sm cursor-pointer flex items-center gap-1.5"
+                              className="w-full px-3 py-2 text-xs font-bold text-rose-700 bg-rose-50 border border-rose-300 hover:bg-rose-100 rounded-lg cursor-pointer flex items-center justify-center gap-1.5"
                             >
                               <X className="w-3.5 h-3.5 shrink-0" />
                               <span>Rechazar</span>
                             </button>
                           </div>
                         ) : v.status === 'cancelada' ? (
-                          <span className="text-xs text-rose-700 font-semibold italic">Visita cancelada</span>
+                          <span className="text-xs text-rose-700 font-semibold italic block">
+                            Visita cancelada
+                          </span>
                         ) : v.status === 'rechazada' ? (
-                          <span className="text-xs text-rose-700 font-semibold italic">Visita rechazada</span>
+                          <span className="text-xs text-rose-700 font-semibold italic block">
+                            Visita rechazada
+                          </span>
                         ) : v.status === 'realizada' ? (
-                          <span className="text-xs text-[#173B43]/60">Sin acciones</span>
+                          <span className="text-xs text-[#173B43]/60 block">Sin acciones</span>
                         ) : (
                           <button
                             type="button"
@@ -1790,17 +1827,128 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
                               setVisitToCancel(v);
                               setCancelReason('');
                             }}
-                            className="px-3 py-1.5 text-xs font-semibold text-red-700 bg-red-50 border border-red-300 rounded-sm hover:bg-red-100 cursor-pointer"
+                            className="w-full px-3 py-2 text-xs font-semibold text-red-700 bg-red-50 border border-red-300 rounded-lg hover:bg-red-100 cursor-pointer text-center"
                           >
                             Cancelar Visita
                           </button>
                         )}
-                      </td>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Vista PC / Tablet en tabla */}
+              <div className="hidden md:block overflow-x-auto -mx-1 px-1">
+                <table className="w-full min-w-[600px] text-left border-collapse text-sm">
+                  <thead>
+                    <tr className="border-b border-[#D5BFA0] text-xs uppercase tracking-wider text-[#173B43]/70">
+                      <th className="py-3 pr-4">Propiedad</th>
+                      <th className="py-3 px-4">Fecha y Horario</th>
+                      <th className="py-3 px-4">Estado</th>
+                      <th className="py-3 px-4">Notas</th>
+                      <th className="py-3 pl-4 text-right">Acción</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody className="divide-y divide-[#D5BFA0]/60">
+                    {clientVisits.map((v) => (
+                      <tr key={v.id}>
+                        <td className="py-3.5 pr-4">
+                          {(() => {
+                            const vp = allProperties.find((p) => p.id === v.propertyId);
+                            return vp ? (
+                              <button
+                                type="button"
+                                onClick={() => onSelectProperty(vp)}
+                                className="font-semibold text-[#1F241F] hover:text-[#173B43] hover:underline text-left cursor-pointer block"
+                                title="Ver ficha completa de la propiedad"
+                              >
+                                {v.propertyTitle}
+                              </button>
+                            ) : (
+                              <div className="font-semibold text-[#1F241F]">{v.propertyTitle}</div>
+                            );
+                          })()}
+                          {v.status === 'reprogramada' && (
+                            <span className="text-[11px] font-semibold text-amber-900 bg-amber-100/90 px-2 py-0.5 rounded-sm inline-block mt-1 border border-amber-300">
+                              Propietario reprogramó fecha/horario. Por favor aceptá o rechazá.
+                            </span>
+                          )}
+                        </td>
+                        <td className="py-3.5 px-4 font-tabular text-xs text-[#173B43]">
+                          {v.date} · {v.timeSlot}
+                        </td>
+                        <td className="py-3.5 px-4">
+                          <span
+                            className={`inline-block text-[11px] uppercase tracking-wider font-bold px-2.5 py-1 rounded-sm border ${getVisitStatusBadgeClass(
+                              v.status
+                            )}`}
+                          >
+                            {v.status}
+                          </span>
+                        </td>
+                        <td className="py-3.5 px-4 text-xs text-[#173B43]/75">{v.notes || '—'}</td>
+                        <td className="py-3.5 pl-4 text-right">
+                          {v.status === 'reprogramada' ? (
+                            <div className="flex flex-col sm:flex-row items-end sm:items-center justify-end gap-1.5">
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  onUpdateVisit(
+                                    v.id,
+                                    'confirmada',
+                                    v.date,
+                                    v.timeSlot,
+                                    'Reprogramación aceptada por el cliente'
+                                  )
+                                }
+                                className="px-3 py-1.5 text-xs font-bold text-white bg-[#173B43] hover:bg-[#122e35] rounded-sm cursor-pointer shadow-xs flex items-center gap-1.5"
+                              >
+                                <Check className="w-3.5 h-3.5 shrink-0" />
+                                <span>Aceptar</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  onUpdateVisit(
+                                    v.id,
+                                    'rechazada',
+                                    v.date,
+                                    v.timeSlot,
+                                    'Reprogramación rechazada por el cliente'
+                                  )
+                                }
+                                className="px-3 py-1.5 text-xs font-bold text-rose-700 bg-rose-50 border border-rose-300 hover:bg-rose-100 rounded-sm cursor-pointer flex items-center gap-1.5"
+                              >
+                                <X className="w-3.5 h-3.5 shrink-0" />
+                                <span>Rechazar</span>
+                              </button>
+                            </div>
+                          ) : v.status === 'cancelada' ? (
+                            <span className="text-xs text-rose-700 font-semibold italic">Visita cancelada</span>
+                          ) : v.status === 'rechazada' ? (
+                            <span className="text-xs text-rose-700 font-semibold italic">Visita rechazada</span>
+                          ) : v.status === 'realizada' ? (
+                            <span className="text-xs text-[#173B43]/60">Sin acciones</span>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setVisitToCancel(v);
+                                setCancelReason('');
+                              }}
+                              className="px-3 py-1.5 text-xs font-semibold text-red-700 bg-red-50 border border-red-300 rounded-sm hover:bg-red-100 cursor-pointer"
+                            >
+                              Cancelar Visita
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
           )}
 
           {/* Modal de Confirmación de Cancelación de Visita por el Cliente */}
@@ -1879,9 +2027,9 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
       )}
 
       {activeSubView === 'cliente_operaciones' && canActAsClient && (
-        <div className="card-floating bg-white border-2 border-[#D5BFA0] rounded-2xl p-6 sm:p-8 space-y-6 shadow-sm">
-          <div className="flex items-center justify-between border-b border-[#D5BFA0]/60 pb-4">
-            <h2 className="text-2xl font-serif-display font-semibold text-[#303638]">
+        <div className="card-floating bg-white border-2 border-[#D5BFA0] rounded-2xl p-4 sm:p-8 space-y-5 sm:space-y-6 shadow-sm">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#D5BFA0]/60 pb-4">
+            <h2 className="text-xl sm:text-2xl font-serif-display font-semibold text-[#303638]">
               Mis Propuestas de Alquiler / Compra y Contratos
             </h2>
             <span className="text-xs text-[#303638]/70 font-tabular bg-[#F8F6F1] px-3 py-1 rounded-full border border-[#D5BFA0]">
@@ -1902,10 +2050,10 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
                 return (
                   <div
                     key={op.id}
-                    className="card-floating p-5 sm:p-6 bg-[#F8F6F1]/60 border-2 border-[#D5BFA0] rounded-2xl space-y-4 shadow-2xs"
+                    className="card-floating p-4 sm:p-6 bg-[#F8F6F1]/60 border-2 border-[#D5BFA0] rounded-2xl space-y-4 shadow-2xs"
                   >
-                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#D5BFA0]/80 pb-3">
-                      <div>
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#D5BFA0]/80 pb-3">
+                      <div className="min-w-0">
                         <span className="text-[11px] font-semibold text-[#C87955] uppercase tracking-wider">
                           Propuesta de {op.operationType}
                         </span>
@@ -1913,18 +2061,18 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
                           <button
                             type="button"
                             onClick={() => onSelectProperty(prop)}
-                            className="text-lg font-serif-display font-semibold text-[#303638] hover:text-[#173B43] hover:underline text-left block cursor-pointer"
+                            className="text-base sm:text-lg font-serif-display font-semibold text-[#303638] hover:text-[#173B43] hover:underline text-left block cursor-pointer"
                             title="Ver ficha completa de la propiedad"
                           >
                             {op.propertyTitle}
                           </button>
                         ) : (
-                          <h3 className="text-lg font-serif-display font-semibold text-[#303638]">
+                          <h3 className="text-base sm:text-lg font-serif-display font-semibold text-[#303638]">
                             {op.propertyTitle}
                           </h3>
                         )}
                       </div>
-                      <div className="text-right space-y-1">
+                      <div className="text-left sm:text-right space-y-1 shrink-0">
                         <span className="text-base font-semibold font-tabular text-[#173B43] block">
                           {op.counterOffer?.currency || op.currency} {(op.counterOffer?.amount || op.offeredAmount).toLocaleString()}
                         </span>
@@ -1998,8 +2146,8 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
 
                     {/* Counter Offer response for Client */}
                     {op.status === 'en_negociacion' && op.counterOffer && (
-                      <div className="p-4 bg-amber-50 border border-amber-300 rounded-sm space-y-2 text-xs">
-                        <div className="font-bold text-amber-900 uppercase tracking-wider text-[11px] flex items-center justify-between">
+                      <div className="p-3.5 sm:p-4 bg-amber-50 border border-amber-300 rounded-sm space-y-2 text-xs">
+                        <div className="font-bold text-amber-900 uppercase tracking-wider text-[11px] flex flex-wrap items-center justify-between gap-2">
                           <span>Contrapropuesta Recibida del Propietario / Agente:</span>
                           <span className="font-tabular">
                             {op.counterOffer.currency} {op.counterOffer.amount.toLocaleString()}
@@ -2030,7 +2178,7 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
                     {/* Proposal Accepted Banner (Aún NO concretada / pendiente de contrato formal) */}
                     {normalizeDealCategory(op.status) === 'aceptada' && (
                       <div className="p-3.5 bg-amber-50/90 border border-amber-300 rounded-sm text-xs space-y-1.5 text-amber-950">
-                        <div className="flex items-center justify-between">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
                           <span className="font-bold block text-amber-900 text-sm">¡Propuesta Aceptada!</span>
                           <span className="uppercase text-[10px] bg-amber-200 text-amber-950 px-2 py-0.5 rounded-sm font-semibold">
                             Pendiente de Formalización
@@ -2044,12 +2192,12 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
 
                     {/* Contract Details - Únicamente visible cuando la operación está CONCRETADA */}
                     {normalizeDealCategory(op.status) === 'concretada' && (op.contractCode || relatedContract) && (
-                      <div className="p-4 bg-[#F8F6F1] border-2 border-[#173B43] rounded-xl text-xs space-y-2">
+                      <div className="p-3.5 sm:p-4 bg-[#F8F6F1] border-2 border-[#173B43] rounded-xl text-xs space-y-2">
                         <div className="flex items-center gap-1.5 text-emerald-900 bg-emerald-100/90 border border-emerald-400 px-3 py-1.5 rounded-lg font-bold text-xs">
                           <CheckCircle2 className="w-4 h-4 text-emerald-700 shrink-0" />
                           <span>Registro Oficial Permanente: Operación de {isRental ? 'Alquiler' : 'Compra'} Concretada</span>
                         </div>
-                        <div className="font-bold text-[#173B43] font-tabular text-sm flex items-center justify-between pt-1">
+                        <div className="font-bold text-[#173B43] font-tabular text-sm flex flex-wrap items-center justify-between gap-2 pt-1">
                           <span>Contrato Registrado: #{op.contractCode || relatedContract?.contractCode}</span>
                           <span className="uppercase text-[10px] bg-emerald-700 text-white px-2.5 py-0.5 rounded-full font-bold">
                             Concretada
@@ -2096,7 +2244,7 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
           SECCIÓN "MIS PROPIEDADES" DEL PROPIETARIO
          ===================================================================== */}
       {activeSubView === 'propietario_inmuebles' && canActAsOwner && (
-        <div className="card-floating bg-white border border-[#D5BFA0] rounded-2xl p-6 sm:p-8 space-y-6 shadow-sm">
+        <div className="card-floating bg-white border border-[#D5BFA0] rounded-2xl p-4 sm:p-8 space-y-5 sm:space-y-6 shadow-sm">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#D5BFA0]/60 pb-5">
             <div>
               <div className="flex items-center gap-1.5 mb-1">
@@ -2104,7 +2252,7 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
                   Panel de Propietario
                 </span>
               </div>
-              <h2 className="text-3xl font-serif-display font-semibold text-[#303638]">
+              <h2 className="text-2xl sm:text-3xl font-serif-display font-semibold text-[#303638]">
                 Mis propiedades
               </h2>
               <p className="text-xs text-[#303638]/75 mt-1 max-w-2xl leading-relaxed">
@@ -2114,7 +2262,7 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
             <button
               type="button"
               onClick={onOpenNewProperty}
-              className="flex items-center gap-2 px-5 py-2.5 text-xs uppercase tracking-wider font-semibold text-white bg-[#173B43] hover:bg-[#122e35] rounded-xl transition-all shadow-xs whitespace-nowrap self-start cursor-pointer"
+              className="w-full sm:w-auto flex items-center justify-center gap-2 px-5 py-2.5 text-xs uppercase tracking-wider font-semibold text-white bg-[#173B43] hover:bg-[#122e35] rounded-xl transition-all shadow-xs whitespace-nowrap sm:self-start cursor-pointer"
             >
               <Plus className="w-4 h-4" />
               <span>Publicar Propiedad</span>
@@ -2233,12 +2381,12 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
                 return (
                   <div
                     key={prop.id}
-                    className="card-floating p-5 sm:p-6 bg-white border-2 border-[#D5BFA0] rounded-2xl space-y-4 shadow-sm"
+                    className="card-floating p-4 sm:p-6 bg-white border-2 border-[#D5BFA0] rounded-2xl space-y-4 shadow-sm"
                   >
                     <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
                       {/* Datos de la propiedad */}
-                      <div className="flex items-start gap-4">
-                        <div className="relative w-32 h-24 rounded-xl overflow-hidden bg-[#F8F6F1] border-2 border-[#D5BFA0] shrink-0">
+                      <div className="flex flex-col sm:flex-row items-start gap-3.5 sm:gap-4 min-w-0">
+                        <div className="relative w-full sm:w-32 h-44 sm:h-24 rounded-xl overflow-hidden bg-[#F8F6F1] border-2 border-[#D5BFA0] shrink-0">
                           <img
                             src={resolvePropertyImageUrl(prop.images[0])}
                             alt={prop.title}
@@ -2256,7 +2404,7 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
                           </span>
                         </div>
 
-                        <div className="space-y-1.5">
+                        <div className="space-y-1.5 min-w-0">
                           <div className="flex flex-wrap items-center gap-2">
                             <span
                               className={`inline-flex items-center gap-1 text-[10px] uppercase tracking-wider font-bold px-2.5 py-0.5 rounded-full border ${getPublicationStatusBadgeClass(
@@ -2308,7 +2456,7 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
                       </div>
 
                       {/* Disponibilidad y Acciones del Propietario matching Image 2 */}
-                      <div className="flex flex-wrap items-center gap-3 self-start lg:self-center">
+                      <div className="flex flex-wrap items-end gap-3 self-start lg:self-center w-full lg:w-auto">
                         <div>
                           <label className="block text-[10px] uppercase tracking-wider text-[#303638]/60 mb-1 font-semibold">
                             Disponibilidad
@@ -2334,11 +2482,11 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
                           )}
                         </div>
 
-                        <div className="flex items-center gap-2 pt-4">
+                        <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
                           <button
                             type="button"
                             onClick={() => onSelectProperty(prop)}
-                            className="px-3.5 py-2 text-xs font-semibold text-[#303638] bg-[#F8F6F1] border border-[#D5BFA0] rounded-xl hover:bg-white inline-flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+                            className="px-2.5 sm:px-3.5 py-1.5 sm:py-2 text-[11px] sm:text-xs font-semibold text-[#303638] bg-[#F8F6F1] border border-[#D5BFA0] rounded-lg sm:rounded-xl hover:bg-white inline-flex items-center gap-1 sm:gap-1.5 transition-colors cursor-pointer shadow-2xs"
                             title="Ver ficha"
                           >
                             <Eye className="w-3.5 h-3.5" />
@@ -2353,7 +2501,7 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
                               <button
                                 type="button"
                                 onClick={() => onOpenEditProperty(prop)}
-                                className="px-3.5 py-2 text-xs font-semibold text-[#303638] bg-[#F8F6F1] border border-[#D5BFA0] rounded-xl hover:bg-white inline-flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+                                className="px-2.5 sm:px-3.5 py-1.5 sm:py-2 text-[11px] sm:text-xs font-semibold text-[#303638] bg-[#F8F6F1] border border-[#D5BFA0] rounded-lg sm:rounded-xl hover:bg-white inline-flex items-center gap-1 sm:gap-1.5 transition-colors cursor-pointer shadow-2xs"
                                 title="Editar propiedad"
                               >
                                 <Edit3 className="w-3.5 h-3.5" />
@@ -2362,7 +2510,7 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
                               <button
                                 type="button"
                                 onClick={() => onDeleteProperty(prop.id)}
-                                className="p-2 text-red-600 bg-red-50 border border-red-200 rounded-xl hover:bg-red-100 transition-colors cursor-pointer shadow-2xs"
+                                className="p-1.5 sm:p-2 text-red-600 bg-red-50 border border-red-200 rounded-lg sm:rounded-xl hover:bg-red-100 transition-colors cursor-pointer shadow-2xs"
                                 title="Eliminar propiedad"
                               >
                                 <Trash2 className="w-3.5 h-3.5" />
@@ -2405,24 +2553,24 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
                               Recibís y respondés directamente las consultas, visitas y ofertas de esta propiedad.
                             </p>
                           </div>
-                          <div className="flex flex-wrap items-center gap-2">
+                          <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-1.5 sm:gap-2">
                             <button
                               type="button"
                               onClick={() =>
                                 setAgentSelectorPropId(isChoosingAgentHere ? null : prop.id)
                               }
-                              className="px-3 py-1.5 text-xs font-semibold text-[#FCFBF7] bg-[#173B43] hover:bg-[#2c382d] rounded-sm transition-colors inline-flex items-center gap-1.5"
+                              className="px-2 sm:px-3 py-1.5 text-[11px] sm:text-xs font-semibold text-[#FCFBF7] bg-[#173B43] hover:bg-[#2c382d] rounded-lg sm:rounded-sm transition-colors inline-flex items-center justify-center gap-1 sm:gap-1.5"
                             >
-                              <UserCheck className="w-3.5 h-3.5" />
-                              Elegir un agente
+                              <UserCheck className="w-3.5 h-3.5 shrink-0" />
+                              <span className="truncate">Elegir agente</span>
                             </button>
                             <button
                               type="button"
                               onClick={() => onOwnerRequestAgent(prop.id, 'asignacion_admin')}
-                              className="px-3 py-1.5 text-xs font-semibold text-[#173B43] bg-white border border-[#D5BFA0] hover:bg-[#FCFBF7] rounded-sm transition-colors inline-flex items-center gap-1.5"
+                              className="px-2 sm:px-3 py-1.5 text-[11px] sm:text-xs font-semibold text-[#173B43] bg-white border border-[#D5BFA0] hover:bg-[#FCFBF7] rounded-lg sm:rounded-sm transition-colors inline-flex items-center justify-center gap-1 sm:gap-1.5"
                             >
-                              <ShieldCheck className="w-3.5 h-3.5 text-[#B86F52]" />
-                              Que me asignen uno
+                              <ShieldCheck className="w-3.5 h-3.5 text-[#B86F52] shrink-0" />
+                              <span className="truncate">Que asignen uno</span>
                             </button>
                           </div>
                         </div>
@@ -2592,7 +2740,7 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
                             {agentsList.map((ag) => (
                               <div
                                 key={ag.uid}
-                                className="p-3.5 bg-white border border-[#D5BFA0] rounded-sm flex items-start justify-between gap-3"
+                                className="p-3.5 bg-white border border-[#D5BFA0] rounded-sm flex flex-col sm:flex-row sm:items-start justify-between gap-3"
                               >
                                 <div className="flex items-start gap-3 min-w-0">
                                   <div className="w-10 h-10 rounded-full overflow-hidden bg-[#173B43] text-[#FCFBF7] flex items-center justify-center shrink-0">
@@ -2613,7 +2761,7 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
                                     <div className="text-[11px] text-[#B86F52] font-medium">
                                       {ag.agencyName || 'Agente Inmobiliario'}
                                     </div>
-                                    <div className="text-[11px] font-tabular text-[#173B43]/80">
+                                    <div className="text-[11px] font-tabular text-[#173B43]/80 break-all">
                                       {ag.email} · {ag.phone}
                                     </div>
                                     {ag.bio && (
@@ -2629,7 +2777,7 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
                                     await onOwnerRequestAgent(prop.id, 'elegir_agente', ag);
                                     setAgentSelectorPropId(null);
                                   }}
-                                  className="px-3 py-1.5 text-xs font-semibold text-[#FCFBF7] bg-[#173B43] hover:bg-[#2c382d] rounded-sm shrink-0"
+                                  className="px-3 py-1.5 text-xs font-semibold text-[#FCFBF7] bg-[#173B43] hover:bg-[#2c382d] rounded-sm shrink-0 self-start sm:self-center"
                                 >
                                   Solicitar este agente
                                 </button>
@@ -2657,13 +2805,13 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
         <div className="space-y-6">
           {/* Solicitudes pendientes enviadas a este agente */}
           {myPendingAgentInvitations.length > 0 && (
-            <div className="bg-amber-50 border-2 border-amber-400 rounded-sm p-6 space-y-4">
+            <div className="bg-amber-50 border-2 border-amber-400 rounded-sm p-4 sm:p-6 space-y-4">
               <div>
                 <span className="inline-flex items-center gap-1.5 text-[11px] uppercase tracking-[0.18em] text-amber-900 font-bold bg-amber-200/80 px-2.5 py-0.5 rounded-sm border border-amber-400">
                   <Clock className="w-3.5 h-3.5" />
                   Solicitudes de Propietarios en Revisión
                 </span>
-                <h2 className="text-xl font-serif-display font-semibold text-amber-950 mt-2">
+                <h2 className="text-lg sm:text-xl font-serif-display font-semibold text-amber-950 mt-2">
                   Propiedades que solicitaron tu gestión ({myPendingAgentInvitations.length})
                 </h2>
                 <p className="text-xs text-amber-900/90">
@@ -2675,9 +2823,9 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
                 {myPendingAgentInvitations.map((prop) => (
                   <div
                     key={prop.id}
-                    className="p-4 bg-white border border-amber-300 rounded-sm flex flex-col lg:flex-row lg:items-center justify-between gap-4"
+                    className="p-3.5 sm:p-4 bg-white border border-amber-300 rounded-sm flex flex-col lg:flex-row lg:items-center justify-between gap-4"
                   >
-                    <div className="flex items-center gap-3.5">
+                    <div className="flex items-center gap-3.5 min-w-0">
                       <img
                         src={resolvePropertyImageUrl(prop.images[0])}
                         alt={prop.title}
@@ -2689,7 +2837,7 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
                         }}
                         className="w-16 h-12 rounded-sm object-cover bg-[#D5BFA0] shrink-0"
                       />
-                      <div className="space-y-0.5">
+                      <div className="space-y-0.5 min-w-0">
                         <div className="text-xs text-amber-800 font-semibold">
                           Propietario solicitante: {prop.ownerName}
                         </div>
@@ -2701,13 +2849,13 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
                       </div>
                     </div>
 
-                    <div className="flex flex-wrap items-center gap-2">
+                    <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-2 w-full lg:w-auto">
                       <button
                         type="button"
                         onClick={() => onAgentRespondAssignment(prop.id, true)}
-                        className="px-3.5 py-2 text-xs font-semibold text-white bg-[#173B43] hover:bg-[#122e35] rounded-sm inline-flex items-center gap-1.5"
+                        className="w-full sm:w-auto px-3.5 py-2 text-xs font-semibold text-white bg-[#173B43] hover:bg-[#122e35] rounded-sm inline-flex items-center justify-center gap-1.5"
                       >
-                        <Check className="w-3.5 h-3.5" />
+                        <Check className="w-3.5 h-3.5 shrink-0" />
                         Aceptar y Gestionar
                       </button>
                       <input
@@ -2720,7 +2868,7 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
                           }))
                         }
                         placeholder="Motivo si no estás disponible..."
-                        className="px-2.5 py-1.5 text-xs bg-white border border-[#D5BFA0] rounded-sm"
+                        className="w-full sm:w-auto sm:flex-none min-w-0 px-2.5 py-1.5 text-xs bg-white border border-[#D5BFA0] rounded-sm"
                       />
                       <button
                         type="button"
@@ -2731,9 +2879,9 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
                             agentRejectReasonDrafts[prop.id] || 'Sin disponibilidad en la zona actualmente.'
                           )
                         }
-                        className="px-3 py-2 text-xs font-semibold text-red-700 bg-red-50 border border-red-300 hover:bg-red-100 rounded-sm inline-flex items-center gap-1"
+                        className="w-full sm:w-auto px-3 py-2 text-xs font-semibold text-red-700 bg-red-50 border border-red-300 hover:bg-red-100 rounded-sm inline-flex items-center justify-center gap-1"
                       >
-                        <X className="w-3.5 h-3.5" />
+                        <X className="w-3.5 h-3.5 shrink-0" />
                         Rechazar
                       </button>
                     </div>
@@ -2744,9 +2892,9 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
           )}
 
           {/* Propiedades confirmadas a cargo de este agente */}
-          <div className="bg-[#FCFBF7] border border-[#D5BFA0] rounded-sm p-6 space-y-5">
+          <div className="bg-[#FCFBF7] border border-[#D5BFA0] rounded-sm p-4 sm:p-6 space-y-5">
             <div className="border-b border-[#D5BFA0] pb-4">
-              <h2 className="text-2xl font-serif-display font-semibold text-[#173B43]">
+              <h2 className="text-xl sm:text-2xl font-serif-display font-semibold text-[#173B43]">
                 Propiedades Confirmadas a Mi Cargo ({myAssignedProperties.length})
               </h2>
               <p className="text-xs text-[#173B43]/75 mt-0.5">
@@ -2759,123 +2907,246 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
                 Actualmente no tenés propiedades asignadas a tu cargo.
               </p>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse text-sm">
-                  <thead>
-                    <tr className="border-b border-[#D5BFA0] text-xs uppercase tracking-wider text-[#173B43]/70">
-                      <th className="py-3 pr-4">Inmueble</th>
-                      <th className="py-3 px-3">Propietario</th>
-                      <th className="py-3 px-3">Operación / Valor</th>
-                      <th className="py-3 px-3">Publicación</th>
-                      <th className="py-3 px-3">Disponibilidad</th>
-                      <th className="py-3 pl-3 text-right">Acciones</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-[#D5BFA0]/60">
-                    {myAssignedProperties.map((prop) => {
-                      const isConcretadaProp = isPropertyConcretada(prop, allOperations);
-                      return (
-                      <tr key={prop.id}>
-                        <td className="py-3.5 pr-4">
-                          <div className="flex items-center gap-3">
-                            <img
-                              src={resolvePropertyImageUrl(prop.images[0])}
-                              alt={prop.title}
-                              referrerPolicy="no-referrer"
-                              onError={(e) => {
-                                if (e.currentTarget.src !== HERO_IMAGE) {
-                                  e.currentTarget.src = HERO_IMAGE;
-                                }
-                              }}
-                              className="w-14 h-10 rounded-sm object-cover bg-[#F8F6F1] shrink-0"
-                            />
-                            <div>
-                              <div className="font-semibold text-[#1F241F]">{prop.title}</div>
-                              <div className="text-xs text-[#173B43]/70">
-                                {prop.location} · <span className="font-tabular">{prop.surface} m²</span>
-                              </div>
+              <>
+                {/* Vista móvil en tarjetas sin scroll horizontal */}
+                <div className="md:hidden space-y-3">
+                  {myAssignedProperties.map((prop) => {
+                    const isConcretadaProp = isPropertyConcretada(prop, allOperations);
+                    return (
+                      <div
+                        key={prop.id}
+                        className="p-3.5 bg-white border border-[#D5BFA0] rounded-xl space-y-3 min-w-0"
+                      >
+                        <div className="flex items-start gap-3 min-w-0">
+                          <img
+                            src={resolvePropertyImageUrl(prop.images[0])}
+                            alt={prop.title}
+                            referrerPolicy="no-referrer"
+                            onError={(e) => {
+                              if (e.currentTarget.src !== HERO_IMAGE) {
+                                e.currentTarget.src = HERO_IMAGE;
+                              }
+                            }}
+                            className="w-16 h-12 rounded-lg object-cover bg-[#F8F6F1] shrink-0"
+                          />
+                          <div className="min-w-0 flex-1">
+                            <div className="font-semibold text-sm text-[#1F241F] leading-snug break-words">
+                              {prop.title}
+                            </div>
+                            <div className="text-xs text-[#173B43]/75 mt-0.5 break-words">
+                              {prop.location} · <span className="font-tabular">{prop.surface} m²</span>
                             </div>
                           </div>
-                        </td>
-                        <td className="py-3.5 px-3 text-xs text-[#173B43]">
-                          <strong className="text-[#1F241F]">{prop.ownerName}</strong>
-                        </td>
-                        <td className="py-3.5 px-3 font-tabular text-xs">
-                          <span className="uppercase text-[#B86F52] font-semibold block">
-                            {prop.operationType}
-                          </span>
-                          <span className="font-semibold text-[#173B43]">
-                            {prop.currency} {prop.price.toLocaleString()}
-                          </span>
-                        </td>
-                        <td className="py-3.5 px-3 text-xs">
-                          <span
-                            className={`inline-block text-[10px] uppercase tracking-wider font-bold px-2.5 py-0.5 rounded-sm border ${getPublicationStatusBadgeClass(
-                              prop.publicationStatus
-                            )}`}
-                          >
-                            {prop.publicationStatus === 'suspendida' ? 'rechazada' : prop.publicationStatus}
-                          </span>
-                          {(prop.publicationStatus === 'rechazada' || prop.publicationStatus === 'suspendida') && prop.rejectionReason && (
-                            <div className="mt-1 max-w-56 text-[11px] text-red-800">
-                              Motivo: {prop.rejectionReason}
-                            </div>
-                          )}
-                        </td>
-                        <td className="py-3.5 px-3">
-                          {isConcretadaProp ? (
-                            <span className="px-2.5 py-1 text-xs font-bold bg-emerald-100 text-emerald-950 border border-emerald-400 rounded-sm inline-block">
-                              {prop.operationType === 'alquiler' ? 'Alquilada (Concretada)' : 'Vendida (Concretada)'}
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2 text-xs bg-[#F8F6F1]/70 p-2.5 rounded-lg border border-[#D5BFA0]/50">
+                          <div className="min-w-0">
+                            <span className="text-[10px] uppercase tracking-wider text-[#173B43]/65 font-semibold block">
+                              Propietario
                             </span>
-                          ) : (
-                            <select
-                              value={prop.availability}
-                              onChange={(e) =>
-                                onUpdateAvailability(prop.id, e.target.value as AvailabilityStatus)
-                              }
-                              className="px-2.5 py-1.5 text-xs bg-white border border-[#D5BFA0] rounded-sm"
+                            <strong className="text-[#1F241F] block truncate">{prop.ownerName}</strong>
+                          </div>
+                          <div className="min-w-0 font-tabular">
+                            <span className="text-[10px] uppercase tracking-wider text-[#B86F52] font-semibold block">
+                              {prop.operationType}
+                            </span>
+                            <strong className="text-[#173B43] block truncate">
+                              {prop.currency} {prop.price.toLocaleString()}
+                            </strong>
+                          </div>
+                          <div className="min-w-0">
+                            <span className="text-[10px] uppercase tracking-wider text-[#173B43]/65 font-semibold block mb-1">
+                              Publicación
+                            </span>
+                            <span
+                              className={`inline-block text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-sm border ${getPublicationStatusBadgeClass(
+                                prop.publicationStatus
+                              )}`}
                             >
-                              <option value="disponible">Disponible</option>
-                              <option value="reservada">Reservada</option>
-                              <option value="alquilada">Alquilada</option>
-                              <option value="vendida">Vendida</option>
-                            </select>
-                          )}
-                        </td>
-                        <td className="py-3.5 pl-3 text-right">
-                          <div className="inline-flex items-center gap-1.5">
-                            <button
-                              type="button"
-                              onClick={() => onSelectProperty(prop)}
-                              className="px-2.5 py-1.5 text-xs font-semibold text-[#173B43] border border-[#D5BFA0] rounded-sm hover:bg-[#F8F6F1] inline-flex items-center gap-1"
-                              title="Ver ficha"
-                            >
-                              <Eye className="w-3.5 h-3.5" />
-                              Ver
-                            </button>
+                              {prop.publicationStatus === 'suspendida' ? 'rechazada' : prop.publicationStatus}
+                            </span>
+                          </div>
+                          <div className="min-w-0">
+                            <span className="text-[10px] uppercase tracking-wider text-[#173B43]/65 font-semibold block mb-1">
+                              Disponibilidad
+                            </span>
                             {isConcretadaProp ? (
-                              <span className="px-2 py-1 text-[11px] font-semibold text-emerald-900 bg-emerald-50 border border-emerald-300 rounded-sm">
-                                {prop.operationType === 'alquiler' ? 'Alquiler Concretado · Solo Lectura' : 'Venta Concretada · Solo Lectura'}
+                              <span className="px-2 py-1 text-[11px] font-bold bg-emerald-100 text-emerald-950 border border-emerald-400 rounded-sm inline-block">
+                                {prop.operationType === 'alquiler' ? 'Alquilada' : 'Vendida'}
                               </span>
                             ) : (
-                              <button
-                                type="button"
-                                onClick={() => onOpenEditProperty(prop)}
-                                className="px-2.5 py-1.5 text-xs font-semibold text-[#FCFBF7] bg-[#B86F52] hover:bg-[#a35e42] rounded-sm inline-flex items-center gap-1 transition-colors"
-                                title="Editar datos de esta propiedad a mi cargo"
+                              <select
+                                value={prop.availability}
+                                onChange={(e) =>
+                                  onUpdateAvailability(prop.id, e.target.value as AvailabilityStatus)
+                                }
+                                className="w-full px-2 py-1 text-xs bg-white border border-[#D5BFA0] rounded-sm"
                               >
-                                <Edit3 className="w-3.5 h-3.5" />
-                                Editar ficha
-                              </button>
+                                <option value="disponible">Disponible</option>
+                                <option value="reservada">Reservada</option>
+                                <option value="alquilada">Alquilada</option>
+                                <option value="vendida">Vendida</option>
+                              </select>
                             )}
                           </div>
-                        </td>
-                      </tr>
+                        </div>
+
+                        {(prop.publicationStatus === 'rechazada' || prop.publicationStatus === 'suspendida') && prop.rejectionReason && (
+                          <div className="text-[11px] text-red-800 bg-red-50 border border-red-200 rounded-lg p-2 break-words">
+                            <strong>Motivo:</strong> {prop.rejectionReason}
+                          </div>
+                        )}
+
+                        <div className="flex items-center gap-2 pt-1 border-t border-[#D5BFA0]/50">
+                          <button
+                            type="button"
+                            onClick={() => onSelectProperty(prop)}
+                            className="flex-1 px-2.5 py-1.5 text-xs font-semibold text-[#173B43] border border-[#D5BFA0] rounded-lg hover:bg-[#F8F6F1] inline-flex items-center justify-center gap-1"
+                            title="Ver ficha"
+                          >
+                            <Eye className="w-3.5 h-3.5 shrink-0" />
+                            <span>Ver</span>
+                          </button>
+                          {isConcretadaProp ? (
+                            <span className="flex-1 px-2 py-1.5 text-[11px] font-semibold text-emerald-900 bg-emerald-50 border border-emerald-300 rounded-lg text-center">
+                              {prop.operationType === 'alquiler' ? 'Alquiler Concretado' : 'Venta Concretada'}
+                            </span>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => onOpenEditProperty(prop)}
+                              className="flex-1 px-2.5 py-1.5 text-xs font-semibold text-[#FCFBF7] bg-[#B86F52] hover:bg-[#a35e42] rounded-lg inline-flex items-center justify-center gap-1 transition-colors"
+                              title="Editar datos de esta propiedad a mi cargo"
+                            >
+                              <Edit3 className="w-3.5 h-3.5 shrink-0" />
+                              <span>Editar ficha</span>
+                            </button>
+                          )}
+                        </div>
+                      </div>
                     );
-                    })}
-                  </tbody>
-                </table>
-              </div>
+                  })}
+                </div>
+
+                {/* Vista PC / Tablet en tabla */}
+                <div className="hidden md:block overflow-x-auto -mx-1 px-1">
+                  <table className="w-full min-w-[680px] text-left border-collapse text-sm">
+                    <thead>
+                      <tr className="border-b border-[#D5BFA0] text-xs uppercase tracking-wider text-[#173B43]/70">
+                        <th className="py-3 pr-4">Inmueble</th>
+                        <th className="py-3 px-3">Propietario</th>
+                        <th className="py-3 px-3">Operación / Valor</th>
+                        <th className="py-3 px-3">Publicación</th>
+                        <th className="py-3 px-3">Disponibilidad</th>
+                        <th className="py-3 pl-3 text-right">Acciones</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[#D5BFA0]/60">
+                      {myAssignedProperties.map((prop) => {
+                        const isConcretadaProp = isPropertyConcretada(prop, allOperations);
+                        return (
+                        <tr key={prop.id}>
+                          <td className="py-3.5 pr-4">
+                            <div className="flex items-center gap-3">
+                              <img
+                                src={resolvePropertyImageUrl(prop.images[0])}
+                                alt={prop.title}
+                                referrerPolicy="no-referrer"
+                                onError={(e) => {
+                                  if (e.currentTarget.src !== HERO_IMAGE) {
+                                    e.currentTarget.src = HERO_IMAGE;
+                                  }
+                                }}
+                                className="w-14 h-10 rounded-sm object-cover bg-[#F8F6F1] shrink-0"
+                              />
+                              <div>
+                                <div className="font-semibold text-[#1F241F]">{prop.title}</div>
+                                <div className="text-xs text-[#173B43]/70">
+                                  {prop.location} · <span className="font-tabular">{prop.surface} m²</span>
+                                </div>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="py-3.5 px-3 text-xs text-[#173B43]">
+                            <strong className="text-[#1F241F]">{prop.ownerName}</strong>
+                          </td>
+                          <td className="py-3.5 px-3 font-tabular text-xs">
+                            <span className="uppercase text-[#B86F52] font-semibold block">
+                              {prop.operationType}
+                            </span>
+                            <span className="font-semibold text-[#173B43]">
+                              {prop.currency} {prop.price.toLocaleString()}
+                            </span>
+                          </td>
+                          <td className="py-3.5 px-3 text-xs">
+                            <span
+                              className={`inline-block text-[10px] uppercase tracking-wider font-bold px-2.5 py-0.5 rounded-sm border ${getPublicationStatusBadgeClass(
+                                prop.publicationStatus
+                              )}`}
+                            >
+                              {prop.publicationStatus === 'suspendida' ? 'rechazada' : prop.publicationStatus}
+                            </span>
+                            {(prop.publicationStatus === 'rechazada' || prop.publicationStatus === 'suspendida') && prop.rejectionReason && (
+                              <div className="mt-1 max-w-56 text-[11px] text-red-800">
+                                Motivo: {prop.rejectionReason}
+                              </div>
+                            )}
+                          </td>
+                          <td className="py-3.5 px-3">
+                            {isConcretadaProp ? (
+                              <span className="px-2.5 py-1 text-xs font-bold bg-emerald-100 text-emerald-950 border border-emerald-400 rounded-sm inline-block">
+                                {prop.operationType === 'alquiler' ? 'Alquilada (Concretada)' : 'Vendida (Concretada)'}
+                              </span>
+                            ) : (
+                              <select
+                                value={prop.availability}
+                                onChange={(e) =>
+                                  onUpdateAvailability(prop.id, e.target.value as AvailabilityStatus)
+                                }
+                                className="px-2.5 py-1.5 text-xs bg-white border border-[#D5BFA0] rounded-sm"
+                              >
+                                <option value="disponible">Disponible</option>
+                                <option value="reservada">Reservada</option>
+                                <option value="alquilada">Alquilada</option>
+                                <option value="vendida">Vendida</option>
+                              </select>
+                            )}
+                          </td>
+                          <td className="py-3.5 pl-3 text-right">
+                            <div className="inline-flex items-center gap-1.5">
+                              <button
+                                type="button"
+                                onClick={() => onSelectProperty(prop)}
+                                className="px-2.5 py-1.5 text-xs font-semibold text-[#173B43] border border-[#D5BFA0] rounded-sm hover:bg-[#F8F6F1] inline-flex items-center gap-1"
+                                title="Ver ficha"
+                              >
+                                <Eye className="w-3.5 h-3.5" />
+                                Ver
+                              </button>
+                              {isConcretadaProp ? (
+                                <span className="px-2 py-1 text-[11px] font-semibold text-emerald-900 bg-emerald-50 border border-emerald-300 rounded-sm">
+                                  {prop.operationType === 'alquiler' ? 'Alquiler Concretado · Solo Lectura' : 'Venta Concretada · Solo Lectura'}
+                                </span>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => onOpenEditProperty(prop)}
+                                  className="px-2.5 py-1.5 text-xs font-semibold text-[#FCFBF7] bg-[#B86F52] hover:bg-[#a35e42] rounded-sm inline-flex items-center gap-1 transition-colors"
+                                  title="Editar datos de esta propiedad a mi cargo"
+                                >
+                                  <Edit3 className="w-3.5 h-3.5" />
+                                  Editar ficha
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </>
             )}
           </div>
         </div>
@@ -2893,20 +3164,20 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
         });
 
         return (
-          <div className="card-floating bg-white border-2 border-[#D5BFA0] rounded-2xl p-6 sm:p-8 space-y-6 shadow-sm">
+          <div className="card-floating bg-white border-2 border-[#D5BFA0] rounded-2xl p-4 sm:p-8 space-y-5 sm:space-y-6 shadow-sm">
             <div className="flex flex-col gap-3 border-b border-[#D5BFA0]/60 pb-4">
-              <h2 className="text-2xl font-serif-display font-semibold text-[#303638]">
+              <h2 className="text-xl sm:text-2xl font-serif-display font-semibold text-[#303638]">
                 {activeSubView === 'propietario_visitas'
                   ? 'Visitas Solicitadas a Mis Propiedades'
                   : 'Agenda de Visitas de Propiedades a Mi Cargo'}
               </h2>
 
               {/* Botones de filtros para visitas del propietario / agente */}
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 w-full">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-1.5 sm:gap-2 w-full">
                 <button
                   type="button"
                   onClick={() => setVisitFilter('todas')}
-                  className={`px-3 py-2 text-xs font-bold rounded-xl border-2 transition-all flex items-center justify-center gap-1.5 cursor-pointer text-center ${
+                  className={`px-2 py-1.5 sm:px-3 sm:py-2 text-[11px] sm:text-xs font-bold rounded-lg sm:rounded-xl border sm:border-2 transition-all flex items-center justify-center gap-1 sm:gap-1.5 cursor-pointer text-center ${
                     visitFilter === 'todas'
                       ? 'bg-[#173B43] text-white border-[#173B43] shadow-xs'
                       : 'bg-[#F8F6F1] text-[#303638] border-[#D5BFA0] hover:bg-white'
@@ -2917,49 +3188,49 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
                 <button
                   type="button"
                   onClick={() => setVisitFilter('pendiente')}
-                  className={`px-3 py-2 text-xs font-bold rounded-xl border-2 transition-all flex items-center justify-center gap-1.5 cursor-pointer text-center ${
+                  className={`px-2 py-1.5 sm:px-3 sm:py-2 text-[11px] sm:text-xs font-bold rounded-lg sm:rounded-xl border sm:border-2 transition-all flex items-center justify-center gap-1 sm:gap-1.5 cursor-pointer text-center ${
                     visitFilter === 'pendiente'
                       ? 'bg-amber-600 text-white border-amber-700 shadow-xs'
                       : 'bg-amber-50 text-amber-900 border-amber-300 hover:bg-amber-100'
                   }`}
                 >
-                  <Clock className="w-3.5 h-3.5 shrink-0" />
+                  <Clock className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0" />
                   <span className="truncate">Pendientes ({baseVisits.filter((v) => v.status === 'pendiente' || v.status === 'reprogramada').length})</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => setVisitFilter('confirmada')}
-                  className={`px-3 py-2 text-xs font-bold rounded-xl border-2 transition-all flex items-center justify-center gap-1.5 cursor-pointer text-center ${
+                  className={`px-2 py-1.5 sm:px-3 sm:py-2 text-[11px] sm:text-xs font-bold rounded-lg sm:rounded-xl border sm:border-2 transition-all flex items-center justify-center gap-1 sm:gap-1.5 cursor-pointer text-center ${
                     visitFilter === 'confirmada'
                       ? 'bg-[#173B43] text-white border-[#173B43] shadow-xs'
                       : 'bg-[#F8F6F1] text-[#173B43] border-[#D5BFA0] hover:bg-[#D5BFA0]/30'
                   }`}
                 >
-                  <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                  <CheckCircle2 className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0" />
                   <span className="truncate">Confirmadas ({baseVisits.filter((v) => v.status === 'confirmada' || v.status === 'realizada').length})</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => setVisitFilter('rechazada')}
-                  className={`px-3 py-2 text-xs font-bold rounded-xl border-2 transition-all flex items-center justify-center gap-1.5 cursor-pointer text-center ${
+                  className={`px-2 py-1.5 sm:px-3 sm:py-2 text-[11px] sm:text-xs font-bold rounded-lg sm:rounded-xl border sm:border-2 transition-all flex items-center justify-center gap-1 sm:gap-1.5 cursor-pointer text-center ${
                     visitFilter === 'rechazada'
                       ? 'bg-rose-700 text-white border-rose-800 shadow-xs'
                       : 'bg-rose-50 text-rose-900 border-rose-300 hover:bg-rose-100'
                   }`}
                 >
-                  <XCircle className="w-3.5 h-3.5 shrink-0" />
+                  <XCircle className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0" />
                   <span className="truncate">Rechazadas ({baseVisits.filter((v) => v.status === 'rechazada').length})</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => setVisitFilter('cancelada')}
-                  className={`px-3 py-2 text-xs font-bold rounded-xl border-2 transition-all flex items-center justify-center gap-1.5 cursor-pointer text-center ${
+                  className={`col-span-2 sm:col-span-1 px-2 py-1.5 sm:px-3 sm:py-2 text-[11px] sm:text-xs font-bold rounded-lg sm:rounded-xl border sm:border-2 transition-all flex items-center justify-center gap-1 sm:gap-1.5 cursor-pointer text-center ${
                     visitFilter === 'cancelada'
                       ? 'bg-gray-700 text-white border-gray-800 shadow-xs'
                       : 'bg-gray-100 text-gray-800 border-gray-300 hover:bg-gray-200'
                   }`}
                 >
-                  <X className="w-3.5 h-3.5 shrink-0" />
+                  <X className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0" />
                   <span className="truncate">Canceladas ({baseVisits.filter((v) => v.status === 'cancelada').length})</span>
                 </button>
               </div>
@@ -2980,7 +3251,7 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
                   return (
                   <div
                     key={v.id}
-                    className="card-floating p-5 bg-white border-2 border-[#D5BFA0] rounded-2xl flex flex-col min-w-0 gap-4 shadow-2xs"
+                    className="card-floating p-4 sm:p-5 bg-white border-2 border-[#D5BFA0] rounded-2xl flex flex-col min-w-0 gap-4 shadow-2xs"
                   >
                     <div className="space-y-1.5">
                       <div className="flex flex-wrap items-center gap-2 text-xs text-[#173B43]/80">
@@ -3016,9 +3287,9 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
                       {v.notes && <div className="text-xs text-[#173B43]/75">Nota: {v.notes}</div>}
                     </div>
 
-                    <div className="flex flex-nowrap items-center gap-2 w-full min-w-0 overflow-x-auto pb-1 [&>button]:shrink-0">
+                    <div className="flex flex-wrap items-center gap-2 w-full min-w-0">
                       {isPropConcretada ? (
-                        <div className="p-3 bg-amber-50 border border-amber-300 rounded-xl text-xs text-amber-900 flex items-center gap-2">
+                        <div className="p-3 bg-amber-50 border border-amber-300 rounded-xl text-xs text-amber-900 flex items-center gap-2 w-full">
                           <AlertCircle className="w-4 h-4 text-amber-700 shrink-0" />
                           <span className="font-semibold">
                             No se permite realizar estas acciones porque la propiedad ya está concretada.
@@ -3044,7 +3315,7 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
                           <span>Editar Acción</span>
                         </button>
                       ) : (
-                        <div className="flex flex-nowrap items-center gap-2 min-w-max [&_button]:h-9 [&_button]:inline-flex [&_button]:items-center [&_button]:justify-center [&_button]:whitespace-nowrap [&_button]:shrink-0 [&_input]:h-9">
+                        <div className="flex flex-wrap items-center gap-2 w-full [&_button]:min-h-9 [&_button]:inline-flex [&_button]:items-center [&_button]:justify-center [&_input]:h-9">
                           <button
                             type="button"
                             onClick={() => {
@@ -3065,7 +3336,7 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
                           >
                             Rechazar
                           </button>
-                          <div className="flex flex-nowrap items-center gap-1.5 shrink-0">
+                          <div className="flex flex-wrap items-center gap-1.5 w-full sm:w-auto">
                             <input
                               type="date"
                               min={getMinVisitDate()}
@@ -3082,7 +3353,7 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
                                 setRescheduleSlots((prev) => ({ ...prev, [v.id]: e.target.value }))
                               }
                               placeholder="Nuevo horario"
-                              className="w-28 px-2.5 py-2 text-xs bg-white border border-[#D5BFA0] rounded-sm"
+                              className="w-28 sm:w-28 flex-1 sm:flex-none px-2.5 py-2 text-xs bg-white border border-[#D5BFA0] rounded-sm"
                             />
                             <button
                               type="button"
@@ -3144,18 +3415,18 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
         renderChatSection(agentInquiries, true)}
 
       {(activeSubView === 'propietario_operaciones' || activeSubView === 'agente_operaciones') && (
-        <div className="card-floating bg-white border-2 border-[#D5BFA0] rounded-2xl p-6 sm:p-8 space-y-6 shadow-sm">
+        <div className="card-floating bg-white border-2 border-[#D5BFA0] rounded-2xl p-4 sm:p-8 space-y-5 sm:space-y-6 shadow-sm">
           <div className="flex flex-col gap-3 border-b border-[#D5BFA0]/60 pb-4">
-            <h2 className="text-2xl font-serif-display font-semibold text-[#303638]">
+            <h2 className="text-xl sm:text-2xl font-serif-display font-semibold text-[#303638]">
               {activeSubView === 'propietario_operaciones'
                 ? 'Propuestas Recibidas y Contratos'
                 : 'Operaciones y Contratos de Propiedades a Mi Cargo'}
             </h2>
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 w-full">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-1.5 sm:gap-2 w-full">
               <button
                 type="button"
                 onClick={() => setOpFilter('todos')}
-                className={`px-3 py-2 text-xs font-bold rounded-xl border-2 transition-all flex items-center justify-center gap-1.5 cursor-pointer text-center ${
+                className={`px-2 py-1.5 sm:px-3 sm:py-2 text-[11px] sm:text-xs font-bold rounded-lg sm:rounded-xl border sm:border-2 transition-all flex items-center justify-center gap-1 sm:gap-1.5 cursor-pointer text-center ${
                   opFilter === 'todos'
                     ? 'bg-[#173B43] text-white border-[#173B43] shadow-xs'
                     : 'bg-[#F8F6F1] text-[#303638] border-[#D5BFA0] hover:bg-white'
@@ -3166,49 +3437,49 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
               <button
                 type="button"
                 onClick={() => setOpFilter('proceso')}
-                className={`px-3 py-2 text-xs font-bold rounded-xl border-2 transition-all flex items-center justify-center gap-1.5 cursor-pointer text-center ${
+                className={`px-2 py-1.5 sm:px-3 sm:py-2 text-[11px] sm:text-xs font-bold rounded-lg sm:rounded-xl border sm:border-2 transition-all flex items-center justify-center gap-1 sm:gap-1.5 cursor-pointer text-center ${
                   opFilter === 'proceso'
                     ? 'bg-sky-700 text-white border-sky-800 shadow-xs'
                     : 'bg-sky-50 text-sky-900 border-sky-300 hover:bg-sky-100'
                 }`}
               >
-                <Clock className="w-3.5 h-3.5 shrink-0" />
+                <Clock className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0" />
                 <span>Pendiente</span>
               </button>
               <button
                 type="button"
                 onClick={() => setOpFilter('aceptadas')}
-                className={`px-3 py-2 text-xs font-bold rounded-xl border-2 transition-all flex items-center justify-center gap-1.5 cursor-pointer text-center ${
+                className={`px-2 py-1.5 sm:px-3 sm:py-2 text-[11px] sm:text-xs font-bold rounded-lg sm:rounded-xl border sm:border-2 transition-all flex items-center justify-center gap-1 sm:gap-1.5 cursor-pointer text-center ${
                   opFilter === 'aceptadas'
                     ? 'bg-amber-600 text-white border-amber-700 shadow-xs'
                     : 'bg-amber-50 text-amber-900 border-amber-300 hover:bg-amber-100'
                 }`}
               >
-                <Check className="w-3.5 h-3.5 shrink-0" />
+                <Check className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0" />
                 <span>Aceptadas</span>
               </button>
               <button
                 type="button"
                 onClick={() => setOpFilter('concretadas')}
-                className={`px-3 py-2 text-xs font-bold rounded-xl border-2 transition-all flex items-center justify-center gap-1.5 cursor-pointer text-center ${
+                className={`px-2 py-1.5 sm:px-3 sm:py-2 text-[11px] sm:text-xs font-bold rounded-lg sm:rounded-xl border sm:border-2 transition-all flex items-center justify-center gap-1 sm:gap-1.5 cursor-pointer text-center ${
                   opFilter === 'concretadas'
                     ? 'bg-[#173B43] text-white border-[#173B43] shadow-xs'
                     : 'bg-[#F8F6F1] text-[#173B43] border-[#D5BFA0] hover:bg-[#D5BFA0]/30'
                 }`}
               >
-                <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                <CheckCircle2 className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0" />
                 <span>Concretadas</span>
               </button>
               <button
                 type="button"
                 onClick={() => setOpFilter('rechazadas')}
-                className={`px-3 py-2 text-xs font-bold rounded-xl border-2 transition-all flex items-center justify-center gap-1.5 cursor-pointer text-center ${
+                className={`col-span-2 sm:col-span-1 px-2 py-1.5 sm:px-3 sm:py-2 text-[11px] sm:text-xs font-bold rounded-lg sm:rounded-xl border sm:border-2 transition-all flex items-center justify-center gap-1 sm:gap-1.5 cursor-pointer text-center ${
                   opFilter === 'rechazadas'
                     ? 'bg-rose-700 text-white border-rose-800 shadow-xs'
                     : 'bg-rose-50 text-rose-900 border-rose-300 hover:bg-rose-100'
                 }`}
               >
-                <XCircle className="w-3.5 h-3.5 shrink-0" />
+                <XCircle className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0" />
                 <span>Rechazadas</span>
               </button>
             </div>
@@ -3244,11 +3515,11 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
                 return (
                   <div
                     key={op.id}
-                    className="card-floating p-5 sm:p-6 bg-[#F8F6F1]/60 border-2 border-[#D5BFA0] rounded-2xl space-y-4 shadow-2xs"
+                    className="card-floating p-4 sm:p-6 bg-[#F8F6F1]/60 border-2 border-[#D5BFA0] rounded-2xl space-y-4 shadow-2xs"
                   >
                     {/* Header */}
-                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#D5BFA0]/70 pb-3">
-                      <div>
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#D5BFA0]/70 pb-3">
+                      <div className="min-w-0">
                         <span className="text-xs font-semibold text-[#B86F52] uppercase tracking-wider">
                           {op.operationType} · Solicitante: {op.clientName}
                         </span>
@@ -3256,18 +3527,18 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
                           <button
                             type="button"
                             onClick={() => onSelectProperty(prop)}
-                            className="text-lg font-serif-display font-semibold text-[#1F241F] hover:text-[#173B43] hover:underline text-left block cursor-pointer"
+                            className="text-base sm:text-lg font-serif-display font-semibold text-[#1F241F] hover:text-[#173B43] hover:underline text-left block cursor-pointer"
                             title="Ver ficha completa de la propiedad"
                           >
                             {op.propertyTitle}
                           </button>
                         ) : (
-                          <h3 className="text-lg font-serif-display font-semibold text-[#1F241F]">
+                          <h3 className="text-base sm:text-lg font-serif-display font-semibold text-[#1F241F]">
                             {op.propertyTitle}
                           </h3>
                         )}
                       </div>
-                      <div className="text-right space-y-1">
+                      <div className="text-left sm:text-right space-y-1 shrink-0">
                         <span className="text-base font-semibold font-tabular text-[#173B43] block">
                           {op.currency} {op.offeredAmount.toLocaleString()}
                         </span>
@@ -3343,8 +3614,8 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
                     {/* Counter offer details if present */}
                     {op.counterOffer && (
                       <div className="p-3.5 bg-amber-50 border border-amber-300 rounded-sm text-xs space-y-1">
-                        <div className="font-bold text-amber-900 uppercase tracking-wider text-[11px] flex items-center justify-between">
-                          <span>Última Contrapropuestas ({op.counterOffer.proposedBy}):</span>
+                        <div className="font-bold text-amber-900 uppercase tracking-wider text-[11px] flex flex-wrap items-center justify-between gap-2">
+                          <span>Última Contrapropuesta ({op.counterOffer.proposedBy}):</span>
                           <span className="font-tabular">
                             {op.counterOffer.currency} {op.counterOffer.amount.toLocaleString()}
                           </span>
@@ -3442,7 +3713,7 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
 
                       {op.status === 'concretada' && (
                         <div className="w-full p-3.5 bg-[#F8F6F1] border-2 border-[#173B43] rounded-sm text-xs space-y-1">
-                          <div className="font-bold text-[#173B43] font-tabular text-sm flex items-center justify-between">
+                          <div className="font-bold text-[#173B43] font-tabular text-sm flex flex-wrap items-center justify-between gap-2">
                             <span>Operación Concretada · Contrato #{op.contractCode || relatedContract?.contractCode}</span>
                             <span className="uppercase text-[10px] bg-[#D5BFA0]/55 text-[#173B43] px-2 py-0.5 rounded-sm font-semibold">
                               {isRental ? 'Alquilada' : 'Vendida'}
@@ -3452,7 +3723,7 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
                             {relatedContract?.contractTerms || op.contractTerms || 'Contrato registrado exitosamente.'}
                           </p>
                           {relatedContract?.signedContractDocRef && (
-                            <div className="text-[11px] font-mono text-[#173B43] pt-0.5">
+                            <div className="text-[11px] font-mono text-[#173B43] pt-0.5 break-all">
                               Documento: {relatedContract.signedContractDocRef}
                             </div>
                           )}
@@ -3471,10 +3742,10 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
           ADMINISTRADOR SCREENS
          ===================================================================== */}
       {activeSubView === 'admin_dashboard' && currentUser.role === 'administrador' && (
-        <div className="bg-[#FCFBF7] border border-[#D5BFA0] rounded-sm p-6 space-y-6">
+        <div className="bg-[#FCFBF7] border border-[#D5BFA0] rounded-sm p-4 sm:p-6 space-y-5 sm:space-y-6">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-2 border-b border-[#D5BFA0] pb-4">
             <div>
-              <h2 className="text-2xl font-serif-display font-semibold text-[#173B43]">
+              <h2 className="text-xl sm:text-2xl font-serif-display font-semibold text-[#173B43]">
                 Reportes y Métricas de la Plataforma
               </h2>
               <p className="text-xs text-[#173B43]/75 mt-0.5">
@@ -3689,10 +3960,10 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
           (Pendientes sin acción vs Ya Respondidas)
          ===================================================================== */}
       {activeSubView === 'admin_publicaciones' && currentUser.role === 'administrador' && (
-        <div className="bg-[#FCFBF7] border border-[#D5BFA0] rounded-sm p-6 space-y-6">
+        <div className="bg-[#FCFBF7] border border-[#D5BFA0] rounded-sm p-4 sm:p-6 space-y-5 sm:space-y-6">
           <div className="flex flex-col gap-4 border-b border-[#D5BFA0] pb-4">
             <div className="w-full">
-              <h2 className="text-2xl font-serif-display font-semibold text-[#173B43]">
+              <h2 className="text-xl sm:text-2xl font-serif-display font-semibold text-[#173B43]">
                 Moderación de Publicaciones y Solicitudes de Agente
               </h2>
               <p className="text-xs text-[#173B43]/75 mt-0.5">
@@ -3702,30 +3973,30 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
             </div>
 
             {/* Filtro de solicitudes del Administrador */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full sm:w-auto">
+            <div className="grid grid-cols-2 gap-1.5 sm:gap-2 w-full sm:w-auto">
               <button
                 type="button"
                 onClick={() => setAdminModerationFilter('pendientes')}
-                className={`px-4 py-2 text-xs font-bold rounded-sm border transition-colors flex items-center justify-center gap-2 cursor-pointer text-center ${
+                className={`px-2 py-1.5 sm:px-4 sm:py-2 text-[11px] sm:text-xs font-bold rounded-lg sm:rounded-sm border transition-colors flex items-center justify-center gap-1.5 sm:gap-2 cursor-pointer text-center ${
                   adminModerationFilter === 'pendientes'
                     ? 'bg-amber-600 text-white border-amber-700 shadow-xs'
                     : 'bg-amber-50 text-amber-900 border-amber-300 hover:bg-amber-100'
                 }`}
               >
-                <Clock className="w-3.5 h-3.5 shrink-0" />
-                <span>Pendientes de Acción ({adminPendingActionProperties.length})</span>
+                <Clock className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0" />
+                <span className="truncate">Pendientes ({adminPendingActionProperties.length})</span>
               </button>
               <button
                 type="button"
                 onClick={() => setAdminModerationFilter('respondidas')}
-                className={`px-4 py-2 text-xs font-bold rounded-sm border transition-colors flex items-center justify-center gap-2 cursor-pointer text-center ${
+                className={`px-2 py-1.5 sm:px-4 sm:py-2 text-[11px] sm:text-xs font-bold rounded-lg sm:rounded-sm border transition-colors flex items-center justify-center gap-1.5 sm:gap-2 cursor-pointer text-center ${
                   adminModerationFilter === 'respondidas'
                     ? 'bg-[#173B43] text-[#FCFBF7] border-[#173B43] shadow-xs'
                     : 'bg-[#F8F6F1] text-[#173B43] border-[#D5BFA0] hover:bg-[#D5BFA0]/40'
                 }`}
               >
-                <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
-                <span>Ya Respondidas / Historial ({adminRespondedProperties.length})</span>
+                <CheckCircle2 className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0" />
+                <span className="truncate">Ya Respondidas ({adminRespondedProperties.length})</span>
               </button>
             </div>
           </div>
@@ -3768,7 +4039,7 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
                   return (
                     <div
                       key={prop.id}
-                      className="p-5 bg-amber-50/60 border-2 border-amber-300 rounded-sm space-y-4"
+                      className="p-4 sm:p-5 bg-amber-50/60 border-2 border-amber-300 rounded-sm space-y-4"
                     >
                       {/* Título de la casa en una línea independiente ocupando toda la tarjeta */}
                       <div className="w-full pb-2.5 border-b border-amber-200 flex flex-col gap-1.5">
@@ -3847,23 +4118,23 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
                       </div>
 
                       {/* Fila inferior con todos los botones de Acción del CRUD alineados */}
-                      <div className="flex flex-wrap items-center justify-start gap-2.5 pt-3 border-t border-amber-300 w-full">
+                      <div className="flex flex-wrap items-center justify-start gap-2 sm:gap-2.5 pt-3 border-t border-amber-300 w-full">
                         {isPubPending ? (
                           <>
                             <button
                               type="button"
                               onClick={() => onModerateProperty(prop.id, 'aprobada')}
-                              className="px-4 py-2 text-xs font-bold text-white bg-[#173B43] rounded-sm hover:bg-[#122e35] inline-flex items-center gap-1.5 cursor-pointer shadow-xs"
+                              className="px-3 py-1.5 sm:px-4 sm:py-2 text-[11px] sm:text-xs font-bold text-white bg-[#173B43] rounded-lg sm:rounded-sm hover:bg-[#122e35] inline-flex items-center gap-1.5 cursor-pointer shadow-xs"
                             >
-                              <Check className="w-3.5 h-3.5" />
+                              <Check className="w-3.5 h-3.5 shrink-0" />
                               Aprobar Publicación
                             </button>
                             <button
                               type="button"
                               onClick={() => onSelectProperty(prop)}
-                              className="px-3.5 py-2 text-xs font-bold text-[#173B43] bg-white border border-[#D5BFA0] rounded-sm inline-flex items-center gap-1.5 cursor-pointer hover:bg-amber-50"
+                              className="px-3 py-1.5 sm:px-3.5 sm:py-2 text-[11px] sm:text-xs font-bold text-[#173B43] bg-white border border-[#D5BFA0] rounded-lg sm:rounded-sm inline-flex items-center gap-1.5 cursor-pointer hover:bg-amber-50"
                             >
-                              <Eye className="w-3.5 h-3.5" />
+                              <Eye className="w-3.5 h-3.5 shrink-0" />
                               Revisar Ficha
                             </button>
                             <button
@@ -3872,30 +4143,30 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
                                 setPropertyToReject(prop);
                                 setRejectionReasonDraft('');
                               }}
-                              className="px-3.5 py-2 text-xs font-bold text-white bg-red-600 rounded-sm hover:bg-red-700 inline-flex items-center gap-1.5 cursor-pointer shadow-xs"
+                              className="px-3 py-1.5 sm:px-3.5 sm:py-2 text-[11px] sm:text-xs font-bold text-white bg-red-600 rounded-lg sm:rounded-sm hover:bg-red-700 inline-flex items-center gap-1.5 cursor-pointer shadow-xs"
                             >
-                              <X className="w-3.5 h-3.5" />
+                              <X className="w-3.5 h-3.5 shrink-0" />
                               Rechazar
                             </button>
                           </>
                         ) : (
                           <>
-                            <div className="text-xs font-semibold text-[#173B43] bg-[#D5BFA0]/30 border border-[#D5BFA0] px-3 py-1.5 rounded-sm">
+                            <div className="text-[11px] sm:text-xs font-semibold text-[#173B43] bg-[#D5BFA0]/30 border border-[#D5BFA0] px-2.5 py-1.5 sm:px-3 rounded-lg sm:rounded-sm">
                               Publicación ya revisada ({prop.publicationStatus.toUpperCase()})
                             </div>
                             <button
                               type="button"
                               onClick={() => onSelectProperty(prop)}
-                              className="px-3.5 py-2 text-xs font-bold text-[#173B43] bg-white border border-[#D5BFA0] rounded-sm inline-flex items-center gap-1.5 cursor-pointer hover:bg-amber-50"
+                              className="px-3 py-1.5 sm:px-3.5 sm:py-2 text-[11px] sm:text-xs font-bold text-[#173B43] bg-white border border-[#D5BFA0] rounded-lg sm:rounded-sm inline-flex items-center gap-1.5 cursor-pointer hover:bg-amber-50"
                             >
-                              <Eye className="w-3.5 h-3.5" />
+                              <Eye className="w-3.5 h-3.5 shrink-0" />
                               Revisar Ficha
                             </button>
                           </>
                         )}
 
                         {isAgentPending && (
-                          <div className="flex flex-wrap items-center gap-2 ml-auto">
+                          <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-2 w-full lg:w-auto lg:ml-auto">
                             <select
                               value={selectedAgentUid}
                               onChange={(e) =>
@@ -3904,7 +4175,7 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
                                   [prop.id]: e.target.value,
                                 }))
                               }
-                              className="px-2.5 py-1.5 text-xs bg-white border border-amber-400 rounded-sm text-[#1F241F]"
+                              className="w-full sm:w-auto max-w-full px-2.5 py-1.5 text-xs bg-white border border-amber-400 rounded-sm text-[#1F241F]"
                             >
                               <option value="">Seleccionar agente...</option>
                               {agentsList.map((ag) => (
@@ -3921,9 +4192,9 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
                                 onAdminConfirmAgentAssignment(prop.id, ag.uid, ag.displayName);
                               }}
                               disabled={!selectedAgentUid}
-                              className="px-3.5 py-1.5 text-xs font-bold text-white bg-[#173B43] hover:bg-[#122e35] rounded-sm disabled:opacity-50 cursor-pointer shadow-xs inline-flex items-center gap-1.5"
+                              className="w-full sm:w-auto px-3.5 py-1.5 text-xs font-bold text-white bg-[#173B43] hover:bg-[#122e35] rounded-lg sm:rounded-sm disabled:opacity-50 cursor-pointer shadow-xs inline-flex items-center justify-center gap-1.5"
                             >
-                              <ShieldCheck className="w-3.5 h-3.5" />
+                              <ShieldCheck className="w-3.5 h-3.5 shrink-0" />
                               Confirmar y Asignar Agente
                             </button>
                           </div>
@@ -3956,7 +4227,7 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
                   return (
                     <div
                       key={prop.id}
-                      className="p-5 bg-[#F8F6F1] border border-[#D5BFA0] rounded-sm space-y-4"
+                      className="p-4 sm:p-5 bg-[#F8F6F1] border border-[#D5BFA0] rounded-sm space-y-4"
                     >
                       {/* Título de la casa en una línea independiente ocupando toda la tarjeta */}
                       <div className="w-full pb-2.5 border-b border-[#D5BFA0]/60 flex flex-col gap-1.5">
@@ -4029,22 +4300,22 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
                       </div>
 
                       {/* Fila inferior con todos los botones de Acción del CRUD alineados */}
-                      <div className="flex flex-wrap items-center justify-start gap-2.5 pt-3 border-t border-[#D5BFA0] w-full">
+                      <div className="flex flex-wrap items-center justify-start gap-2 sm:gap-2.5 pt-3 border-t border-[#D5BFA0] w-full">
                         <button
                           type="button"
                           onClick={() => onSelectProperty(prop)}
-                          className="px-3.5 py-2 text-xs font-bold text-[#173B43] bg-white border border-[#D5BFA0] rounded-sm inline-flex items-center gap-1.5 cursor-pointer hover:bg-amber-50"
+                          className="px-3 py-1.5 sm:px-3.5 sm:py-2 text-[11px] sm:text-xs font-bold text-[#173B43] bg-white border border-[#D5BFA0] rounded-lg sm:rounded-sm inline-flex items-center gap-1.5 cursor-pointer hover:bg-amber-50"
                         >
-                          <Eye className="w-3.5 h-3.5" />
+                          <Eye className="w-3.5 h-3.5 shrink-0" />
                           Revisar Ficha
                         </button>
                         {prop.publicationStatus !== 'aprobada' && (
                           <button
                             type="button"
                             onClick={() => onModerateProperty(prop.id, 'aprobada')}
-                            className="px-3.5 py-2 text-xs font-bold text-white bg-[#173B43] border border-[#173B43] rounded-sm hover:bg-[#122e35] inline-flex items-center gap-1.5 cursor-pointer shadow-xs"
+                            className="px-3 py-1.5 sm:px-3.5 sm:py-2 text-[11px] sm:text-xs font-bold text-white bg-[#173B43] border border-[#173B43] rounded-lg sm:rounded-sm hover:bg-[#122e35] inline-flex items-center gap-1.5 cursor-pointer shadow-xs"
                           >
-                            <Check className="w-3.5 h-3.5" />
+                            <Check className="w-3.5 h-3.5 shrink-0" />
                             Cambiar a Aprobada
                           </button>
                         )}
@@ -4055,14 +4326,14 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
                               setPropertyToReject(prop);
                               setRejectionReasonDraft('');
                             }}
-                            className="px-3.5 py-2 text-xs font-bold text-red-700 bg-red-50 border border-red-300 rounded-sm hover:bg-red-100 inline-flex items-center gap-1.5 cursor-pointer"
+                            className="px-3 py-1.5 sm:px-3.5 sm:py-2 text-[11px] sm:text-xs font-bold text-red-700 bg-red-50 border border-red-300 rounded-lg sm:rounded-sm hover:bg-red-100 inline-flex items-center gap-1.5 cursor-pointer"
                           >
-                            <X className="w-3.5 h-3.5" />
+                            <X className="w-3.5 h-3.5 shrink-0" />
                             Cambiar a Rechazada
                           </button>
                         )}
 
-                        <div className="flex flex-wrap items-center gap-2 ml-auto">
+                        <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-2 w-full lg:w-auto lg:ml-auto">
                           <select
                             value={selectedAgentUid}
                             onChange={(e) =>
@@ -4071,7 +4342,7 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
                                 [prop.id]: e.target.value,
                               }))
                             }
-                            className="px-2.5 py-1.5 text-xs bg-white border border-[#D5BFA0] rounded-sm text-[#1F241F]"
+                            className="w-full sm:w-auto max-w-full px-2.5 py-1.5 text-xs bg-white border border-[#D5BFA0] rounded-sm text-[#1F241F]"
                           >
                             <option value="">Seleccionar agente...</option>
                             {agentsList.map((ag) => (
@@ -4088,9 +4359,9 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
                               onAdminConfirmAgentAssignment(prop.id, ag.uid, ag.displayName);
                             }}
                             disabled={!selectedAgentUid}
-                            className="px-3.5 py-1.5 text-xs font-bold text-white bg-[#173B43] hover:bg-[#122e35] rounded-sm disabled:opacity-50 cursor-pointer shadow-xs inline-flex items-center gap-1.5"
+                            className="w-full sm:w-auto px-3.5 py-1.5 text-xs font-bold text-white bg-[#173B43] hover:bg-[#122e35] rounded-lg sm:rounded-sm disabled:opacity-50 cursor-pointer shadow-xs inline-flex items-center justify-center gap-1.5"
                           >
-                            <ShieldCheck className="w-3.5 h-3.5" />
+                            <ShieldCheck className="w-3.5 h-3.5 shrink-0" />
                             Asignar / Cambiar Agente
                           </button>
                         </div>
@@ -4105,17 +4376,80 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
       )}
 
       {activeSubView === 'admin_usuarios' && currentUser.role === 'administrador' && (
-        <div className="bg-[#FCFBF7] border border-[#D5BFA0] rounded-sm p-6 space-y-4">
+        <div className="bg-[#FCFBF7] border border-[#D5BFA0] rounded-sm p-4 sm:p-6 space-y-4">
           <div>
-            <h2 className="text-2xl font-serif-display font-semibold text-[#173B43]">
+            <h2 className="text-xl sm:text-2xl font-serif-display font-semibold text-[#173B43]">
               Administración de Usuarios, Roles y Estado de Cuentas
             </h2>
             <p className="text-xs text-[#173B43]/75 mt-0.5">
               Cualquier usuario registrado ingresa como Cliente (pudiendo habilitar funciones de Propietario). Desde aquí podés cambiar el rol de un usuario a Agente Inmobiliario.
             </p>
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse text-sm">
+          {/* Vista móvil en tarjetas completas sin scroll horizontal */}
+          <div className="md:hidden space-y-3">
+            {uniqueUsers.map((u) => (
+              <div
+                key={u.uid}
+                className="p-3.5 bg-white border border-[#D5BFA0] rounded-xl space-y-3 min-w-0"
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-10 h-10 rounded-full overflow-hidden bg-[#173B43] text-[#FCFBF7] flex items-center justify-center shrink-0">
+                    {u.photoUrl ? (
+                      <img src={u.photoUrl} alt={u.displayName} className="w-full h-full object-cover" />
+                    ) : (
+                      <User className="w-4 h-4" />
+                    )}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="font-semibold text-sm text-[#1F241F] truncate">{u.displayName}</div>
+                    <div className="text-xs text-[#173B43]/70 truncate">
+                      {u.agencyName || (u.isAlsoOwner ? 'Cliente y Propietario' : 'Particular')}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="text-xs font-tabular text-[#173B43] bg-[#F8F6F1]/70 p-2.5 rounded-lg border border-[#D5BFA0]/50 space-y-0.5">
+                  <div className="break-all font-medium">{u.email}</div>
+                  <div className="text-[#173B43]/75">{u.phone}</div>
+                </div>
+
+                <div className="space-y-2 pt-0.5">
+                  <div>
+                    <label className="block text-[10px] uppercase tracking-wider text-[#173B43]/65 font-semibold mb-1">
+                      Rol Asignado
+                    </label>
+                    <select
+                      value={u.role}
+                      onChange={(e) =>
+                        onUpdateUserAdmin(u.uid, e.target.value as UserRole, u.active)
+                      }
+                      className="w-full px-2.5 py-2 text-xs bg-white border border-[#D5BFA0] rounded-lg capitalize"
+                    >
+                      <option value="cliente">Cliente</option>
+                      <option value="propietario">Propietario</option>
+                      <option value="agente">Agente Inmobiliario</option>
+                      <option value="administrador">Administrador</option>
+                    </select>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => onUpdateUserAdmin(u.uid, u.role, !u.active)}
+                    className={`w-full px-3 py-2 text-xs font-bold rounded-lg border text-center cursor-pointer ${
+                      u.active
+                        ? 'text-[#173B43] border-[#173B43] bg-[#D5BFA0]/30'
+                        : 'text-red-800 border-red-400 bg-red-100'
+                    }`}
+                  >
+                    {u.active ? 'Activa (Desactivar)' : 'Suspendida / Inactiva (Activar)'}
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Vista PC / Tablet en tabla */}
+          <div className="hidden md:block overflow-x-auto -mx-1 px-1">
+            <table className="w-full min-w-[640px] text-left border-collapse text-sm">
               <thead>
                 <tr className="border-b border-[#D5BFA0] text-xs uppercase tracking-wider text-[#173B43]/70">
                   <th className="py-3 pr-4">Nombre</th>
@@ -4201,7 +4535,7 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
               value={newCatName}
               onChange={(e) => setNewCatName(e.target.value)}
               placeholder="Nombre de nuevo tipo o característica (ej. Quincho cubierto)..."
-              className="flex-1 min-w-[220px] px-3.5 py-2 text-xs bg-white border border-[#D5BFA0] rounded-sm"
+              className="w-full sm:w-auto sm:flex-1 sm:min-w-[220px] min-w-0 px-3.5 py-2 text-base sm:text-xs bg-white border border-[#D5BFA0] rounded-sm"
             />
             <select
               value={newCatKind}
@@ -4254,13 +4588,13 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
           CLAIMS / RECLAMOS (Admin & User views, con 4 estados y filtros)
          ===================================================================== */}
       {(activeSubView === 'admin_reclamos' || activeSubView === 'reclamos_usuario') && (
-        <div className="bg-[#FCFBF7] border border-[#D5BFA0] rounded-sm p-6 space-y-6">
+        <div className="bg-[#FCFBF7] border border-[#D5BFA0] rounded-sm p-4 sm:p-6 space-y-5 sm:space-y-6">
           <div className="flex flex-col gap-4 border-b border-[#D5BFA0] pb-4">
             <div className="w-full">
               <span className="text-[11px] uppercase tracking-[0.2em] text-[#B86F52] font-semibold block">
                 Soporte y Reclamaciones
               </span>
-              <h2 className="text-2xl font-serif-display font-semibold text-[#173B43]">
+              <h2 className="text-xl sm:text-2xl font-serif-display font-semibold text-[#173B43]">
                 Centro de Reclamos y Seguimiento
               </h2>
               <p className="text-xs text-[#173B43]/75 mt-0.5">
@@ -4271,52 +4605,52 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
             </div>
 
             {currentUser.role === 'administrador' && (
-              <div className="grid grid-cols-3 gap-2 w-full">
+              <div className="grid grid-cols-3 gap-1.5 sm:gap-2 w-full">
                 <button
                   type="button"
                   onClick={() => setAdminClaimFilter('pendientes')}
-                  className={`px-3 py-2 text-xs font-bold rounded-sm border transition-colors flex items-center justify-center gap-1.5 cursor-pointer text-center ${
+                  className={`px-1.5 py-1.5 sm:px-3 sm:py-2 text-[10px] sm:text-xs font-bold rounded-lg sm:rounded-sm border transition-colors flex items-center justify-center gap-1 sm:gap-1.5 cursor-pointer text-center ${
                     adminClaimFilter === 'pendientes'
                       ? 'bg-amber-600 text-white border-amber-700 shadow-xs'
                       : 'bg-amber-50 text-amber-900 border-amber-300 hover:bg-amber-100'
                   }`}
                 >
-                  <Clock className="w-3.5 h-3.5 shrink-0" />
+                  <Clock className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0" />
                   <span className="truncate">Pendientes ({adminPendingClaims.length})</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => setAdminClaimFilter('en_revision')}
-                  className={`px-3 py-2 text-xs font-bold rounded-sm border transition-colors flex items-center justify-center gap-1.5 cursor-pointer text-center ${
+                  className={`px-1.5 py-1.5 sm:px-3 sm:py-2 text-[10px] sm:text-xs font-bold rounded-lg sm:rounded-sm border transition-colors flex items-center justify-center gap-1 sm:gap-1.5 cursor-pointer text-center ${
                     adminClaimFilter === 'en_revision'
                       ? 'bg-blue-600 text-white border-blue-700 shadow-xs'
                       : 'bg-blue-50 text-blue-900 border-blue-300 hover:bg-blue-100'
                   }`}
                 >
-                  <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                  <span className="truncate">En Revisión ({adminRevisionClaims.length})</span>
+                  <AlertCircle className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0" />
+                  <span className="truncate">Revisión ({adminRevisionClaims.length})</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => setAdminClaimFilter('solucionados')}
-                  className={`px-3 py-2 text-xs font-bold rounded-sm border transition-colors flex items-center justify-center gap-1.5 cursor-pointer text-center ${
+                  className={`px-1.5 py-1.5 sm:px-3 sm:py-2 text-[10px] sm:text-xs font-bold rounded-lg sm:rounded-sm border transition-colors flex items-center justify-center gap-1 sm:gap-1.5 cursor-pointer text-center ${
                     adminClaimFilter === 'solucionados'
                       ? 'bg-[#173B43] text-white border-[#173B43] shadow-xs'
                       : 'bg-[#F8F6F1] text-[#173B43] border-[#D5BFA0] hover:bg-[#D5BFA0]/30'
                   }`}
                 >
-                  <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                  <CheckCircle2 className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0" />
                   <span className="truncate">Solucionados ({adminSolvedClaims.length})</span>
                 </button>
               </div>
             )}
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 sm:gap-6">
             {currentUser.role !== 'administrador' && (
               <form
                 onSubmit={handleClaimSubmit}
-                className="lg:col-span-4 space-y-3.5 bg-[#F8F6F1] p-5 rounded-sm border border-[#D5BFA0] shadow-xs"
+                className="lg:col-span-4 space-y-3.5 bg-[#F8F6F1] p-4 sm:p-5 rounded-sm border border-[#D5BFA0] shadow-xs"
               >
                 <div className="text-xs font-bold uppercase tracking-wider text-[#173B43]">
                   Enviar Nuevo Reclamo
@@ -4417,7 +4751,7 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
                   return (
                     <div
                       key={clm.id}
-                      className="p-5 bg-white border border-[#D5BFA0] rounded-sm space-y-4 shadow-xs"
+                      className="p-4 sm:p-5 bg-white border border-[#D5BFA0] rounded-sm space-y-4 shadow-xs"
                     >
                       {/* Cabecera del reclamo */}
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#D5BFA0]/60 pb-3">
@@ -4531,13 +4865,13 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
 
                         {/* Panel expandido con chat y línea de tiempo */}
                         {isExpanded && (
-                          <div className="mt-3 p-4 bg-[#F8F6F1]/70 border border-[#D5BFA0] rounded-sm space-y-4">
+                          <div className="mt-3 p-3 sm:p-4 bg-[#F8F6F1]/70 border border-[#D5BFA0] rounded-sm space-y-4">
                             <div className="text-xs font-bold text-[#173B43] uppercase tracking-wider flex items-center gap-1.5">
-                              <MessageSquare className="w-3.5 h-3.5" />
+                              <MessageSquare className="w-3.5 h-3.5 shrink-0" />
                               Conversación interna del reclamo
                             </div>
 
-                            <div className="space-y-2.5 max-h-60 overflow-y-auto pr-1">
+                            <div className="space-y-2.5 max-h-72 overflow-y-auto pr-1">
                               {(!clm.messages || clm.messages.length === 0) ? (
                                 <p className="text-xs text-[#173B43]/70 italic">
                                   No hay mensajes en la conversación todavía. Escribí abajo para responder.
@@ -4548,24 +4882,26 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
                                   return (
                                     <div
                                       key={m.id}
-                                      className={`flex flex-col ${isMine ? 'items-end' : 'items-start'}`}
+                                      className={`flex flex-col min-w-0 ${isMine ? 'items-end' : 'items-start'}`}
                                     >
                                       <div
-                                        className={`max-w-md p-3 rounded-sm text-xs space-y-1 ${
+                                        className={`max-w-[90%] sm:max-w-md min-w-0 p-3 rounded-sm text-xs space-y-1 ${
                                           isMine
                                             ? 'bg-[#173B43] text-[#FCFBF7]'
                                             : 'bg-white border border-[#D5BFA0] text-[#1F241F]'
                                         }`}
                                       >
                                         <div
-                                          className={`flex items-center justify-between gap-4 text-[10px] ${
+                                          className={`flex flex-wrap items-center justify-between gap-x-3 gap-y-0.5 text-[10px] ${
                                             isMine ? 'text-[#D5BFA0]' : 'text-[#173B43]/75'
                                           }`}
                                         >
                                           <span className="font-semibold">{m.senderName} ({m.senderRole})</span>
                                           <span className="font-tabular">{m.timestamp}</span>
                                         </div>
-                                        <p className="leading-relaxed">{m.text}</p>
+                                        <p className="leading-relaxed break-words [overflow-wrap:anywhere] whitespace-pre-wrap">
+                                          {m.text}
+                                        </p>
                                       </div>
                                     </div>
                                   );
@@ -4582,7 +4918,7 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
                                 await onSendClaimMessage(clm.id, txt);
                                 setClaimReplyDrafts((prev) => ({ ...prev, [clm.id]: '' }));
                               }}
-                              className="flex gap-2 pt-2 border-t border-[#D5BFA0]/60"
+                              className="flex items-center gap-2 pt-2 border-t border-[#D5BFA0]/60"
                             >
                               <input
                                 type="text"
@@ -4590,15 +4926,15 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
                                 onChange={(e) =>
                                   setClaimReplyDrafts((prev) => ({ ...prev, [clm.id]: e.target.value }))
                                 }
-                                placeholder="Escribir respuesta en el reclamo..."
-                                className="flex-1 px-3 py-2 text-xs bg-white border border-[#D5BFA0] rounded-sm"
+                                placeholder="Escribir respuesta..."
+                                className="min-w-0 flex-1 px-3 py-2 text-base sm:text-xs bg-white border border-[#D5BFA0] rounded-sm"
                               />
                               <button
                                 type="submit"
-                                className="px-4 py-2 text-xs font-semibold text-white bg-[#173B43] hover:bg-[#2c382d] rounded-sm inline-flex items-center gap-1 cursor-pointer"
+                                className="px-3.5 sm:px-4 py-2 min-h-[38px] text-xs font-semibold text-white bg-[#173B43] hover:bg-[#2c382d] rounded-sm inline-flex items-center gap-1 cursor-pointer shrink-0"
                               >
-                                <Send className="w-3.5 h-3.5" />
-                                Enviar
+                                <Send className="w-3.5 h-3.5 shrink-0" />
+                                <span>Enviar</span>
                               </button>
                             </form>
 
@@ -4606,17 +4942,17 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
                             {clm.statusHistory && clm.statusHistory.length > 0 && (
                               <div className="pt-3 border-t border-[#D5BFA0]/60 space-y-2">
                                 <div className="text-[11px] font-bold text-[#173B43] uppercase tracking-wider flex items-center gap-1.5">
-                                  <History className="w-3.5 h-3.5" />
+                                  <History className="w-3.5 h-3.5 shrink-0" />
                                   Historial de Seguimiento y Cambios
                                 </div>
                                 <div className="space-y-1.5 text-[11px] text-[#173B43]/85">
                                   {clm.statusHistory.map((sh) => (
-                                    <div key={sh.id} className="flex flex-wrap items-center justify-between bg-white p-2 rounded-sm border border-[#D5BFA0]/60">
-                                      <div>
+                                    <div key={sh.id} className="flex flex-wrap items-center justify-between gap-2 bg-white p-2 rounded-sm border border-[#D5BFA0]/60 min-w-0 break-words">
+                                      <div className="min-w-0">
                                         <span className="font-semibold text-[#1F241F]">{sh.changedBy}</span> ({sh.changedByRole}):{' '}
                                         <span>{sh.note || `Estado: ${sh.fromStatus} → ${sh.toStatus}`}</span>
                                       </div>
-                                      <span className="font-tabular text-[10px] text-[#173B43]/70">{sh.timestamp}</span>
+                                      <span className="font-tabular text-[10px] text-[#173B43]/70 shrink-0">{sh.timestamp}</span>
                                     </div>
                                   ))}
                                 </div>

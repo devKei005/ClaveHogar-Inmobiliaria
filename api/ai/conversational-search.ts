@@ -267,7 +267,7 @@ INSTRUCCIONES CLAVE PARA CLARA:
     - Termina SIEMPRE tu mensaje con una pregunta abierta y cordial para que el cliente pueda continuar la conversación.`;
 
       const response = await ai.models.generateContent({
-        model: 'models/gemini-3.8-flash',
+        model: 'gemini-4-hydrogen',
         contents: prompt,
         config: {
           systemInstruction: `Eres Clara, una corredora y asesora inmobiliaria profesional, amable, cálida y de confianza en la inmobiliaria ClaveHogar (Argentina).

@@ -468,14 +468,14 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#1F241F]/60 p-4 overflow-y-auto">
-      <div className="relative w-full max-w-3xl bg-[#FCFBF7] border border-[#D5BFA0] rounded-md overflow-hidden my-8 max-h-[92vh] flex flex-col">
-        <div className="flex items-center justify-between px-6 py-4 bg-[#173B43] text-[#FCFBF7] shrink-0">
-          <div>
-            <span className="text-[11px] uppercase tracking-[0.2em] text-[#D5BFA0] font-semibold block">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#1F241F]/60 p-0 sm:p-4 overflow-y-auto">
+      <div className="relative w-full max-w-3xl bg-[#FCFBF7] border-0 sm:border border-[#D5BFA0] rounded-none sm:rounded-md overflow-hidden my-0 sm:my-8 h-[100dvh] sm:h-auto max-h-[100dvh] sm:max-h-[92vh] flex flex-col">
+        <div className="flex items-center justify-between gap-3 px-4 sm:px-6 py-3.5 sm:py-4 bg-[#173B43] text-[#FCFBF7] shrink-0">
+          <div className="min-w-0">
+            <span className="text-[10px] sm:text-[11px] uppercase tracking-[0.2em] text-[#D5BFA0] font-semibold block truncate">
               Mis Propiedades · ClaveHogar
             </span>
-            <h2 className="text-xl font-serif-display font-semibold text-white">
+            <h2 className="text-lg sm:text-xl font-serif-display font-semibold text-white truncate">
               {editingProperty
                 ? 'Editar Propiedad Registrada'
                 : 'Publicar Nueva Propiedad'}
@@ -484,13 +484,13 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
           <button
             type="button"
             onClick={onClose}
-            className="p-2 text-[#D5BFA0] hover:text-[#FCFBF7] rounded-sm hover:bg-white/10 transition-colors"
+            className="p-2 text-[#D5BFA0] hover:text-[#FCFBF7] rounded-sm hover:bg-white/10 transition-colors shrink-0"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="overflow-y-auto p-6 space-y-5">
+        <form onSubmit={handleSubmit} className="overflow-y-auto p-4 sm:p-6 space-y-5 flex-1">
           {!editingProperty && currentUser?.role !== 'administrador' && (
             <div className="p-3.5 bg-[#F8F6F1] border border-[#D5BFA0] rounded-sm text-xs text-[#173B43]">
               <strong>Nota sobre revisión:</strong> Al publicar tu propiedad, quedará en estado{' '}
@@ -980,7 +980,7 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
 
           {/* Real Device File Upload */}
           <div className="space-y-3">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-wrap items-center justify-between gap-1">
               <label className="block text-xs font-semibold text-[#173B43]">
                 Fotografías del inmueble ({selectedImages.length} / {SCHEMA_LIMITS.PROP_IMAGES_MAX}) *
               </label>
@@ -1048,18 +1048,18 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
             )}
           </div>
 
-          <div className="flex items-center justify-end gap-3 pt-4 border-t border-[#D5BFA0]">
+          <div className="flex flex-col-reverse sm:flex-row sm:items-center justify-end gap-2.5 sm:gap-3 pt-4 border-t border-[#D5BFA0]">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2.5 text-xs font-semibold text-[#173B43] bg-white border border-[#D5BFA0] rounded-sm hover:bg-[#F8F6F1]"
+              className="w-full sm:w-auto px-4 py-2.5 text-xs font-semibold text-[#173B43] bg-white border border-[#D5BFA0] rounded-sm hover:bg-[#F8F6F1]"
             >
               Cancelar
             </button>
             <button
               type="submit"
               disabled={saving || uploadingFiles}
-              className="px-6 py-2.5 text-xs font-semibold text-[#FCFBF7] bg-[#173B43] hover:bg-[#2c382d] rounded-sm transition-colors disabled:opacity-50"
+              className="w-full sm:w-auto px-6 py-2.5 text-xs font-semibold text-[#FCFBF7] bg-[#173B43] hover:bg-[#2c382d] rounded-sm transition-colors disabled:opacity-50"
             >
               {saving
                 ? 'Guardando...'

@@ -307,18 +307,18 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#1F241F]/65 p-4 overflow-y-auto">
-      <div className="relative w-full max-w-6xl bg-[#FCFBF7] border border-[#D5BFA0] rounded-md overflow-hidden my-8 max-h-[92vh] flex flex-col">
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-[#1F241F]/65 p-0 sm:p-4 overflow-y-auto">
+      <div className="relative w-full max-w-6xl bg-[#FCFBF7] border border-[#D5BFA0] rounded-none sm:rounded-md overflow-hidden my-0 sm:my-8 h-full sm:h-auto max-h-full sm:max-h-[92vh] flex flex-col">
         {/* Top bar */}
-        <div className="flex items-center justify-between px-6 py-4 bg-[#173B43] text-[#FCFBF7] shrink-0">
-          <div className="flex items-center gap-2 text-xs tracking-wider uppercase text-[#D5BFA0]">
-            <span>{property.propertyType}</span>
+        <div className="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-6 py-3 sm:py-4 bg-[#173B43] text-[#FCFBF7] shrink-0">
+          <div className="flex items-center gap-1.5 sm:gap-2 text-[10px] sm:text-xs tracking-wider uppercase text-[#D5BFA0] min-w-0 truncate">
+            <span className="truncate">{property.propertyType}</span>
             <span aria-hidden="true">·</span>
             <span>{property.operationType === 'alquiler' ? 'Alquiler' : 'Venta'}</span>
-            <span aria-hidden="true">·</span>
-            <span>{property.availability}</span>
+            <span aria-hidden="true" className="hidden xs:inline">·</span>
+            <span className="hidden xs:inline">{property.availability}</span>
           </div>
-          <div className="flex items-center gap-2.5">
+          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2.5 shrink-0">
             {canEdit && onOpenEditProperty && !isConcretada && (
               <button
                 type="button"
@@ -326,11 +326,12 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
                   onClose();
                   onOpenEditProperty(property);
                 }}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-sm bg-[#B86F52] hover:bg-[#a35e42] text-[#FCFBF7] border border-[#B86F52] transition-colors whitespace-nowrap cursor-pointer shadow-sm"
+                className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 text-[11px] sm:text-xs font-semibold rounded-sm bg-[#B86F52] hover:bg-[#a35e42] text-[#FCFBF7] border border-[#B86F52] transition-colors whitespace-nowrap cursor-pointer shadow-sm"
                 title="Editar datos, fotos, precio o disponibilidad de esta propiedad"
               >
                 <Edit3 className="w-3.5 h-3.5" />
-                <span>Editar Propiedad</span>
+                <span className="hidden sm:inline">Editar Propiedad</span>
+                <span className="sm:hidden">Editar</span>
               </button>
             )}
             {currentUser?.role !== 'administrador' && isOwnerOfProperty && !isConcretada && onDeleteProperty && (
@@ -339,41 +340,43 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
                 onClick={() => {
                   onDeleteProperty(property.id);
                 }}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-sm bg-red-600 hover:bg-red-700 text-white border border-red-600 transition-colors whitespace-nowrap cursor-pointer shadow-xs"
+                className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 text-[11px] sm:text-xs font-semibold rounded-sm bg-red-600 hover:bg-red-700 text-white border border-red-600 transition-colors whitespace-nowrap cursor-pointer shadow-xs"
                 title="Eliminar esta propiedad"
               >
                 <Trash2 className="w-3.5 h-3.5" />
-                <span>Eliminar</span>
+                <span className="hidden sm:inline">Eliminar</span>
               </button>
             )}
             <button
               type="button"
               onClick={() => onToggleCompare(property.id)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-xl border transition-colors whitespace-nowrap cursor-pointer ${
+              className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 text-[11px] sm:text-xs font-medium rounded-xl border transition-colors whitespace-nowrap cursor-pointer ${
                 isCompared
                   ? 'bg-[#C87955] text-white border-[#C87955]'
                   : 'bg-transparent text-white border-white/30 hover:bg-white/10'
               }`}
+              title={isCompared ? 'En comparador' : 'Comparar'}
             >
               <ArrowLeftRight className="w-3.5 h-3.5" />
-              {isCompared ? 'En comparador' : 'Comparar'}
+              <span className="hidden md:inline">{isCompared ? 'En comparador' : 'Comparar'}</span>
             </button>
             <button
               type="button"
               onClick={() => onToggleFavorite(property.id)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-sm border transition-colors whitespace-nowrap ${
+              className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 text-[11px] sm:text-xs font-medium rounded-sm border transition-colors whitespace-nowrap cursor-pointer ${
                 isFavorite
                   ? 'bg-[#B86F52] text-[#FCFBF7] border-[#B86F52]'
                   : 'bg-transparent text-[#FCFBF7] border-[#A8B5A0]/40 hover:bg-white/10'
               }`}
+              title={isFavorite ? 'Guardado' : 'Guardar'}
             >
               <Heart className={`w-3.5 h-3.5 ${isFavorite ? 'fill-current' : ''}`} />
-              {isFavorite ? 'Guardado' : 'Guardar'}
+              <span className="hidden md:inline">{isFavorite ? 'Guardado' : 'Guardar'}</span>
             </button>
             <button
               type="button"
               onClick={onClose}
-              className="p-2 text-[#D5BFA0] hover:text-[#FCFBF7] rounded-sm hover:bg-white/10 transition-colors"
+              className="p-2 text-[#D5BFA0] hover:text-[#FCFBF7] rounded-sm hover:bg-white/10 transition-colors cursor-pointer"
               aria-label="Cerrar detalle"
             >
               <X className="w-5 h-5" />
@@ -382,7 +385,7 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
         </div>
 
         {/* Scrollable Content */}
-        <div className="overflow-y-auto p-6 lg:p-10 grid grid-cols-1 lg:grid-cols-12 gap-10">
+        <div className="overflow-y-auto p-4 sm:p-6 lg:p-10 grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-10">
           {/* Left column: Large Photography + Architectural Specs + Description (7 cols) */}
           <div className="lg:col-span-7 space-y-8">
             {/* Image Gallery */}
@@ -514,8 +517,8 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
           </div>
 
           {/* Right column: Editorial Action Module + Clean Chat List -> Full Conversation (5 cols) */}
-          <div className="lg:col-span-5">
-            <div className="bg-[#F8F6F1] border border-[#D5BFA0] rounded-sm p-6 space-y-6 sticky top-0">
+          <div className="lg:col-span-5 min-w-0">
+            <div className="bg-[#F8F6F1] border border-[#D5BFA0] rounded-sm p-4 sm:p-6 space-y-5 sm:space-y-6 lg:sticky lg:top-0">
               {/* Header info */}
               <div className="space-y-2 border-b border-[#D5BFA0] pb-5">
                 <div className="text-xs uppercase tracking-widest text-[#B86F52] font-semibold">
@@ -610,7 +613,7 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
                 <button
                   type="button"
                   onClick={() => setActiveTab('visita')}
-                  className={`py-2 px-2 text-xs font-semibold rounded-sm transition-colors whitespace-nowrap ${
+                  className={`py-2 px-1 sm:px-2 text-[11px] sm:text-xs font-semibold rounded-sm transition-colors truncate ${
                     activeTab === 'visita'
                       ? 'bg-[#173B43] text-[#FCFBF7]'
                       : 'text-[#173B43] hover:bg-[#FCFBF7]/60'
@@ -621,7 +624,7 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
                 <button
                   type="button"
                   onClick={() => setActiveTab('operacion')}
-                  className={`py-2 px-2 text-xs font-semibold rounded-sm transition-colors whitespace-nowrap ${
+                  className={`py-2 px-1 sm:px-2 text-[11px] sm:text-xs font-semibold rounded-sm transition-colors truncate ${
                     activeTab === 'operacion'
                       ? 'bg-[#173B43] text-[#FCFBF7]'
                       : 'text-[#173B43] hover:bg-[#FCFBF7]/60'
@@ -632,7 +635,7 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
                 <button
                   type="button"
                   onClick={() => setActiveTab('consulta')}
-                  className={`py-2 px-2 text-xs font-semibold rounded-sm transition-colors whitespace-nowrap ${
+                  className={`py-2 px-1 sm:px-2 text-[11px] sm:text-xs font-semibold rounded-sm transition-colors truncate ${
                     activeTab === 'consulta'
                       ? 'bg-[#173B43] text-[#FCFBF7]'
                       : 'text-[#173B43] hover:bg-[#FCFBF7]/60'
@@ -660,7 +663,7 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
                   )}
 
                   <div className="space-y-1">
-                    <div className="flex items-center justify-between">
+                    <div className="flex flex-wrap items-center justify-between gap-1.5">
                       <label className="block text-xs font-semibold text-[#173B43]">
                         Fecha preferida de visita
                       </label>
@@ -969,12 +972,12 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
                     </>
                   ) : (
                     /* Individual Full Chat View inside modal */
-                    <div className="space-y-3 bg-[#FCFBF7] border border-[#D5BFA0] rounded-sm p-4">
-                      <div className="flex items-center justify-between border-b border-[#D5BFA0] pb-2.5">
+                    <div className="space-y-3 bg-[#FCFBF7] border border-[#D5BFA0] rounded-sm p-3 sm:p-4 min-w-0">
+                      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#D5BFA0] pb-2.5">
                         <button
                           type="button"
                           onClick={() => setSelectedInquiryId(null)}
-                          className="inline-flex items-center gap-1 text-xs font-semibold text-[#173B43] hover:text-[#B86F52]"
+                          className="inline-flex items-center gap-1 text-xs font-semibold text-[#173B43] hover:text-[#B86F52] cursor-pointer"
                         >
                           <ArrowLeft className="w-3.5 h-3.5" />
                           Volver a la lista
@@ -984,12 +987,12 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
                         </span>
                       </div>
 
-                      <div className="text-xs text-[#173B43]">
+                      <div className="text-xs text-[#173B43] break-words">
                         Conversación entre <strong>{activeThread.clientName}</strong> y{' '}
                         <strong>{activeThread.agentName || property.agentName || property.ownerName}</strong>
                       </div>
 
-                      <div className="space-y-2.5 max-h-60 overflow-y-auto py-2">
+                      <div className="space-y-2.5 max-h-60 overflow-y-auto overscroll-contain py-2 pr-1">
                         {(activeThread.messages && activeThread.messages.length > 0
                           ? activeThread.messages
                           : [
@@ -1007,13 +1010,13 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
                           return (
                             <div
                               key={msg.id}
-                              className={`p-3 rounded-sm text-xs space-y-1 ${
+                              className={`p-3 rounded-sm text-xs space-y-1 min-w-0 break-words [overflow-wrap:anywhere] ${
                                 isClient
-                                  ? 'bg-[#F8F6F1] text-[#1F241F] mr-4 border border-[#D5BFA0]'
-                                  : 'bg-[#173B43] text-[#FCFBF7] ml-4'
+                                  ? 'bg-[#F8F6F1] text-[#1F241F] mr-2 sm:mr-4 border border-[#D5BFA0]'
+                                  : 'bg-[#173B43] text-[#FCFBF7] ml-2 sm:ml-4'
                               }`}
                             >
-                              <div className="flex items-center justify-between text-[10px] opacity-75">
+                              <div className="flex flex-wrap items-center justify-between gap-2 text-[10px] opacity-75">
                                 <span className="font-semibold">{msg.senderName}</span>
                                 <span className="font-tabular">{msg.timestamp}</span>
                               </div>
@@ -1025,7 +1028,7 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
 
                       <form
                         onSubmit={(e) => handleChatSubmit(e, activeThread.id)}
-                        className="flex gap-2 pt-2 border-t border-[#D5BFA0]"
+                        className="flex items-center gap-2 pt-2 border-t border-[#D5BFA0]"
                       >
                         <input
                           type="text"
@@ -1033,12 +1036,12 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
                           value={chatText}
                           onChange={(e) => setChatText(e.target.value)}
                           placeholder="Responder en este chat..."
-                          className="flex-1 px-3 py-2 text-xs bg-white border border-[#D5BFA0] rounded-sm focus:outline-none focus:border-[#173B43]"
+                          className="flex-1 min-w-0 px-3 py-2 text-base sm:text-xs bg-white border border-[#D5BFA0] rounded-sm focus:outline-none focus:border-[#173B43]"
                         />
                         <button
                           type="submit"
                           disabled={submitting}
-                          className="px-3.5 py-2 text-xs font-semibold text-[#FCFBF7] bg-[#173B43] hover:bg-[#2c382d] rounded-sm"
+                          className="px-3.5 py-2 min-h-[38px] text-xs font-semibold text-[#FCFBF7] bg-[#173B43] hover:bg-[#2c382d] rounded-sm shrink-0 cursor-pointer"
                         >
                           Enviar
                         </button>
