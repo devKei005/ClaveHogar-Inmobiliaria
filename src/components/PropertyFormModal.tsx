@@ -8,7 +8,9 @@ import {
   UserCheck,
   ShieldCheck,
   User,
+  WifiOff,
 } from 'lucide-react';
+import { useOnlineStatus } from '../hooks/useOnlineStatus';
 import {
   PropertyItem,
   OperationTypeChoice,
@@ -89,6 +91,7 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
   onNotify,
 }) => {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const isOnline = useOnlineStatus();
 
   const propertyTypes = categories
     .filter((c) => c.kind === 'tipo_inmueble' && c.active)
@@ -431,6 +434,15 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
       finalRequestedAgentName = editingProperty?.requestedAgentName || currentUser?.displayName || '';
     }
 
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      onNotify(
+        'error',
+        'Sin conexión a internet',
+        'Conectate a internet para publicar o guardar cambios en esta propiedad.'
+      );
+      return;
+    }
+
     setSaving(true);
     try {
       await onSave(
@@ -491,6 +503,18 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
         </div>
 
         <form onSubmit={handleSubmit} className="overflow-y-auto p-4 sm:p-6 space-y-5 flex-1">
+          {!isOnline && (
+            <div
+              role="status"
+              className="p-3.5 bg-amber-50 border border-amber-300 rounded-sm text-xs text-amber-950 flex items-start gap-2.5"
+            >
+              <WifiOff className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
+              <span>
+                <strong>Sin conexión a internet:</strong> conectate a internet para publicar o guardar modificaciones en tus propiedades.
+              </span>
+            </div>
+          )}
+
           {!editingProperty && currentUser?.role !== 'administrador' && (
             <div className="p-3.5 bg-[#F8F6F1] border border-[#D5BFA0] rounded-sm text-xs text-[#173B43]">
               <strong>Nota sobre revisión:</strong> Al publicar tu propiedad, quedará en estado{' '}

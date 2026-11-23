@@ -5,7 +5,9 @@ import {
   Camera,
   Trash2,
   User,
+  WifiOff,
 } from 'lucide-react';
+import { useOnlineStatus } from '../hooks/useOnlineStatus';
 import {
   UserProfile,
   UserRole,
@@ -118,6 +120,7 @@ export const AuthProfileModal: React.FC<AuthProfileModalProps> = ({
 
   const [busy, setBusy] = useState(false);
   const [googleBusy, setGoogleBusy] = useState(false);
+  const isOnline = useOnlineStatus();
   const [authFeedback, setAuthFeedback] = useState<{
     type: 'error' | 'info';
     message: string;
@@ -346,6 +349,18 @@ export const AuthProfileModal: React.FC<AuthProfileModalProps> = ({
         </div>
 
         <div className="p-4 sm:p-6 overflow-y-auto flex-1">
+          {!isOnline && (
+            <div
+              role="status"
+              className="mb-4 p-3 rounded-sm border border-amber-300 bg-amber-50 text-amber-950 text-xs flex items-start gap-2"
+            >
+              <WifiOff className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
+              <span>
+                <strong>Sin conexión a internet:</strong> necesitás estar conectado para iniciar sesión, registrarte o guardar cambios en tu cuenta.
+              </span>
+            </div>
+          )}
+
           {/* SCREEN 1: INICIAR SESIÓN */}
           {mode === 'login' && (
             <div className="space-y-4">

@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <rect width="512" height="512" rx="96" fill="#173B43" />
+  <rect x="28" y="28" width="456" height="456" rx="76" stroke="#D5BFA0" stroke-opacity="0.28" stroke-width="6" />
+  <!-- Architectural Roof & House Frame -->
+  <path d="M116 244L256 124L396 244" stroke="#D5BFA0" stroke-width="26" stroke-linecap="round" stroke-linejoin="round" />
+  <path d="M158 228V376H354V228" stroke="#F8F6F1" stroke-width="24" stroke-linecap="round" stroke-linejoin="round" />
+  <!-- Keyhole / Key Accent inside Home -->
+  <circle cx="256" cy="264" r="32" fill="#C87955" />
+  <circle cx="256" cy="264" r="12" fill="#173B43" />
+  <path d="M256 294V348M256 326H282M256 346H276" stroke="#D5BFA0" stroke-width="18" stroke-linecap="round" stroke-linejoin="round" />
+</svg>

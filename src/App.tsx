@@ -99,6 +99,8 @@ import { ComparatorView } from './components/ComparatorView';
 import { AuthProfileModal, AuthModalMode } from './components/AuthProfileModal';
 import { PropertyFormModal } from './components/PropertyFormModal';
 import { AIChatAssistant } from './components/AIChatAssistant';
+import { PWAInstallButton } from './components/PWAInstallButton';
+import { OfflineIndicator } from './components/OfflineIndicator';
 import {
   RoleWorkspaceView,
   WorkspaceSubView,
@@ -180,6 +182,32 @@ function saveCachedUsers(userList: UserProfile[]) {
   }
 }
 
+function getCachedProperties(): PropertyItem[] {
+  try {
+    const raw = localStorage.getItem('clavehogar_properties_cache_v1');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed.map((p: PropertyItem) => ({
+          ...p,
+          images: resolvePropertyImages(p.images, p.id),
+        }));
+      }
+    }
+  } catch {
+    // ignore
+  }
+  return INITIAL_PROPERTIES;
+}
+
+function saveCachedProperties(propList: PropertyItem[]) {
+  try {
+    localStorage.setItem('clavehogar_properties_cache_v1', JSON.stringify(propList));
+  } catch {
+    // ignore
+  }
+}
+
 export default function App() {
   const [activeSection, setActiveSection] = useState<MainSection>('catalogo');
   const [activeSubView, setActiveSubView] = useState<WorkspaceSubView>('cliente_favoritos');
@@ -217,7 +245,7 @@ export default function App() {
   const [showNotifDropdown, setShowNotifDropdown] = useState(false);
 
   // Core Entities state (synced with Firestore)
-  const [properties, setProperties] = useState<PropertyItem[]>(INITIAL_PROPERTIES);
+  const [properties, setProperties] = useState<PropertyItem[]>(() => getCachedProperties());
   const [allFavorites, setAllFavorites] = useState<{ userId: string; propertyId: string }[]>([]);
   const [comparedByUser, setComparedByUser] = useState<Record<string, string[]>>({});
   const [visits, setVisits] = useState<VisitItem[]>(INITIAL_VISITS);
@@ -511,7 +539,9 @@ export default function App() {
             images: resolvedImages,
           });
         });
-        setProperties(Array.from(uniqueMap.values()));
+        const nextProps = Array.from(uniqueMap.values());
+        setProperties(nextProps);
+        saveCachedProperties(nextProps);
       },
       (err) => handleFirestoreError(err, OperationType.GET, 'properties')
     );
@@ -908,6 +938,12 @@ export default function App() {
     reason?: 'not_registered' | 'already_registered' | 'suspended' | 'cancelled' | 'error';
     message?: string;
   }> => {
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      const msg =
+        'Sin conexión a internet. Conectate para iniciar sesión o registrarte con Google.';
+      notify('error', 'Sin conexión a internet', msg);
+      return { ok: false, reason: 'error', message: msg };
+    }
     authFlowInProgressRef.current = intent;
     try {
       isDemoSessionRef.current = false;
@@ -1046,6 +1082,15 @@ export default function App() {
     const emailClean = email.trim().toLowerCase();
     const officialDemoProfile = findOfficialDemoProfileByEmail(emailClean);
 
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      notify(
+        'error',
+        'Sin conexión a internet',
+        'Conectate a internet para iniciar sesión en tu cuenta.'
+      );
+      return false;
+    }
+
     authFlowInProgressRef.current = 'login';
     try {
       isDemoSessionRef.current = false;
@@ -1183,6 +1228,15 @@ export default function App() {
       return false;
     }
 
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      notify(
+        'error',
+        'Sin conexión a internet',
+        'Necesitás conexión a internet para crear una cuenta nueva.'
+      );
+      return false;
+    }
+
     authFlowInProgressRef.current = 'register';
     try {
       isDemoSessionRef.current = false;
@@ -1241,6 +1295,14 @@ export default function App() {
   };
 
   const handlePasswordReset = async (email: string) => {
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      notify(
+        'error',
+        'Sin conexión a internet',
+        'Conectate a internet para enviar el correo de recuperación.'
+      );
+      return;
+    }
     try {
       await sendPasswordResetEmail(auth, email);
       notify('info', 'Enlace enviado', `Revisá la casilla de ${email}.`);
@@ -1451,6 +1513,14 @@ export default function App() {
     existingId?: string
   ) => {
     if (!currentUser) return;
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      notify(
+        'error',
+        'Sin conexión a internet',
+        'Conectate a internet para publicar o guardar cambios en una propiedad.'
+      );
+      return;
+    }
     const isEdit = Boolean(existingId);
     if (!isEdit && currentUser.role === 'administrador') {
       notify(
@@ -1620,6 +1690,14 @@ export default function App() {
   const handleDeleteProperty = async (propertyId: string) => {
     const target = properties.find((p) => p.id === propertyId);
     if (!currentUser || !target) return;
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      notify(
+        'error',
+        'Sin conexión a internet',
+        'Necesitás conexión a internet para eliminar una propiedad.'
+      );
+      return;
+    }
     if (isPropertyConcretada(target, operations) && currentUser.role !== 'administrador') {
       notify(
         'error',
@@ -3337,8 +3415,9 @@ export default function App() {
             )}
           </nav>
 
-          {/* Right: Auth & User Actions */}
-          <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
+          {/* Right: Auth, Install & User Actions */}
+          <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
+            <PWAInstallButton variant="header" />
             {!currentUser ? (
               <>
                 <button
@@ -3529,6 +3608,8 @@ export default function App() {
         </div>
       </header>
 
+      <OfflineIndicator />
+
       {/* =====================================================================
           SLIDE-OVER HAMBURGER LATERAL MENU PANEL
          ===================================================================== */}
@@ -3699,27 +3780,33 @@ export default function App() {
               )}
             </div>
 
-            {currentUser && (
-              <div className="pt-4 border-t border-[#D5BFA0] space-y-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsSideMenuOpen(false);
-                    openAuthModal('profile');
-                  }}
-                  className="w-full text-left px-3.5 py-2 text-xs font-semibold text-[#173B43] hover:bg-[#F8F6F1] rounded-sm"
-                >
-                  Mi Perfil Personal y Foto
-                </button>
-                <button
-                  type="button"
-                  onClick={handleLogout}
-                  className="w-full text-left px-3.5 py-2 text-xs font-semibold text-[#B86F52] hover:bg-[#F8F6F1] rounded-sm"
-                >
-                  Cerrar sesión
-                </button>
-              </div>
-            )}
+            <div className="pt-4 border-t border-[#D5BFA0] space-y-2">
+              <PWAInstallButton
+                variant="drawer"
+                onInstalled={() => setIsSideMenuOpen(false)}
+              />
+              {currentUser && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsSideMenuOpen(false);
+                      openAuthModal('profile');
+                    }}
+                    className="w-full text-left px-3.5 py-2 text-xs font-semibold text-[#173B43] hover:bg-[#F8F6F1] rounded-sm"
+                  >
+                    Mi Perfil Personal y Foto
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleLogout}
+                    className="w-full text-left px-3.5 py-2 text-xs font-semibold text-[#B86F52] hover:bg-[#F8F6F1] rounded-sm"
+                  >
+                    Cerrar sesión
+                  </button>
+                </>
+              )}
+            </div>
           </aside>
         </div>
       )}

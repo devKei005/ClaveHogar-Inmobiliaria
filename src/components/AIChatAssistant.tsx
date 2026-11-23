@@ -9,8 +9,10 @@ import {
   Info,
   Sparkles,
   Bot,
+  WifiOff,
 } from 'lucide-react';
 import { PropertyItem, UserProfile } from '../types';
+import { useOnlineStatus } from '../hooks/useOnlineStatus';
 import { HERO_IMAGE } from '../data/initialData';
 import {
   ExtractedSearchCriteria,
@@ -53,6 +55,8 @@ export const AIChatAssistant: React.FC<AIChatAssistantProps> = ({
   initialPrompt,
   currentUser,
 }) => {
+  const isOnline = useOnlineStatus();
+  const [offlineSendWarning, setOfflineSendWarning] = useState(false);
   const userKey = currentUser?.uid ? `user_${currentUser.uid}` : 'guest';
   const storageKeyHistory = `clavehogar_ai_chat_history_${userKey}`;
   const storageKeyCriteria = `clavehogar_ai_chat_criteria_${userKey}`;
@@ -159,9 +163,21 @@ export const AIChatAssistant: React.FC<AIChatAssistantProps> = ({
     }
   }, [initialPrompt]);
 
+  useEffect(() => {
+    if (isOnline) {
+      setOfflineSendWarning(false);
+    }
+  }, [isOnline]);
+
   const handleSendMessage = async (textToSend?: string) => {
     const text = (textToSend ?? inputValue).trim();
     if (!text || isLoading) return;
+
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      setOfflineSendWarning(true);
+      return;
+    }
+    setOfflineSendWarning(false);
 
     setInputValue('');
 
@@ -383,6 +399,18 @@ export const AIChatAssistant: React.FC<AIChatAssistantProps> = ({
           </button>
         </div>
       </header>
+
+      {!isOnline && (
+        <div
+          role="status"
+          className="bg-amber-50 border-b border-amber-300 text-amber-950 px-3 sm:px-8 py-2 text-[11px] sm:text-xs flex items-center gap-2 shrink-0"
+        >
+          <WifiOff className="w-3.5 h-3.5 text-amber-700 shrink-0" />
+          <span>
+            <strong>Chat con IA sin conexión:</strong> necesitás conexión a internet para hacer nuevas consultas a Clara. Tu historial previo sigue disponible.
+          </span>
+        </div>
+      )}
 
       {/* 2. Barra de Preferencias Recordadas (Full-Width, compacta) */}
       {hasActiveCriteria && (
@@ -708,6 +736,17 @@ export const AIChatAssistant: React.FC<AIChatAssistantProps> = ({
       {/* 4. Barra de Entrada Destacada con Fondo Elegante */}
       <footer className="w-full bg-gradient-to-t from-[#EAE2D5] via-[#F4EFE6] to-[#F4EFE6] border-t-2 border-[#D5BFA0] px-3 py-2.5 sm:p-5 shrink-0 z-10 shadow-lg">
         <div className="max-w-4xl mx-auto space-y-2">
+          {offlineSendWarning && !isOnline && (
+            <div
+              role="alert"
+              className="px-3 py-2 rounded-lg bg-red-50 border border-red-300 text-red-900 text-xs flex items-center gap-2"
+            >
+              <WifiOff className="w-3.5 h-3.5 text-red-600 shrink-0" />
+              <span>
+                No se pudo enviar la consulta porque estás sin conexión a internet. Reconectate e intentá nuevamente.
+              </span>
+            </div>
+          )}
           <form
             onSubmit={(e) => {
               e.preventDefault();
