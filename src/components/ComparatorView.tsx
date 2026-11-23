@@ -103,14 +103,14 @@ export const ComparatorView: React.FC<ComparatorViewProps> = ({
           <button
             type="button"
             onClick={onGoToCatalog}
-            className="px-2.5 sm:px-4 py-2 sm:py-2.5 text-[11px] sm:text-xs font-semibold text-[#173B43] bg-[#FCFBF7] border border-[#D5BFA0] rounded-lg sm:rounded-sm hover:bg-[#F8F6F1] transition-colors text-center truncate"
+            className="px-2 sm:px-4 py-2 sm:py-2.5 text-[10px] sm:text-xs font-semibold text-[#173B43] bg-[#FCFBF7] border border-[#D5BFA0] rounded-lg sm:rounded-sm hover:bg-[#F8F6F1] transition-colors text-center leading-tight"
           >
             + Agregar otra
           </button>
           <button
             type="button"
             onClick={onClearCompare}
-            className="px-2.5 sm:px-4 py-2 sm:py-2.5 text-[11px] sm:text-xs font-semibold text-[#B86F52] bg-[#FCFBF7] border border-[#B86F52]/40 rounded-lg sm:rounded-sm hover:bg-[#B86F52]/10 transition-colors text-center truncate"
+            className="px-2 sm:px-4 py-2 sm:py-2.5 text-[10px] sm:text-xs font-semibold text-[#B86F52] bg-[#FCFBF7] border border-[#B86F52]/40 rounded-lg sm:rounded-sm hover:bg-[#B86F52]/10 transition-colors text-center leading-tight"
           >
             Limpiar comparador
           </button>
@@ -163,8 +163,11 @@ export const ComparatorView: React.FC<ComparatorViewProps> = ({
                 key={prop.id}
                 className="bg-[#FCFBF7] border border-[#D5BFA0] rounded-xl overflow-hidden flex flex-col justify-between p-2 space-y-2 shadow-2xs min-w-0"
               >
-                <div className="space-y-1.5">
-                  <div className="relative aspect-[4/3] rounded-lg overflow-hidden bg-[#F8F6F1]">
+                <div className="space-y-1">
+                  <div
+                    onClick={() => onSelectProperty(prop)}
+                    className="relative aspect-[16/10] rounded-lg overflow-hidden bg-[#F8F6F1] cursor-pointer"
+                  >
                     <img
                       src={resolvePropertyImageUrl(prop.images[0])}
                       alt={prop.title}
@@ -178,24 +181,30 @@ export const ComparatorView: React.FC<ComparatorViewProps> = ({
                     />
                     <button
                       type="button"
-                      onClick={() => onRemoveFromCompare(prop.id)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onRemoveFromCompare(prop.id);
+                      }}
                       className="absolute top-1.5 right-1.5 p-1 rounded-md bg-[#173B43]/90 text-[#FCFBF7] hover:bg-[#B86F52] transition-colors"
                       title="Quitar de la comparación"
                     >
                       <X className="w-3 h-3" />
                     </button>
                   </div>
-                  <div className="text-[9px] uppercase tracking-wider text-[#B86F52] font-bold truncate">
+                  <div className="text-[8.5px] uppercase tracking-wide text-[#B86F52] font-bold leading-tight truncate">
                     {prop.propertyType} · {prop.operationType === 'alquiler' ? 'Alquiler' : 'Venta'}
                   </div>
-                  <div className="text-xs font-serif-display font-semibold text-[#1F241F] line-clamp-2 min-h-[2rem] leading-tight">
+                  <div
+                    onClick={() => onSelectProperty(prop)}
+                    className="text-[11px] font-serif-display font-semibold text-[#1F241F] leading-tight line-clamp-1 cursor-pointer"
+                  >
                     {prop.title}
                   </div>
                 </div>
                 <button
                   type="button"
                   onClick={() => onSelectProperty(prop)}
-                  className="w-full py-1.5 px-2 text-[10px] font-semibold text-[#FCFBF7] bg-[#173B43] hover:bg-[#2c382d] rounded-lg transition-colors"
+                  className="w-full py-1 px-2 text-[10px] font-semibold text-[#FCFBF7] bg-[#173B43] hover:bg-[#2c382d] rounded-lg transition-colors"
                 >
                   Ver Ficha
                 </button>

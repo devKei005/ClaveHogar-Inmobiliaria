@@ -613,7 +613,7 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
                 <button
                   type="button"
                   onClick={() => setActiveTab('visita')}
-                  className={`py-2 px-1 sm:px-2 text-[11px] sm:text-xs font-semibold rounded-sm transition-colors truncate ${
+                  className={`py-2 px-1 sm:px-2 text-[10px] sm:text-xs font-semibold rounded-sm transition-colors leading-tight text-center ${
                     activeTab === 'visita'
                       ? 'bg-[#173B43] text-[#FCFBF7]'
                       : 'text-[#173B43] hover:bg-[#FCFBF7]/60'
@@ -624,7 +624,7 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
                 <button
                   type="button"
                   onClick={() => setActiveTab('operacion')}
-                  className={`py-2 px-1 sm:px-2 text-[11px] sm:text-xs font-semibold rounded-sm transition-colors truncate ${
+                  className={`py-2 px-1 sm:px-2 text-[10px] sm:text-xs font-semibold rounded-sm transition-colors leading-tight text-center ${
                     activeTab === 'operacion'
                       ? 'bg-[#173B43] text-[#FCFBF7]'
                       : 'text-[#173B43] hover:bg-[#FCFBF7]/60'
@@ -635,7 +635,7 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
                 <button
                   type="button"
                   onClick={() => setActiveTab('consulta')}
-                  className={`py-2 px-1 sm:px-2 text-[11px] sm:text-xs font-semibold rounded-sm transition-colors truncate ${
+                  className={`py-2 px-1 sm:px-2 text-[10px] sm:text-xs font-semibold rounded-sm transition-colors leading-tight text-center ${
                     activeTab === 'consulta'
                       ? 'bg-[#173B43] text-[#FCFBF7]'
                       : 'text-[#173B43] hover:bg-[#FCFBF7]/60'
@@ -924,10 +924,10 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
                                   className="w-full p-3.5 text-left hover:bg-[#F8F6F1] transition-colors flex items-center justify-between gap-3"
                                 >
                                   <div className="min-w-0">
-                                    <div className="text-xs font-semibold text-[#1F241F] truncate">
+                                    <div className="text-[11px] sm:text-xs font-semibold text-[#1F241F] leading-snug break-words">
                                       {inq.clientName} ↔ {inq.agentName || property.agentName || property.ownerName}
                                     </div>
-                                    <p className="text-xs text-[#173B43]/75 truncate mt-0.5">
+                                    <p className="text-[11px] sm:text-xs text-[#173B43]/75 line-clamp-2 sm:truncate mt-0.5 leading-snug">
                                       {lastMsg}
                                     </p>
                                   </div>

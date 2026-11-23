@@ -3024,42 +3024,46 @@ export default function App() {
   return (
     <div className={activeSection === 'buscador_ia' ? "fixed inset-0 flex flex-col bg-[#FCFBF7] text-[#1F241F] overflow-hidden" : "min-h-screen flex flex-col bg-[#FCFBF7] text-[#1F241F]"}>
       {/* =====================================================================
-          TOAST NOTIFICATIONS (Capa principal superior sobre cualquier modal)
+          TOAST NOTIFICATIONS (Arriba y compacto en celular; abajo a la derecha en tablet/PC)
          ===================================================================== */}
-      <div className="fixed bottom-4 left-3 right-3 sm:left-auto sm:bottom-6 sm:right-6 z-[99999] flex flex-col gap-2.5 sm:max-w-md sm:w-full pointer-events-none">
+      <div className="fixed top-2.5 left-2.5 right-2.5 sm:top-auto sm:left-auto sm:bottom-6 sm:right-6 z-[99999] flex flex-col gap-1.5 sm:gap-2.5 max-w-sm mx-auto sm:max-w-md sm:w-full sm:mx-0 pointer-events-none">
         {toasts.map((t) => (
           <div
             key={t.id}
-            className={`pointer-events-auto flex items-start gap-3 p-4 rounded-sm border-2 shadow-2xl backdrop-blur-md animate-fade-slide ${
+            className={`pointer-events-auto flex items-start gap-2 sm:gap-3 p-2.5 sm:p-4 rounded-xl sm:rounded-sm border sm:border-2 shadow-xl sm:shadow-2xl backdrop-blur-md animate-fade-slide ${
               t.type === 'success'
-                ? 'bg-emerald-50 text-emerald-950 border-emerald-600 shadow-xl ring-2 ring-emerald-600/20'
+                ? 'bg-emerald-50 text-emerald-950 border-emerald-600 shadow-lg ring-1 sm:ring-2 ring-emerald-600/20'
                 : t.type === 'error'
-                ? 'bg-[#FDF2F2] text-[#691C1C] border-red-500 shadow-red-950/15 ring-2 ring-red-500/20'
-                : 'bg-[#FEF9EE] text-[#5C3B00] border-amber-500 shadow-amber-950/15 ring-2 ring-amber-500/20'
+                ? 'bg-[#FDF2F2] text-[#691C1C] border-red-500 shadow-red-950/15 ring-1 sm:ring-2 ring-red-500/20'
+                : 'bg-[#FEF9EE] text-[#5C3B00] border-amber-500 shadow-amber-950/15 ring-1 sm:ring-2 ring-amber-500/20'
             }`}
           >
             <div className="shrink-0 mt-0.5">
               {t.type === 'success' && (
-                <div className="w-8 h-8 rounded-full bg-emerald-700 text-white flex items-center justify-center shadow-md ring-2 ring-emerald-600/30">
-                  <CheckCircle2 className="w-5 h-5 stroke-[2.5] text-white" />
+                <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-emerald-700 text-white flex items-center justify-center shadow-sm ring-1 sm:ring-2 ring-emerald-600/30">
+                  <CheckCircle2 className="w-3.5 h-3.5 sm:w-5 sm:h-5 stroke-[2.5] text-white" />
                 </div>
               )}
               {t.type === 'error' && (
-                <div className="w-8 h-8 rounded-full bg-red-600 text-white flex items-center justify-center shadow-xs">
-                  <XCircle className="w-4 h-4 stroke-[2.5]" />
+                <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-red-600 text-white flex items-center justify-center shadow-xs">
+                  <XCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4 stroke-[2.5]" />
                 </div>
               )}
               {t.type === 'info' && (
-                <div className="w-8 h-8 rounded-full bg-amber-500 text-white flex items-center justify-center shadow-xs">
-                  <Info className="w-4 h-4 stroke-[2.5]" />
+                <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-amber-500 text-white flex items-center justify-center shadow-xs">
+                  <Info className="w-3.5 h-3.5 sm:w-4 sm:h-4 stroke-[2.5]" />
                 </div>
               )}
             </div>
 
-            <div className="flex-1 text-xs">
-              <div className="font-bold text-sm leading-snug">{t.title}</div>
+            <div className="flex-1 min-w-0 text-[11px] sm:text-xs">
+              <div className="font-bold text-xs sm:text-sm leading-tight sm:leading-snug break-words">
+                {t.title}
+              </div>
               {t.description && (
-                <p className="opacity-90 mt-1 leading-relaxed text-[12px]">{t.description}</p>
+                <p className="opacity-90 mt-0.5 sm:mt-1 leading-snug sm:leading-relaxed text-[10.5px] sm:text-[12px] break-words">
+                  {t.description}
+                </p>
               )}
             </div>
 
@@ -3067,9 +3071,9 @@ export default function App() {
               type="button"
               onClick={() => setToasts((prev) => prev.filter((item) => item.id !== t.id))}
               title="Cerrar aviso"
-              className="p-1 rounded-sm text-current/60 hover:text-current hover:bg-black/5 transition-colors shrink-0 cursor-pointer"
+              className="p-0.5 sm:p-1 rounded-sm text-current/60 hover:text-current hover:bg-black/5 transition-colors shrink-0 cursor-pointer"
             >
-              <X className="w-4 h-4 stroke-[2.5]" />
+              <X className="w-3.5 h-3.5 sm:w-4 sm:h-4 stroke-[2.5]" />
             </button>
           </div>
         ))}
@@ -3895,7 +3899,7 @@ export default function App() {
                               className="w-full h-full object-cover group-hover:scale-104 transition-transform duration-700"
                             />
 
-                            <div className="absolute top-1.5 left-1.5 sm:top-3 sm:left-3 bg-white/95 backdrop-blur-xs text-[#303638] px-1.5 py-0.5 sm:px-3 sm:py-1 text-[8px] sm:text-[10px] uppercase tracking-wider font-bold rounded sm:rounded-lg border border-[#D5BFA0]/60 shadow-2xs max-w-[56%] sm:max-w-none truncate">
+                            <div className="absolute top-1.5 left-1.5 sm:top-3 sm:left-3 bg-white/95 backdrop-blur-xs text-[#303638] px-1.5 py-0.5 sm:px-3 sm:py-1 text-[7.5px] sm:text-[10px] uppercase tracking-wide sm:tracking-wider font-bold rounded sm:rounded-lg border border-[#D5BFA0]/60 shadow-2xs max-w-[66%] sm:max-w-none leading-tight sm:truncate">
                               {prop.operationType === 'alquiler' ? 'Alquiler' : 'Venta'} · {prop.propertyType}
                             </div>
 
@@ -3930,13 +3934,13 @@ export default function App() {
                             </div>
                           </div>
 
-                          <div className="property-card-info p-2.5 sm:p-5 space-y-1.5 sm:space-y-3">
+                          <div className="property-card-info p-2 sm:p-4 space-y-1 sm:space-y-2">
                             <div className="flex items-center justify-between text-xs gap-1 sm:gap-2">
-                              <span className="uppercase tracking-wider text-[#303638]/60 font-semibold truncate text-[9px] sm:text-[11px]">
+                              <span className="uppercase tracking-wide sm:tracking-wider text-[#303638]/60 font-semibold text-[8.5px] sm:text-[11px] leading-tight truncate">
                                 {prop.location}
                               </span>
                               <span
-                                className={`text-[8px] sm:text-[10px] uppercase tracking-wider font-bold px-1.5 sm:px-2.5 py-0.5 rounded-full border shrink-0 ${
+                                className={`text-[7.5px] sm:text-[10px] uppercase tracking-wider font-bold px-1.5 sm:px-2.5 py-0.5 rounded-full border shrink-0 ${
                                   prop.availability === 'disponible'
                                     ? 'bg-[#E5ECE4] text-[#173B43] border-[#C6D6C4]'
                                     : prop.availability === 'reservada'
@@ -3950,28 +3954,32 @@ export default function App() {
 
                             <h3
                               onClick={() => setSelectedProperty(prop)}
-                              className="text-xs sm:text-lg font-serif-display font-semibold text-[#303638] group-hover:text-[#173B43] transition-colors line-clamp-2 cursor-pointer leading-tight sm:leading-snug"
+                              className="text-[11.5px] sm:text-base font-serif-display font-semibold text-[#303638] group-hover:text-[#173B43] transition-colors line-clamp-1 sm:line-clamp-2 cursor-pointer leading-tight sm:leading-snug"
                             >
                               {prop.title}
                             </h3>
 
-                            <p className="hidden sm:block text-xs text-[#303638]/75 line-clamp-2 leading-relaxed">
+                            <p
+                              onClick={() => setSelectedProperty(prop)}
+                              title="Entrar para ver la descripción completa"
+                              className="text-[10px] sm:text-xs text-[#303638]/75 line-clamp-1 sm:line-clamp-2 leading-snug sm:leading-relaxed cursor-pointer hover:text-[#173B43] transition-colors"
+                            >
                               {prop.description}
                             </p>
                           </div>
                         </div>
 
-                        <div className="property-card-footer px-2.5 pb-2.5 pt-2 sm:px-5 sm:pb-5 sm:pt-4 border-t border-[#D5BFA0]/50 space-y-2 sm:space-y-4">
-                          <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-baseline justify-between gap-0.5 sm:gap-x-3 sm:gap-y-2">
+                        <div className="property-card-footer px-2 pb-2 pt-1.5 sm:px-4 sm:pb-4 sm:pt-3 border-t border-[#D5BFA0]/50 space-y-1.5 sm:space-y-2.5">
+                          <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-baseline justify-between gap-0.5 sm:gap-x-3 sm:gap-y-1">
                             <div className="min-w-0">
                               <span className="hidden sm:block text-[10px] uppercase tracking-wider text-[#303638]/50 font-bold">
                                 Precio
                               </span>
-                              <span className="text-xs sm:text-lg font-bold font-tabular text-[#173B43] block truncate">
+                              <span className="text-[11.5px] sm:text-base font-bold font-tabular text-[#173B43] block truncate">
                                 {prop.currency} {prop.price.toLocaleString()}
                               </span>
                             </div>
-                            <span className="text-[9.5px] sm:text-xs text-[#303638]/70 font-tabular truncate">
+                            <span className="text-[9px] sm:text-xs text-[#303638]/70 font-tabular leading-tight truncate">
                               {prop.bedrooms} dorm. · {prop.bathrooms} baños · {prop.surface} m²
                             </span>
                           </div>
@@ -3981,7 +3989,7 @@ export default function App() {
                               <button
                                 type="button"
                                 onClick={() => setSelectedProperty(prop)}
-                                className="flex-1 py-1.5 sm:py-2 px-1.5 sm:px-3 text-[10px] sm:text-xs uppercase tracking-wide sm:tracking-wider font-semibold text-[#303638] bg-[#F8F6F1] hover:bg-[#173B43] hover:text-white border border-[#D5BFA0] rounded-lg sm:rounded-xl transition-all flex items-center justify-center gap-1 sm:gap-1.5 cursor-pointer"
+                                className="flex-1 py-1 sm:py-2 px-1.5 sm:px-3 text-[10px] sm:text-xs uppercase tracking-wide sm:tracking-wider font-semibold text-[#303638] bg-[#F8F6F1] hover:bg-[#173B43] hover:text-white border border-[#D5BFA0] rounded-lg sm:rounded-xl transition-all flex items-center justify-center gap-1 sm:gap-1.5 cursor-pointer"
                               >
                                 <span>Ver</span>
                                 <ArrowRight className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
@@ -3993,7 +4001,7 @@ export default function App() {
                                   setEditingProperty(prop);
                                   setIsPropertyFormOpen(true);
                                 }}
-                                className="flex-1 py-1.5 sm:py-2 px-1.5 sm:px-3 text-[10px] sm:text-xs uppercase tracking-wide sm:tracking-wider font-semibold text-white bg-[#173B43] hover:bg-[#122e35] rounded-lg sm:rounded-xl transition-all flex items-center justify-center gap-1 sm:gap-1.5 cursor-pointer shadow-xs"
+                                className="flex-1 py-1 sm:py-2 px-1.5 sm:px-3 text-[10px] sm:text-xs uppercase tracking-wide sm:tracking-wider font-semibold text-white bg-[#173B43] hover:bg-[#122e35] rounded-lg sm:rounded-xl transition-all flex items-center justify-center gap-1 sm:gap-1.5 cursor-pointer shadow-xs"
                                 title="Editar ficha de esta propiedad"
                               >
                                 <Edit3 className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
@@ -4004,7 +4012,7 @@ export default function App() {
                             <button
                               type="button"
                               onClick={() => setSelectedProperty(prop)}
-                              className="w-full py-1.5 sm:py-2 px-2 sm:px-4 text-[10px] sm:text-xs uppercase tracking-wide sm:tracking-wider font-semibold text-[#303638] bg-[#F8F6F1] hover:bg-[#173B43] hover:text-white border border-[#D5BFA0] rounded-lg sm:rounded-xl transition-all flex items-center justify-center gap-1 sm:gap-2 cursor-pointer shadow-2xs"
+                              className="w-full py-1 sm:py-2 px-2 sm:px-4 text-[10px] sm:text-xs uppercase tracking-wide sm:tracking-wider font-semibold text-[#303638] bg-[#F8F6F1] hover:bg-[#173B43] hover:text-white border border-[#D5BFA0] rounded-lg sm:rounded-xl transition-all flex items-center justify-center gap-1 sm:gap-2 cursor-pointer shadow-2xs"
                             >
                               <span>Ver Propiedad</span>
                               <ArrowRight className="w-3 h-3 sm:w-3.5 sm:h-3.5" />

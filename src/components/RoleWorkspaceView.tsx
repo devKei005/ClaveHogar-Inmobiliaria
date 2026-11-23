@@ -1040,61 +1040,61 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
             <button
               type="button"
               onClick={() => setAdminOpFilter('todos')}
-              className={`px-2 py-1.5 sm:px-3 sm:py-2.5 text-[11px] sm:text-xs font-bold rounded-lg sm:rounded-sm border transition-colors flex items-center justify-center gap-1 sm:gap-1.5 cursor-pointer text-center ${
+              className={`px-2 py-1.5 sm:px-3 sm:py-2.5 text-[10px] sm:text-xs font-bold rounded-lg sm:rounded-sm border transition-colors flex items-center justify-center gap-1 sm:gap-1.5 cursor-pointer text-center leading-tight ${
                 adminOpFilter === 'todos'
                   ? 'bg-[#173B43] text-[#FCFBF7] border-[#173B43] shadow-xs'
                   : 'bg-[#F8F6F1] text-[#173B43] border-[#D5BFA0] hover:bg-[#D5BFA0]/40'
               }`}
             >
-              <span className="truncate">Todas ({allOperations.length})</span>
+              <span>Todas ({allOperations.length})</span>
             </button>
             <button
               type="button"
               onClick={() => setAdminOpFilter('concretadas')}
-              className={`px-2 py-1.5 sm:px-3 sm:py-2.5 text-[11px] sm:text-xs font-bold rounded-lg sm:rounded-sm border transition-colors flex items-center justify-center gap-1 sm:gap-1.5 cursor-pointer text-center ${
+              className={`px-2 py-1.5 sm:px-3 sm:py-2.5 text-[10px] sm:text-xs font-bold rounded-lg sm:rounded-sm border transition-colors flex items-center justify-center gap-1 sm:gap-1.5 cursor-pointer text-center leading-tight ${
                 adminOpFilter === 'concretadas'
                   ? 'bg-[#173B43] text-white border-[#173B43] shadow-xs'
                   : 'bg-[#F8F6F1] text-[#173B43] border-[#D5BFA0] hover:bg-[#D5BFA0]/30'
               }`}
             >
               <CheckCircle2 className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0" />
-              <span className="truncate">Concretadas ({adminConcretadas.length})</span>
+              <span>Concretadas ({adminConcretadas.length})</span>
             </button>
             <button
               type="button"
               onClick={() => setAdminOpFilter('aceptadas')}
-              className={`px-2 py-1.5 sm:px-3 sm:py-2.5 text-[11px] sm:text-xs font-bold rounded-lg sm:rounded-sm border transition-colors flex items-center justify-center gap-1 sm:gap-1.5 cursor-pointer text-center ${
+              className={`px-2 py-1.5 sm:px-3 sm:py-2.5 text-[10px] sm:text-xs font-bold rounded-lg sm:rounded-sm border transition-colors flex items-center justify-center gap-1 sm:gap-1.5 cursor-pointer text-center leading-tight ${
                 adminOpFilter === 'aceptadas'
                   ? 'bg-amber-600 text-white border-amber-700 shadow-xs'
                   : 'bg-amber-50 text-amber-900 border-amber-300 hover:bg-amber-100'
               }`}
             >
               <Check className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0" />
-              <span className="truncate">Propuesta Aceptada ({adminAceptadas.length})</span>
+              <span>Propuesta Aceptada ({adminAceptadas.length})</span>
             </button>
             <button
               type="button"
               onClick={() => setAdminOpFilter('negociacion')}
-              className={`px-2 py-1.5 sm:px-3 sm:py-2.5 text-[11px] sm:text-xs font-bold rounded-lg sm:rounded-sm border transition-colors flex items-center justify-center gap-1 sm:gap-1.5 cursor-pointer text-center ${
+              className={`px-2 py-1.5 sm:px-3 sm:py-2.5 text-[10px] sm:text-xs font-bold rounded-lg sm:rounded-sm border transition-colors flex items-center justify-center gap-1 sm:gap-1.5 cursor-pointer text-center leading-tight ${
                 adminOpFilter === 'negociacion'
                   ? 'bg-sky-700 text-white border-sky-800 shadow-xs'
                   : 'bg-sky-50 text-sky-900 border-sky-300 hover:bg-sky-100'
               }`}
             >
               <Clock className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0" />
-              <span className="truncate">En negociación ({adminNegociacion.length})</span>
+              <span>En negociación ({adminNegociacion.length})</span>
             </button>
             <button
               type="button"
               onClick={() => setAdminOpFilter('rechazadas')}
-              className={`col-span-2 sm:col-span-1 px-2 py-1.5 sm:px-3 sm:py-2.5 text-[11px] sm:text-xs font-bold rounded-lg sm:rounded-sm border transition-colors flex items-center justify-center gap-1 sm:gap-1.5 cursor-pointer text-center ${
+              className={`col-span-2 sm:col-span-1 px-2 py-1.5 sm:px-3 sm:py-2.5 text-[10px] sm:text-xs font-bold rounded-lg sm:rounded-sm border transition-colors flex items-center justify-center gap-1 sm:gap-1.5 cursor-pointer text-center leading-tight ${
                 adminOpFilter === 'rechazadas'
                   ? 'bg-rose-700 text-white border-rose-800 shadow-xs'
                   : 'bg-rose-50 text-rose-900 border-rose-300 hover:bg-rose-100'
               }`}
             >
               <XCircle className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0" />
-              <span className="truncate">Rechazadas ({adminRechazadas.length})</span>
+              <span>Rechazadas ({adminRechazadas.length})</span>
             </button>
           </div>
         </div>
@@ -1348,10 +1348,10 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
           </div>
 
           <div className="space-y-1 min-w-0">
-            <h1 className="text-lg font-serif-display font-semibold text-white leading-tight truncate">
+            <h1 className="text-base font-serif-display font-semibold text-white leading-tight break-words">
               {currentUser.displayName}
             </h1>
-            <p className="text-xs text-[#F4EFE6]/85 leading-snug line-clamp-2">
+            <p className="text-[11px] text-[#F4EFE6]/85 leading-snug">
               {currentUser.role === 'cliente' &&
                 !canActAsOwner &&
                 'Gestioná favoritos, visitas programadas, solicitudes y consultas.'}
@@ -1542,7 +1542,7 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
                       setSelectedChatId(null);
                       onChangeSubView(item.id as WorkspaceSubView);
                     }}
-                    className={`px-2 py-2 sm:px-4 sm:py-2.5 text-[11px] sm:text-xs rounded-lg sm:rounded-xl transition-all cursor-pointer flex items-center justify-center sm:justify-start text-center sm:text-left gap-1.5 sm:gap-2 min-h-[38px] sm:min-h-0 leading-tight ${
+                    className={`px-1.5 py-2 sm:px-4 sm:py-2.5 text-[10px] sm:text-xs rounded-lg sm:rounded-xl transition-all cursor-pointer flex items-center justify-center sm:justify-start text-center sm:text-left gap-1.5 sm:gap-2 min-h-[38px] sm:min-h-0 leading-tight ${
                       active
                         ? 'bg-[#173B43] text-white font-semibold shadow-xs border border-[#173B43]'
                         : 'bg-white hover:bg-[#F8F6F1] text-[#303638] border sm:border-2 border-[#D5BFA0] font-medium shadow-2xs'
@@ -1590,7 +1590,7 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
                       setSelectedChatId(null);
                       onChangeSubView(item.id as WorkspaceSubView);
                     }}
-                    className={`px-2 py-2 sm:px-4 sm:py-2.5 text-[11px] sm:text-xs rounded-lg sm:rounded-xl transition-all cursor-pointer flex items-center justify-center sm:justify-start text-center sm:text-left gap-1.5 sm:gap-2 min-h-[38px] sm:min-h-0 leading-tight ${
+                    className={`px-1.5 py-2 sm:px-4 sm:py-2.5 text-[10px] sm:text-xs rounded-lg sm:rounded-xl transition-all cursor-pointer flex items-center justify-center sm:justify-start text-center sm:text-left gap-1.5 sm:gap-2 min-h-[38px] sm:min-h-0 leading-tight ${
                       active
                         ? 'bg-[#173B43] text-white font-semibold shadow-xs border border-[#173B43]'
                         : 'bg-white hover:bg-[#F8F6F1] text-[#303638] border sm:border-2 border-[#D5BFA0] font-medium shadow-2xs'
@@ -1635,7 +1635,7 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
                           setSelectedChatId(null);
                           onChangeSubView(item.id as WorkspaceSubView);
                         }}
-                        className={`px-2 py-2 sm:px-3.5 sm:py-2 text-[11px] sm:text-xs rounded-lg sm:rounded-xl transition-all cursor-pointer flex items-center justify-center sm:justify-start text-center sm:text-left gap-1.5 sm:gap-2 min-h-[38px] sm:min-h-0 leading-tight ${
+                        className={`px-1.5 py-2 sm:px-3.5 sm:py-2 text-[10px] sm:text-xs rounded-lg sm:rounded-xl transition-all cursor-pointer flex items-center justify-center sm:justify-start text-center sm:text-left gap-1.5 sm:gap-2 min-h-[38px] sm:min-h-0 leading-tight ${
                           active
                             ? 'bg-[#173B43] text-white font-semibold shadow-xs border border-[#173B43]'
                             : 'bg-white hover:bg-[#F8F6F1] text-[#303638] border sm:border-2 border-[#D5BFA0] font-medium shadow-2xs'
@@ -1677,7 +1677,7 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
                           setSelectedChatId(null);
                           onChangeSubView(item.id as WorkspaceSubView);
                         }}
-                        className={`px-2 py-2 sm:px-3.5 sm:py-2 text-[11px] sm:text-xs rounded-lg sm:rounded-xl transition-all cursor-pointer flex items-center justify-center sm:justify-start text-center sm:text-left gap-1.5 sm:gap-2 min-h-[38px] sm:min-h-0 leading-tight ${
+                        className={`px-1.5 py-2 sm:px-3.5 sm:py-2 text-[10px] sm:text-xs rounded-lg sm:rounded-xl transition-all cursor-pointer flex items-center justify-center sm:justify-start text-center sm:text-left gap-1.5 sm:gap-2 min-h-[38px] sm:min-h-0 leading-tight ${
                           active
                             ? 'bg-[#173B43] text-white font-semibold shadow-xs border border-[#173B43]'
                             : 'bg-white hover:bg-[#F8F6F1] text-[#303638] border sm:border-2 border-[#D5BFA0] font-medium shadow-2xs'
@@ -1743,7 +1743,10 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
                   className="card-floating border sm:border-2 border-[#D5BFA0] rounded-xl sm:rounded-2xl overflow-hidden bg-white shadow-2xs flex flex-col justify-between min-w-0"
                 >
                   <div>
-                    <div className="aspect-[4/3] bg-[#F8F6F1]">
+                    <div
+                      onClick={() => onSelectProperty(prop)}
+                      className="aspect-[16/10] bg-[#F8F6F1] cursor-pointer"
+                    >
                       <img
                         src={resolvePropertyImageUrl(prop.images[0])}
                         alt={prop.title}
@@ -1756,35 +1759,42 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
                         className="w-full h-full object-cover"
                       />
                     </div>
-                    <div className="p-2.5 sm:p-4 space-y-1 sm:space-y-1.5">
-                      <div className="text-[9px] sm:text-[11px] uppercase tracking-wider text-[#B86F52] font-semibold truncate">
+                    <div className="p-2 sm:p-3.5 space-y-1">
+                      <div className="text-[8.5px] sm:text-[11px] uppercase tracking-wide sm:tracking-wider text-[#B86F52] font-semibold leading-tight truncate">
                         {prop.propertyType} · {prop.location}
                       </div>
                       <button
                         type="button"
                         onClick={() => onSelectProperty(prop)}
-                        className="text-xs sm:text-base font-serif-display font-semibold text-[#1F241F] hover:text-[#173B43] hover:underline text-left line-clamp-2 sm:line-clamp-1 cursor-pointer block w-full leading-tight"
+                        className="text-[11.5px] sm:text-base font-serif-display font-semibold text-[#1F241F] hover:text-[#173B43] hover:underline text-left line-clamp-1 sm:line-clamp-2 cursor-pointer block w-full leading-tight"
                         title="Ver ficha completa de la propiedad"
                       >
                         {prop.title}
                       </button>
-                      <div className="text-xs sm:text-base font-tabular font-semibold text-[#173B43] truncate">
+                      <p
+                        onClick={() => onSelectProperty(prop)}
+                        title="Entrar para ver la descripción completa"
+                        className="text-[10px] sm:text-xs text-[#303638]/75 line-clamp-1 sm:line-clamp-2 leading-snug cursor-pointer hover:text-[#173B43]"
+                      >
+                        {prop.description}
+                      </p>
+                      <div className="text-[11.5px] sm:text-base font-tabular font-semibold text-[#173B43] truncate pt-0.5">
                         {prop.currency} {prop.price.toLocaleString()}
                       </div>
                     </div>
                   </div>
-                  <div className="px-2.5 pb-2.5 sm:px-4 sm:pb-4 flex items-center gap-1.5 sm:gap-2">
+                  <div className="px-2 pb-2 sm:px-3.5 sm:pb-3.5 flex items-center gap-1.5 sm:gap-2">
                     <button
                       type="button"
                       onClick={() => onSelectProperty(prop)}
-                      className="flex-1 py-1.5 sm:py-2 px-2 sm:px-3 text-[10px] sm:text-xs font-semibold text-[#FCFBF7] bg-[#173B43] rounded-lg sm:rounded-sm hover:bg-[#2c382d] truncate"
+                      className="flex-1 py-1 sm:py-1.5 px-1.5 sm:px-3 text-[9.5px] sm:text-xs font-semibold text-[#FCFBF7] bg-[#173B43] rounded-lg sm:rounded-sm hover:bg-[#2c382d] leading-tight cursor-pointer"
                     >
                       Ver Ficha
                     </button>
                     <button
                       type="button"
                       onClick={() => onToggleFavorite(prop.id)}
-                      className="py-1.5 sm:py-2 px-2 sm:px-3 text-[10px] sm:text-xs font-semibold text-red-700 bg-red-50 border border-red-300 rounded-lg sm:rounded-sm hover:bg-red-100 shrink-0"
+                      className="py-1 sm:py-1.5 px-2 sm:px-3 text-[10px] sm:text-xs font-semibold text-red-700 bg-red-50 border border-red-300 rounded-lg sm:rounded-sm hover:bg-red-100 shrink-0 cursor-pointer"
                     >
                       Quitar
                     </button>
@@ -2651,18 +2661,18 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
                               onClick={() =>
                                 setAgentSelectorPropId(isChoosingAgentHere ? null : prop.id)
                               }
-                              className="px-2 sm:px-3 py-1.5 text-[11px] sm:text-xs font-semibold text-[#FCFBF7] bg-[#173B43] hover:bg-[#2c382d] rounded-lg sm:rounded-sm transition-colors inline-flex items-center justify-center gap-1 sm:gap-1.5"
+                              className="px-1.5 sm:px-3 py-1.5 text-[10px] sm:text-xs font-semibold text-[#FCFBF7] bg-[#173B43] hover:bg-[#2c382d] rounded-lg sm:rounded-sm transition-colors inline-flex items-center justify-center gap-1 sm:gap-1.5 leading-tight text-center"
                             >
                               <UserCheck className="w-3.5 h-3.5 shrink-0" />
-                              <span className="truncate">Elegir agente</span>
+                              <span>Elegir agente</span>
                             </button>
                             <button
                               type="button"
                               onClick={() => onOwnerRequestAgent(prop.id, 'asignacion_admin')}
-                              className="px-2 sm:px-3 py-1.5 text-[11px] sm:text-xs font-semibold text-[#173B43] bg-white border border-[#D5BFA0] hover:bg-[#FCFBF7] rounded-lg sm:rounded-sm transition-colors inline-flex items-center justify-center gap-1 sm:gap-1.5"
+                              className="px-1.5 sm:px-3 py-1.5 text-[10px] sm:text-xs font-semibold text-[#173B43] bg-white border border-[#D5BFA0] hover:bg-[#FCFBF7] rounded-lg sm:rounded-sm transition-colors inline-flex items-center justify-center gap-1 sm:gap-1.5 leading-tight text-center"
                             >
                               <ShieldCheck className="w-3.5 h-3.5 text-[#B86F52] shrink-0" />
-                              <span className="truncate">Que asignen uno</span>
+                              <span>Que asignen uno</span>
                             </button>
                           </div>
                         </div>
@@ -3036,13 +3046,13 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
                             <span className="text-[10px] uppercase tracking-wider text-[#173B43]/65 font-semibold block">
                               Propietario
                             </span>
-                            <strong className="text-[#1F241F] block truncate">{prop.ownerName}</strong>
+                            <strong className="text-[#1F241F] block break-words">{prop.ownerName}</strong>
                           </div>
                           <div className="min-w-0 font-tabular">
                             <span className="text-[10px] uppercase tracking-wider text-[#B86F52] font-semibold block">
                               {prop.operationType}
                             </span>
-                            <strong className="text-[#173B43] block truncate">
+                            <strong className="text-[#173B43] block break-words">
                               {prop.currency} {prop.price.toLocaleString()}
                             </strong>
                           </div>
@@ -3269,61 +3279,61 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
                 <button
                   type="button"
                   onClick={() => setVisitFilter('todas')}
-                  className={`px-2 py-1.5 sm:px-3 sm:py-2 text-[11px] sm:text-xs font-bold rounded-lg sm:rounded-xl border sm:border-2 transition-all flex items-center justify-center gap-1 sm:gap-1.5 cursor-pointer text-center ${
+                  className={`px-2 py-1.5 sm:px-3 sm:py-2 text-[10px] sm:text-xs font-bold rounded-lg sm:rounded-xl border sm:border-2 transition-all flex items-center justify-center gap-1 sm:gap-1.5 cursor-pointer text-center leading-tight ${
                     visitFilter === 'todas'
                       ? 'bg-[#173B43] text-white border-[#173B43] shadow-xs'
                       : 'bg-[#F8F6F1] text-[#303638] border-[#D5BFA0] hover:bg-white'
                   }`}
                 >
-                  <span className="truncate">Todas ({baseVisits.length})</span>
+                  <span>Todas ({baseVisits.length})</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => setVisitFilter('pendiente')}
-                  className={`px-2 py-1.5 sm:px-3 sm:py-2 text-[11px] sm:text-xs font-bold rounded-lg sm:rounded-xl border sm:border-2 transition-all flex items-center justify-center gap-1 sm:gap-1.5 cursor-pointer text-center ${
+                  className={`px-2 py-1.5 sm:px-3 sm:py-2 text-[10px] sm:text-xs font-bold rounded-lg sm:rounded-xl border sm:border-2 transition-all flex items-center justify-center gap-1 sm:gap-1.5 cursor-pointer text-center leading-tight ${
                     visitFilter === 'pendiente'
                       ? 'bg-amber-600 text-white border-amber-700 shadow-xs'
                       : 'bg-amber-50 text-amber-900 border-amber-300 hover:bg-amber-100'
                   }`}
                 >
                   <Clock className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0" />
-                  <span className="truncate">Pendientes ({baseVisits.filter((v) => v.status === 'pendiente' || v.status === 'reprogramada').length})</span>
+                  <span>Pendientes ({baseVisits.filter((v) => v.status === 'pendiente' || v.status === 'reprogramada').length})</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => setVisitFilter('confirmada')}
-                  className={`px-2 py-1.5 sm:px-3 sm:py-2 text-[11px] sm:text-xs font-bold rounded-lg sm:rounded-xl border sm:border-2 transition-all flex items-center justify-center gap-1 sm:gap-1.5 cursor-pointer text-center ${
+                  className={`px-2 py-1.5 sm:px-3 sm:py-2 text-[10px] sm:text-xs font-bold rounded-lg sm:rounded-xl border sm:border-2 transition-all flex items-center justify-center gap-1 sm:gap-1.5 cursor-pointer text-center leading-tight ${
                     visitFilter === 'confirmada'
                       ? 'bg-[#173B43] text-white border-[#173B43] shadow-xs'
                       : 'bg-[#F8F6F1] text-[#173B43] border-[#D5BFA0] hover:bg-[#D5BFA0]/30'
                   }`}
                 >
                   <CheckCircle2 className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0" />
-                  <span className="truncate">Confirmadas ({baseVisits.filter((v) => v.status === 'confirmada' || v.status === 'realizada').length})</span>
+                  <span>Confirmadas ({baseVisits.filter((v) => v.status === 'confirmada' || v.status === 'realizada').length})</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => setVisitFilter('rechazada')}
-                  className={`px-2 py-1.5 sm:px-3 sm:py-2 text-[11px] sm:text-xs font-bold rounded-lg sm:rounded-xl border sm:border-2 transition-all flex items-center justify-center gap-1 sm:gap-1.5 cursor-pointer text-center ${
+                  className={`px-2 py-1.5 sm:px-3 sm:py-2 text-[10px] sm:text-xs font-bold rounded-lg sm:rounded-xl border sm:border-2 transition-all flex items-center justify-center gap-1 sm:gap-1.5 cursor-pointer text-center leading-tight ${
                     visitFilter === 'rechazada'
                       ? 'bg-rose-700 text-white border-rose-800 shadow-xs'
                       : 'bg-rose-50 text-rose-900 border-rose-300 hover:bg-rose-100'
                   }`}
                 >
                   <XCircle className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0" />
-                  <span className="truncate">Rechazadas ({baseVisits.filter((v) => v.status === 'rechazada').length})</span>
+                  <span>Rechazadas ({baseVisits.filter((v) => v.status === 'rechazada').length})</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => setVisitFilter('cancelada')}
-                  className={`col-span-2 sm:col-span-1 px-2 py-1.5 sm:px-3 sm:py-2 text-[11px] sm:text-xs font-bold rounded-lg sm:rounded-xl border sm:border-2 transition-all flex items-center justify-center gap-1 sm:gap-1.5 cursor-pointer text-center ${
+                  className={`col-span-2 sm:col-span-1 px-2 py-1.5 sm:px-3 sm:py-2 text-[10px] sm:text-xs font-bold rounded-lg sm:rounded-xl border sm:border-2 transition-all flex items-center justify-center gap-1 sm:gap-1.5 cursor-pointer text-center leading-tight ${
                     visitFilter === 'cancelada'
                       ? 'bg-gray-700 text-white border-gray-800 shadow-xs'
                       : 'bg-gray-100 text-gray-800 border-gray-300 hover:bg-gray-200'
                   }`}
                 >
                   <X className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0" />
-                  <span className="truncate">Canceladas ({baseVisits.filter((v) => v.status === 'cancelada').length})</span>
+                  <span>Canceladas ({baseVisits.filter((v) => v.status === 'cancelada').length})</span>
                 </button>
               </div>
             </div>
@@ -4069,26 +4079,26 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
               <button
                 type="button"
                 onClick={() => setAdminModerationFilter('pendientes')}
-                className={`px-2 py-1.5 sm:px-4 sm:py-2 text-[11px] sm:text-xs font-bold rounded-lg sm:rounded-sm border transition-colors flex items-center justify-center gap-1.5 sm:gap-2 cursor-pointer text-center ${
+                className={`px-2 py-1.5 sm:px-4 sm:py-2 text-[10px] sm:text-xs font-bold rounded-lg sm:rounded-sm border transition-colors flex items-center justify-center gap-1.5 sm:gap-2 cursor-pointer text-center leading-tight ${
                   adminModerationFilter === 'pendientes'
                     ? 'bg-amber-600 text-white border-amber-700 shadow-xs'
                     : 'bg-amber-50 text-amber-900 border-amber-300 hover:bg-amber-100'
                 }`}
               >
                 <Clock className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0" />
-                <span className="truncate">Pendientes ({adminPendingActionProperties.length})</span>
+                <span>Pendientes ({adminPendingActionProperties.length})</span>
               </button>
               <button
                 type="button"
                 onClick={() => setAdminModerationFilter('respondidas')}
-                className={`px-2 py-1.5 sm:px-4 sm:py-2 text-[11px] sm:text-xs font-bold rounded-lg sm:rounded-sm border transition-colors flex items-center justify-center gap-1.5 sm:gap-2 cursor-pointer text-center ${
+                className={`px-2 py-1.5 sm:px-4 sm:py-2 text-[10px] sm:text-xs font-bold rounded-lg sm:rounded-sm border transition-colors flex items-center justify-center gap-1.5 sm:gap-2 cursor-pointer text-center leading-tight ${
                   adminModerationFilter === 'respondidas'
                     ? 'bg-[#173B43] text-[#FCFBF7] border-[#173B43] shadow-xs'
                     : 'bg-[#F8F6F1] text-[#173B43] border-[#D5BFA0] hover:bg-[#D5BFA0]/40'
                 }`}
               >
                 <CheckCircle2 className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0" />
-                <span className="truncate">Ya Respondidas ({adminRespondedProperties.length})</span>
+                <span>Ya Respondidas ({adminRespondedProperties.length})</span>
               </button>
             </div>
           </div>
@@ -4493,8 +4503,8 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
                     )}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <div className="font-semibold text-sm text-[#1F241F] truncate">{u.displayName}</div>
-                    <div className="text-xs text-[#173B43]/70 truncate">
+                    <div className="font-semibold text-xs sm:text-sm text-[#1F241F] break-words">{u.displayName}</div>
+                    <div className="text-[11px] text-[#173B43]/70 break-words">
                       {u.agencyName || (u.isAlsoOwner ? 'Cliente y Propietario' : 'Particular')}
                     </div>
                   </div>
@@ -4697,42 +4707,42 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
             </div>
 
             {currentUser.role === 'administrador' && (
-              <div className="grid grid-cols-3 gap-1.5 sm:gap-2 w-full">
+              <div className="grid grid-cols-3 gap-1 sm:gap-2 w-full">
                 <button
                   type="button"
                   onClick={() => setAdminClaimFilter('pendientes')}
-                  className={`px-1.5 py-1.5 sm:px-3 sm:py-2 text-[10px] sm:text-xs font-bold rounded-lg sm:rounded-sm border transition-colors flex items-center justify-center gap-1 sm:gap-1.5 cursor-pointer text-center ${
+                  className={`px-1 py-1.5 sm:px-3 sm:py-2 text-[9px] sm:text-xs font-bold rounded-lg sm:rounded-sm border transition-colors flex items-center justify-center gap-1 sm:gap-1.5 cursor-pointer text-center leading-tight ${
                     adminClaimFilter === 'pendientes'
                       ? 'bg-amber-600 text-white border-amber-700 shadow-xs'
                       : 'bg-amber-50 text-amber-900 border-amber-300 hover:bg-amber-100'
                   }`}
                 >
-                  <Clock className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0" />
-                  <span className="truncate">Pendientes ({adminPendingClaims.length})</span>
+                  <Clock className="w-2.5 h-2.5 sm:w-3.5 sm:h-3.5 shrink-0" />
+                  <span>Pendientes ({adminPendingClaims.length})</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => setAdminClaimFilter('en_revision')}
-                  className={`px-1.5 py-1.5 sm:px-3 sm:py-2 text-[10px] sm:text-xs font-bold rounded-lg sm:rounded-sm border transition-colors flex items-center justify-center gap-1 sm:gap-1.5 cursor-pointer text-center ${
+                  className={`px-1 py-1.5 sm:px-3 sm:py-2 text-[9px] sm:text-xs font-bold rounded-lg sm:rounded-sm border transition-colors flex items-center justify-center gap-1 sm:gap-1.5 cursor-pointer text-center leading-tight ${
                     adminClaimFilter === 'en_revision'
                       ? 'bg-blue-600 text-white border-blue-700 shadow-xs'
                       : 'bg-blue-50 text-blue-900 border-blue-300 hover:bg-blue-100'
                   }`}
                 >
-                  <AlertCircle className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0" />
-                  <span className="truncate">Revisión ({adminRevisionClaims.length})</span>
+                  <AlertCircle className="w-2.5 h-2.5 sm:w-3.5 sm:h-3.5 shrink-0" />
+                  <span>Revisión ({adminRevisionClaims.length})</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => setAdminClaimFilter('solucionados')}
-                  className={`px-1.5 py-1.5 sm:px-3 sm:py-2 text-[10px] sm:text-xs font-bold rounded-lg sm:rounded-sm border transition-colors flex items-center justify-center gap-1 sm:gap-1.5 cursor-pointer text-center ${
+                  className={`px-1 py-1.5 sm:px-3 sm:py-2 text-[9px] sm:text-xs font-bold rounded-lg sm:rounded-sm border transition-colors flex items-center justify-center gap-1 sm:gap-1.5 cursor-pointer text-center leading-tight ${
                     adminClaimFilter === 'solucionados'
                       ? 'bg-[#173B43] text-white border-[#173B43] shadow-xs'
                       : 'bg-[#F8F6F1] text-[#173B43] border-[#D5BFA0] hover:bg-[#D5BFA0]/30'
                   }`}
                 >
-                  <CheckCircle2 className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0" />
-                  <span className="truncate">Solucionados ({adminSolvedClaims.length})</span>
+                  <CheckCircle2 className="w-2.5 h-2.5 sm:w-3.5 sm:h-3.5 shrink-0" />
+                  <span>Solucionados ({adminSolvedClaims.length})</span>
                 </button>
               </div>
             )}

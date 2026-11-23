@@ -351,7 +351,7 @@ export const AIChatAssistant: React.FC<AIChatAssistantProps> = ({
           </div>
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2 min-w-0">
-              <h1 className="text-sm sm:text-xl md:text-2xl font-serif-display font-semibold text-[#F4EFE6] truncate">
+              <h1 className="text-[13px] sm:text-xl md:text-2xl font-serif-display font-semibold text-[#F4EFE6] leading-tight sm:truncate">
                 Clara · Asesora Inmobiliaria
               </h1>
               <span className="text-[10px] bg-[#2B2B2B]/40 text-emerald-200 border border-emerald-500/50 px-2 py-0.5 rounded-full font-medium hidden md:inline shrink-0">
@@ -501,7 +501,10 @@ export const AIChatAssistant: React.FC<AIChatAssistantProps> = ({
                             className="bg-[#FCFBF7] border-2 border-[#173B43] rounded-sm overflow-hidden flex flex-col justify-between hover:shadow-md transition-shadow"
                           >
                             <div>
-                              <div className="relative aspect-[16/10] bg-[#F8F6F1]">
+                              <div
+                                onClick={() => onSelectProperty(prop)}
+                                className="relative aspect-[16/9] bg-[#F8F6F1] cursor-pointer"
+                              >
                                 <img
                                   src={prop.images[0] || HERO_IMAGE}
                                   alt={prop.title}
@@ -513,27 +516,34 @@ export const AIChatAssistant: React.FC<AIChatAssistantProps> = ({
                                   }}
                                   className="w-full h-full object-cover"
                                 />
-                                <div className="absolute top-2.5 left-2.5 px-2.5 py-1 bg-[#173B43] text-[#FCFBF7] text-[11px] font-bold rounded-sm shadow-xs flex items-center gap-1">
-                                  <CheckCircle2 className="w-3.5 h-3.5" />
+                                <div className="absolute top-2 left-2 px-2 py-0.5 bg-[#173B43] text-[#FCFBF7] text-[10px] sm:text-[11px] font-bold rounded-sm shadow-xs flex items-center gap-1">
+                                  <CheckCircle2 className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
                                   Coincidencia destacada
                                 </div>
-                                <div className="absolute bottom-2.5 right-2.5 px-2.5 py-1 bg-[#1F241F]/80 backdrop-blur-xs text-[#FCFBF7] text-xs font-bold font-tabular rounded-sm">
+                                <div className="absolute bottom-2 right-2 px-2 py-0.5 bg-[#1F241F]/80 backdrop-blur-xs text-[#FCFBF7] text-xs font-bold font-tabular rounded-sm">
                                   {prop.currency} {prop.price.toLocaleString()}
                                 </div>
                               </div>
 
-                              <div className="p-4 space-y-2">
-                                <div className="text-[11px] uppercase tracking-wider font-semibold text-[#B86F52] flex items-center gap-1">
+                              <div className="p-3 sm:p-4 space-y-1.5">
+                                <div className="text-[10px] sm:text-[11px] uppercase tracking-wider font-semibold text-[#B86F52] flex items-center gap-1">
                                   <MapPin className="w-3 h-3 shrink-0" />
                                   <span className="truncate">{prop.location}</span>
                                 </div>
-                                <h3 className="text-base font-serif-display font-semibold text-[#1F241F] line-clamp-2 leading-snug">
+                                <h3
+                                  onClick={() => onSelectProperty(prop)}
+                                  className="text-sm sm:text-base font-serif-display font-semibold text-[#1F241F] line-clamp-1 sm:line-clamp-2 leading-snug cursor-pointer hover:text-[#173B43]"
+                                >
                                   {prop.title}
                                 </h3>
-                                <p className="text-xs text-[#1F241F]/75 line-clamp-2 leading-relaxed">
+                                <p
+                                  onClick={() => onSelectProperty(prop)}
+                                  title="Entrar para ver la descripción completa"
+                                  className="text-xs text-[#1F241F]/75 line-clamp-1 sm:line-clamp-2 leading-snug sm:leading-relaxed cursor-pointer hover:text-[#173B43]"
+                                >
                                   {prop.description}
                                 </p>
-                                <div className="flex flex-wrap gap-2 pt-1 text-[11px] text-[#173B43] font-tabular">
+                                <div className="flex flex-wrap gap-2 pt-0.5 text-[11px] text-[#173B43] font-tabular">
                                   <span>{prop.bedrooms} dorm.</span>
                                   <span>·</span>
                                   <span>{prop.bathrooms} baños</span>
@@ -542,7 +552,7 @@ export const AIChatAssistant: React.FC<AIChatAssistantProps> = ({
                                 </div>
 
                                 {prop.features && prop.features.length > 0 && (
-                                  <div className="flex flex-wrap gap-1 pt-1.5">
+                                  <div className="flex flex-wrap gap-1 pt-1">
                                     {prop.features.slice(0, 3).map((feat, idx) => (
                                       <span
                                         key={idx}
@@ -556,7 +566,7 @@ export const AIChatAssistant: React.FC<AIChatAssistantProps> = ({
                               </div>
                             </div>
 
-                            <div className="p-4 pt-0">
+                            <div className="p-3 pt-0 sm:p-4 sm:pt-0">
                               <button
                                 type="button"
                                 onClick={() => onSelectProperty(prop)}
@@ -591,7 +601,10 @@ export const AIChatAssistant: React.FC<AIChatAssistantProps> = ({
                               className="bg-[#FCFBF7] border border-amber-300 rounded-sm overflow-hidden flex flex-col justify-between hover:shadow-md transition-shadow"
                             >
                               <div>
-                                <div className="relative aspect-[16/10] bg-[#F8F6F1]">
+                                <div
+                                  onClick={() => onSelectProperty(prop)}
+                                  className="relative aspect-[16/9] bg-[#F8F6F1] cursor-pointer"
+                                >
                                   <img
                                     src={prop.images[0] || HERO_IMAGE}
                                     alt={prop.title}
@@ -603,22 +616,25 @@ export const AIChatAssistant: React.FC<AIChatAssistantProps> = ({
                                     }}
                                     className="w-full h-full object-cover"
                                   />
-                                  <div className="absolute top-2.5 left-2.5 px-2.5 py-1 bg-amber-700 text-[#FCFBF7] text-[11px] font-bold rounded-sm shadow-xs flex items-center gap-1">
-                                    <AlertTriangle className="w-3.5 h-3.5" />
+                                  <div className="absolute top-2 left-2 px-2 py-0.5 bg-amber-700 text-[#FCFBF7] text-[10px] sm:text-[11px] font-bold rounded-sm shadow-xs flex items-center gap-1">
+                                    <AlertTriangle className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
                                     Alternativa afín
                                   </div>
-                                  <div className="absolute bottom-2.5 right-2.5 px-2.5 py-1 bg-[#1F241F]/80 backdrop-blur-xs text-[#FCFBF7] text-xs font-bold font-tabular rounded-sm">
+                                  <div className="absolute bottom-2 right-2 px-2 py-0.5 bg-[#1F241F]/80 backdrop-blur-xs text-[#FCFBF7] text-xs font-bold font-tabular rounded-sm">
                                     {prop.currency} {prop.price.toLocaleString()}
                                   </div>
                                 </div>
 
-                                <div className="p-4 space-y-2">
-                                  <div className="text-[11px] uppercase tracking-wider font-semibold text-[#B86F52] flex items-center gap-1">
+                                <div className="p-3 sm:p-4 space-y-1.5">
+                                  <div className="text-[10px] sm:text-[11px] uppercase tracking-wider font-semibold text-[#B86F52] flex items-center gap-1">
                                     <MapPin className="w-3 h-3 shrink-0" />
                                     <span className="truncate">{prop.location}</span>
                                   </div>
 
-                                  <h3 className="text-base font-serif-display font-semibold text-[#1F241F] line-clamp-2 leading-snug">
+                                  <h3
+                                    onClick={() => onSelectProperty(prop)}
+                                    className="text-sm sm:text-base font-serif-display font-semibold text-[#1F241F] line-clamp-1 sm:line-clamp-2 leading-snug cursor-pointer hover:text-[#173B43]"
+                                  >
                                     {prop.title}
                                   </h3>
 
