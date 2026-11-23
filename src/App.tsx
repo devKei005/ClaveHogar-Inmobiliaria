@@ -26,11 +26,13 @@ import {
 import {
   onAuthStateChanged,
   signInWithPopup,
+  getAdditionalUserInfo,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   updateProfile,
   sendPasswordResetEmail,
   signOut,
+  type User as FirebaseUser,
 } from 'firebase/auth';
 import {
   collection,
@@ -208,6 +210,7 @@ export default function App() {
   const isDemoSessionRef = useRef<boolean>(
     Boolean(typeof window !== 'undefined' && localStorage.getItem('clavehogar_active_session'))
   );
+  const authFlowInProgressRef = useRef<'login' | 'register' | null>(null);
 
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [authModalMode, setAuthModalMode] = useState<AuthModalMode>('login');
@@ -353,6 +356,21 @@ export default function App() {
           } catch (e) {
             console.warn('Seed demo user error:', e);
           }
+        }
+
+        // Limpiar cualquier perfil generado por error previo de bootstrap admin automático
+        try {
+          const legacyAdminSnap = await getDocs(
+            query(collection(db, 'app_users'), where('email', '==', 'programacionkeichi@gmail.com'))
+          );
+          for (const d of legacyAdminSnap.docs) {
+            const data = d.data() as Partial<UserProfile>;
+            if (data.role === 'administrador' && data.agencyName === 'ClaveHogar Administración') {
+              await deleteDoc(doc(db, 'app_users', d.id));
+            }
+          }
+        } catch (e) {
+          console.warn('Cleanup legacy bootstrap admin check:', e);
         }
 
         const propsSnap = await getDocs(collection(db, 'properties'));
@@ -599,134 +617,166 @@ export default function App() {
     };
   }, []);
 
-  // Sync Firebase Auth without wiping out quick-access demo sessions
+  const buildFirebaseUserProfileFromRaw = (
+    firebaseUser: FirebaseUser,
+    uid: string,
+    emailLower: string,
+    raw: Partial<UserProfile>
+  ): UserProfile => ({
+    uid,
+    displayName: truncateText(
+      raw.displayName || firebaseUser.displayName || emailLower.split('@')[0] || 'Usuario ClaveHogar',
+      SCHEMA_LIMITS.DISPLAY_NAME_MAX
+    ),
+    email: truncateText(raw.email || emailLower, SCHEMA_LIMITS.EMAIL_MAX),
+    phone: truncateText(raw.phone || '+54 9 11 4500-1200', SCHEMA_LIMITS.PHONE_MAX),
+    address: truncateText(raw.address || 'Buenos Aires, Argentina', SCHEMA_LIMITS.ADDRESS_MAX),
+    dni: truncateText(raw.dni || '', SCHEMA_LIMITS.DNI_MAX),
+    role: (raw.role as UserRole) || 'cliente',
+    isAlsoOwner: Boolean(raw.isAlsoOwner),
+    active: raw.active !== false,
+    agencyName: truncateText(raw.agencyName || '', SCHEMA_LIMITS.AGENCY_MAX),
+    bio: truncateText(raw.bio || '', SCHEMA_LIMITS.BIO_MAX),
+    photoUrl: raw.photoUrl || firebaseUser.photoURL || '',
+  });
+
+  const findRegisteredFirebaseUserProfile = async (
+    firebaseUser: FirebaseUser
+  ): Promise<UserProfile | null> => {
+    const uid = sanitizeId(firebaseUser.uid);
+    const rawEmail = (firebaseUser.email || '').trim();
+    const emailLower = truncateText(rawEmail.toLowerCase(), SCHEMA_LIMITS.EMAIL_MAX);
+
+    // 1. Consultar si ya existe el perfil persistido por UID en Firestore
+    try {
+      const snap = await getDoc(doc(db, 'app_users', uid));
+      if (snap.exists()) {
+        const raw = snap.data() as Partial<UserProfile>;
+        if (
+          emailLower === 'programacionkeichi@gmail.com' &&
+          raw.role === 'administrador' &&
+          raw.agencyName === 'ClaveHogar Administración'
+        ) {
+          await deleteDoc(doc(db, 'app_users', uid)).catch(() => {});
+          return null;
+        }
+        return buildFirebaseUserProfileFromRaw(firebaseUser, uid, emailLower, raw);
+      }
+    } catch (err) {
+      console.warn('Could not read existing user doc from Firestore:', err);
+    }
+
+    // 2. Buscar en Firestore por campo email (minúsculas o tal cual vino de Firebase)
+    if (emailLower) {
+      try {
+        let qSnap = await getDocs(
+          query(collection(db, 'app_users'), where('email', '==', emailLower))
+        );
+        if (qSnap.empty && rawEmail && rawEmail !== emailLower) {
+          qSnap = await getDocs(
+            query(collection(db, 'app_users'), where('email', '==', rawEmail))
+          );
+        }
+        if (!qSnap.empty) {
+          const matchedDoc = qSnap.docs[0];
+          const raw = matchedDoc.data() as Partial<UserProfile>;
+          if (
+            emailLower === 'programacionkeichi@gmail.com' &&
+            raw.role === 'administrador' &&
+            raw.agencyName === 'ClaveHogar Administración'
+          ) {
+            await deleteDoc(doc(db, 'app_users', matchedDoc.id)).catch(() => {});
+            return null;
+          }
+          return buildFirebaseUserProfileFromRaw(firebaseUser, uid, emailLower, raw);
+        }
+      } catch (err) {
+        console.warn('Could not query user by email in Firestore:', err);
+      }
+    }
+
+    // 3. Buscar únicamente entre las cuentas oficiales iniciales (@clavehogar.com)
+    const demoExisting = INITIAL_USERS.find(
+      (u) => u.email.toLowerCase() === emailLower || u.uid === uid
+    );
+    if (demoExisting) {
+      return buildFirebaseUserProfileFromRaw(firebaseUser, uid, emailLower, demoExisting);
+    }
+
+    return null;
+  };
+
+  const registerNewClientProfileFromFirebaseUser = async (
+    firebaseUser: FirebaseUser
+  ): Promise<UserProfile> => {
+    const uid = sanitizeId(firebaseUser.uid);
+    const rawEmail = (firebaseUser.email || 'usuario@clavehogar.com').trim();
+    const emailLower = truncateText(rawEmail.toLowerCase(), SCHEMA_LIMITS.EMAIL_MAX);
+    const displayName = truncateText(
+      firebaseUser.displayName || emailLower.split('@')[0] || 'Usuario ClaveHogar',
+      SCHEMA_LIMITS.DISPLAY_NAME_MAX
+    );
+
+    const newProfile: UserProfile = {
+      uid,
+      displayName,
+      email: emailLower,
+      phone: '+54 9 11 4500-1200',
+      address: 'Buenos Aires, Argentina',
+      dni: '',
+      role: 'cliente',
+      isAlsoOwner: false,
+      active: true,
+      agencyName: '',
+      bio: 'Cliente registrado en ClaveHogar.',
+      photoUrl: firebaseUser.photoURL || '',
+    };
+
+    try {
+      await setDoc(doc(db, 'app_users', uid), newProfile, { merge: true });
+    } catch (err) {
+      handleFirestoreError(err, OperationType.WRITE, `app_users/${uid}`);
+    }
+
+    setCurrentUser(newProfile);
+    setUsers((prev) => {
+      const next = [newProfile, ...prev.filter((u) => u.uid !== uid)];
+      saveCachedUsers(next);
+      return next;
+    });
+    setActiveSubView(getDefaultSubViewForRole('cliente'));
+    return newProfile;
+  };
+
+  // Sync Firebase Auth without wiping out quick-access demo sessions or auto-creating unregistered users
   useEffect(() => {
     const unsubAuth = onAuthStateChanged(auth, async (user) => {
-      if (isDemoSessionRef.current) {
+      if (isDemoSessionRef.current || authFlowInProgressRef.current !== null) {
         return;
       }
       if (!user) {
         setCurrentUser(null);
         return;
       }
-      const uid = sanitizeId(user.uid);
-      const email = truncateText(user.email || 'usuario@clavehogar.com', SCHEMA_LIMITS.EMAIL_MAX);
-
-      // 1. Primero consultar si ya existe el perfil persistido en Firestore
-      try {
-        const snap = await getDoc(doc(db, 'app_users', uid));
-        if (snap.exists()) {
-          const raw = snap.data() as Partial<UserProfile>;
-          const profile: UserProfile = {
-            uid,
-            displayName: raw.displayName || user.displayName || email.split('@')[0] || 'Usuario ClaveHogar',
-            email: raw.email || email,
-            phone: raw.phone || '+54 9 11 4500-1200',
-            address: raw.address || 'Buenos Aires, Argentina',
-            dni: raw.dni || '',
-            role: (raw.role as UserRole) || 'cliente',
-            isAlsoOwner: Boolean(raw.isAlsoOwner),
-            active: raw.active !== false,
-            agencyName: raw.agencyName || '',
-            bio: raw.bio || '',
-            photoUrl: raw.photoUrl || user.photoURL || '',
-          };
-          setCurrentUser(profile);
-          setUsers((prev) => {
-            const next = [profile, ...prev.filter((u) => u.uid !== uid)];
-            saveCachedUsers(next);
-            return next;
-          });
-          return;
-        }
-      } catch (err) {
-        console.warn('Could not read existing user doc from Firestore:', err);
-      }
-
-      // 1.b Si no se encontró por ID de documento, buscar en Firestore por campo email
-      try {
-        const qSnap = await getDocs(
-          query(collection(db, 'app_users'), where('email', '==', email))
-        );
-        if (!qSnap.empty) {
-          const raw = qSnap.docs[0].data() as Partial<UserProfile>;
-          const profile: UserProfile = {
-            uid,
-            displayName: raw.displayName || user.displayName || email.split('@')[0] || 'Usuario ClaveHogar',
-            email: raw.email || email,
-            phone: raw.phone || '+54 9 11 4500-1200',
-            address: raw.address || 'Buenos Aires, Argentina',
-            dni: raw.dni || '',
-            role: (raw.role as UserRole) || 'cliente',
-            isAlsoOwner: Boolean(raw.isAlsoOwner),
-            active: raw.active !== false,
-            agencyName: raw.agencyName || '',
-            bio: raw.bio || '',
-            photoUrl: raw.photoUrl || user.photoURL || '',
-          };
-          setCurrentUser(profile);
-          setUsers((prev) => {
-            const next = [
-              profile,
-              ...prev.filter((u) => u.uid !== uid && u.email.toLowerCase() !== email.toLowerCase()),
-            ];
-            saveCachedUsers(next);
-            return next;
-          });
-          return;
-        }
-      } catch (err) {
-        console.warn('Could not query user by email in Firestore:', err);
-      }
-
-      // 2. Si no está en Firestore por UID ni email, buscar en memoria
-      const currentList = usersRef.current;
-      const existing =
-        currentList.find((u) => u.uid === uid) ||
-        currentList.find((u) => u.email.toLowerCase() === email.toLowerCase()) ||
-        INITIAL_USERS.find((u) => u.email.toLowerCase() === email.toLowerCase() || u.uid === uid);
-
-      if (existing) {
-        setCurrentUser(existing);
-        // NUNCA sobreescribir el documento de Firestore hacia atrás
+      const profile = await findRegisteredFirebaseUserProfile(user);
+      if (!profile || !profile.active) {
+        setCurrentUser(null);
+        await signOut(auth).catch(() => {});
         return;
       }
-
-      // 3. Usuario totalmente nuevo
-      const isBootstrapAdmin = email.toLowerCase() === 'programacionkeichi@gmail.com';
-      const defaultRole: UserRole = isBootstrapAdmin ? 'administrador' : 'cliente';
-      const displayName = truncateText(
-        user.displayName || email.split('@')[0] || 'Usuario ClaveHogar',
-        SCHEMA_LIMITS.DISPLAY_NAME_MAX
-      );
-
-      const newProfile: UserProfile = {
-        uid,
-        displayName,
-        email,
-        phone: '+54 9 11 4500-1200',
-        address: 'Buenos Aires, Argentina',
-        dni: '35.100.200',
-        role: defaultRole,
-        isAlsoOwner: false,
-        active: true,
-        agencyName: isBootstrapAdmin ? 'ClaveHogar Administración' : '',
-        bio: 'Cliente registrado en ClaveHogar.',
-        photoUrl: user.photoURL || '',
-      };
-
-      setCurrentUser(newProfile);
+      setCurrentUser(profile);
       setUsers((prev) => {
-        const next = [newProfile, ...prev.filter((u) => u.uid !== uid)];
+        const next = [
+          profile,
+          ...prev.filter(
+            (u) =>
+              u.uid !== profile.uid &&
+              u.email.toLowerCase() !== profile.email.toLowerCase()
+          ),
+        ];
         saveCachedUsers(next);
         return next;
       });
-      setActiveSubView(getDefaultSubViewForRole(newProfile.role));
-      try {
-        await setDoc(doc(db, 'app_users', uid), newProfile, { merge: true });
-      } catch (err) {
-        handleFirestoreError(err, OperationType.WRITE, `app_users/${uid}`);
-      }
     });
     return () => unsubAuth();
   }, []);
@@ -851,13 +901,133 @@ export default function App() {
     setIsAuthModalOpen(true);
   };
 
-  const handleGoogleLogin = async () => {
+  const handleGoogleLogin = async (
+    intent: 'login' | 'register'
+  ): Promise<{
+    ok: boolean;
+    reason?: 'not_registered' | 'already_registered' | 'suspended' | 'cancelled' | 'error';
+    message?: string;
+  }> => {
+    authFlowInProgressRef.current = intent;
     try {
       isDemoSessionRef.current = false;
-      await signInWithPopup(auth, googleProvider);
-      notify('success', 'Sesión iniciada con Google', 'Bienvenido a ClaveHogar.');
-    } catch {
-      notify('error', 'No se pudo iniciar con Google', 'Podés ingresar con correo y contraseña o usar las cuentas demo.');
+      try {
+        localStorage.removeItem('clavehogar_active_session');
+      } catch {
+        // ignore
+      }
+      const result = await signInWithPopup(auth, googleProvider);
+      const additionalInfo = getAdditionalUserInfo(result);
+      const existingProfile = await findRegisteredFirebaseUserProfile(result.user);
+
+      if (intent === 'login') {
+        if (!existingProfile) {
+          if (additionalInfo?.isNewUser) {
+            await result.user.delete().catch(() => {});
+          }
+          await signOut(auth).catch(() => {});
+          setCurrentUser(null);
+          const msg =
+            'Esta cuenta de Google todavía no está registrada. Por favor, registrate primero desde "Crear cuenta".';
+          notify('error', 'Cuenta no registrada', msg);
+          return { ok: false, reason: 'not_registered', message: msg };
+        }
+
+        if (!existingProfile.active) {
+          await signOut(auth).catch(() => {});
+          setCurrentUser(null);
+          const msg = 'Tu cuenta está desactivada por el administrador.';
+          notify('error', 'Cuenta suspendida', msg);
+          return { ok: false, reason: 'suspended', message: msg };
+        }
+
+        setCurrentUser(existingProfile);
+        setUsers((prev) => {
+          const next = [
+            existingProfile,
+            ...prev.filter(
+              (u) =>
+                u.uid !== existingProfile.uid &&
+                u.email.toLowerCase() !== existingProfile.email.toLowerCase()
+            ),
+          ];
+          saveCachedUsers(next);
+          return next;
+        });
+        setDoc(doc(db, 'app_users', existingProfile.uid), existingProfile, { merge: true }).catch(
+          () => {}
+        );
+        setActiveSubView(getDefaultSubViewForRole(existingProfile.role));
+        notify(
+          'success',
+          `¡Bienvenido/a, ${existingProfile.displayName}!`,
+          `Ingresaste con Google (${existingProfile.role}).`
+        );
+        return { ok: true };
+      }
+
+      // intent === 'register'
+      if (existingProfile) {
+        await signOut(auth).catch(() => {});
+        setCurrentUser(null);
+        const msg =
+          'Esta cuenta de Google ya está registrada en ClaveHogar. Iniciá sesión desde "Iniciar sesión".';
+        notify('info', 'Cuenta ya registrada', msg);
+        return { ok: false, reason: 'already_registered', message: msg };
+      }
+
+      await registerNewClientProfileFromFirebaseUser(result.user);
+      notify(
+        'success',
+        'Cuenta creada con Google',
+        'Te registraste como Cliente. Podés convertirte también en Propietario desde tu misma cuenta cuando quieras publicar un inmueble.'
+      );
+      return { ok: true };
+    } catch (err: unknown) {
+      const code =
+        typeof err === 'object' && err !== null && 'code' in err
+          ? String((err as { code?: string }).code || '')
+          : '';
+      console.error('Google Sign-In error:', code, err);
+
+      if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request') {
+        notify(
+          'info',
+          'Acceso con Google cancelado',
+          'Cerraste la ventana de Google antes de completar el ingreso.'
+        );
+        return { ok: false, reason: 'cancelled' };
+      } else if (code === 'auth/popup-blocked') {
+        const msg =
+          'Habilitá las ventanas emergentes en tu navegador para continuar con Google.';
+        notify('error', 'Ventana emergente bloqueada', msg);
+        return { ok: false, reason: 'error', message: msg };
+      } else if (code === 'auth/unauthorized-domain') {
+        const msg = 'Este dominio no está autorizado en Firebase Authentication.';
+        notify('error', 'Dominio no autorizado', msg);
+        return { ok: false, reason: 'error', message: msg };
+      } else if (code === 'auth/operation-not-allowed') {
+        const msg = 'El proveedor de Google no está habilitado en Firebase Authentication.';
+        notify('error', 'Acceso con Google deshabilitado', msg);
+        return { ok: false, reason: 'error', message: msg };
+      } else if (code === 'auth/account-exists-with-different-credential') {
+        const msg =
+          'Ya existe una cuenta con ese correo. Iniciá sesión con tu correo y contraseña.';
+        notify('error', 'Cuenta registrada con contraseña', msg);
+        return { ok: false, reason: 'error', message: msg };
+      } else if (code === 'auth/network-request-failed') {
+        const msg = 'Verificá tu conexión a internet e intentá nuevamente.';
+        notify('error', 'Error de conexión', msg);
+        return { ok: false, reason: 'error', message: msg };
+      } else {
+        const msg = code
+          ? `Error de autenticación (${code}). Intentá nuevamente o ingresá con correo y contraseña.`
+          : 'Intentá nuevamente o ingresá con tu correo y contraseña.';
+        notify('error', 'No se pudo iniciar con Google', msg);
+        return { ok: false, reason: 'error', message: msg };
+      }
+    } finally {
+      authFlowInProgressRef.current = null;
     }
   };
 
@@ -876,6 +1046,7 @@ export default function App() {
     const emailClean = email.trim().toLowerCase();
     const officialDemoProfile = findOfficialDemoProfileByEmail(emailClean);
 
+    authFlowInProgressRef.current = 'login';
     try {
       isDemoSessionRef.current = false;
       const cred = await signInWithEmailAndPassword(auth, email.trim(), password);
@@ -984,6 +1155,8 @@ export default function App() {
           : 'No se pudo iniciar sesión. Verificá tu correo y contraseña.';
       notify('error', 'Error al iniciar sesión', msg);
       return false;
+    } finally {
+      authFlowInProgressRef.current = null;
     }
   };
 
@@ -1010,6 +1183,7 @@ export default function App() {
       return false;
     }
 
+    authFlowInProgressRef.current = 'register';
     try {
       isDemoSessionRef.current = false;
       const cred = await createUserWithEmailAndPassword(auth, data.email.trim(), data.password);
@@ -1061,6 +1235,8 @@ export default function App() {
 
       notify('error', 'Error al registrarte', humanMsg);
       return false;
+    } finally {
+      authFlowInProgressRef.current = null;
     }
   };
 

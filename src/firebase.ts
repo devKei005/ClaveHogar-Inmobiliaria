@@ -11,6 +11,7 @@ export const db = initializeFirestore(
 );
 export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
+googleProvider.setCustomParameters({ prompt: 'select_account' });
 
 // Validate connection to Firestore on boot as required by firebase-integration-rpc skill
 async function testConnection() {

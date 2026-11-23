@@ -21,7 +21,11 @@ interface AuthProfileModalProps {
   initialMode: AuthModalMode;
   currentUser: UserProfile | null;
   onClose: () => void;
-  onGoogleLogin: () => Promise<void>;
+  onGoogleLogin: (intent: 'login' | 'register') => Promise<{
+    ok: boolean;
+    reason?: 'not_registered' | 'already_registered' | 'suspended' | 'cancelled' | 'error';
+    message?: string;
+  }>;
   onLoginSubmit: (email: string, password: string) => Promise<boolean>;
   onRegisterSubmit: (data: {
     displayName: string;
@@ -74,6 +78,7 @@ export const AuthProfileModal: React.FC<AuthProfileModalProps> = ({
   initialMode,
   currentUser,
   onClose,
+  onGoogleLogin,
   onLoginSubmit,
   onRegisterSubmit,
   onPasswordReset,
@@ -112,6 +117,13 @@ export const AuthProfileModal: React.FC<AuthProfileModalProps> = ({
   const [confirmDeleteAccount, setConfirmDeleteAccount] = useState(false);
 
   const [busy, setBusy] = useState(false);
+  const [googleBusy, setGoogleBusy] = useState(false);
+  const [authFeedback, setAuthFeedback] = useState<{
+    type: 'error' | 'info';
+    message: string;
+    actionLabel?: string;
+    actionMode?: AuthModalMode;
+  } | null>(null);
 
   const clearAuthForms = () => {
     setLoginEmail('');
@@ -124,6 +136,7 @@ export const AuthProfileModal: React.FC<AuthProfileModalProps> = ({
     setRegAddress('');
     setRecoverEmail('');
     setConfirmDeleteAccount(false);
+    setAuthFeedback(null);
   };
 
   useEffect(() => {
@@ -152,6 +165,7 @@ export const AuthProfileModal: React.FC<AuthProfileModalProps> = ({
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    setAuthFeedback(null);
     setBusy(true);
     try {
       const ok = await onLoginSubmit(loginEmail.trim(), loginPassword);
@@ -164,8 +178,40 @@ export const AuthProfileModal: React.FC<AuthProfileModalProps> = ({
     }
   };
 
+  const handleGoogleAuth = async (intent: 'login' | 'register') => {
+    setAuthFeedback(null);
+    setGoogleBusy(true);
+    try {
+      const res = await onGoogleLogin(intent);
+      if (res.ok) {
+        clearAuthForms();
+        onClose();
+      } else if (res.message) {
+        setAuthFeedback({
+          type: res.reason === 'already_registered' ? 'info' : 'error',
+          message: res.message,
+          actionLabel:
+            res.reason === 'not_registered'
+              ? 'Ir a Registrarse'
+              : res.reason === 'already_registered'
+              ? 'Ir a Iniciar sesión'
+              : undefined,
+          actionMode:
+            res.reason === 'not_registered'
+              ? 'register'
+              : res.reason === 'already_registered'
+              ? 'login'
+              : undefined,
+        });
+      }
+    } finally {
+      setGoogleBusy(false);
+    }
+  };
+
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
+    setAuthFeedback(null);
     setBusy(true);
     try {
       const ok = await onRegisterSubmit({
@@ -302,7 +348,7 @@ export const AuthProfileModal: React.FC<AuthProfileModalProps> = ({
         <div className="p-4 sm:p-6 overflow-y-auto flex-1">
           {/* SCREEN 1: INICIAR SESIÓN */}
           {mode === 'login' && (
-            <div className="space-y-5">
+            <div className="space-y-4">
               <form onSubmit={handleLogin} autoComplete="off" className="space-y-4">
                 <div>
                   <label className="block text-xs font-semibold text-[#173B43] mb-1">
@@ -345,12 +391,69 @@ export const AuthProfileModal: React.FC<AuthProfileModalProps> = ({
                 </div>
                 <button
                   type="submit"
-                  disabled={busy}
+                  disabled={busy || googleBusy}
                   className="w-full py-3 px-4 text-xs uppercase tracking-widest font-semibold text-[#FCFBF7] bg-[#173B43] hover:bg-[#2c382d] rounded-sm transition-colors disabled:opacity-50"
                 >
                   {busy ? 'Iniciando sesión...' : 'Iniciar sesión'}
                 </button>
               </form>
+
+              <div className="relative flex items-center py-0.5">
+                <div className="flex-grow border-t border-[#D5BFA0]" />
+                <span className="shrink-0 mx-3 text-[11px] uppercase tracking-wider text-[#173B43]/65 font-semibold">
+                  o continuá con
+                </span>
+                <div className="flex-grow border-t border-[#D5BFA0]" />
+              </div>
+
+              {authFeedback && (
+                <div
+                  role="alert"
+                  className={`p-3 rounded-sm border text-xs space-y-2 ${
+                    authFeedback.type === 'error'
+                      ? 'bg-red-50 border-red-300 text-red-900'
+                      : 'bg-amber-50 border-amber-300 text-amber-900'
+                  }`}
+                >
+                  <p className="font-medium leading-relaxed">{authFeedback.message}</p>
+                  {authFeedback.actionLabel && authFeedback.actionMode && (
+                    <button
+                      type="button"
+                      onClick={() => switchMode(authFeedback.actionMode!)}
+                      className="inline-flex items-center px-2.5 py-1 text-[11px] font-semibold bg-[#173B43] text-[#FCFBF7] rounded-sm hover:bg-[#2c382d] transition-colors cursor-pointer"
+                    >
+                      {authFeedback.actionLabel}
+                    </button>
+                  )}
+                </div>
+              )}
+
+              <button
+                type="button"
+                onClick={() => handleGoogleAuth('login')}
+                disabled={busy || googleBusy}
+                className="w-full py-2.5 px-4 text-xs sm:text-sm font-semibold text-[#303638] bg-white hover:bg-[#F8F6F1] border border-[#D5BFA0] rounded-sm transition-colors flex items-center justify-center gap-2.5 shadow-2xs cursor-pointer disabled:opacity-50"
+              >
+                <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24" aria-hidden="true">
+                  <path
+                    fill="#4285F4"
+                    d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.17Z"
+                  />
+                  <path
+                    fill="#34A853"
+                    d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.11-6.72-4.96H1.29v3.14C3.26 21.3 7.31 24 12 24Z"
+                  />
+                  <path
+                    fill="#FBBC05"
+                    d="M5.28 14.24c-.24-.72-.38-1.49-.38-2.24s.14-1.52.38-2.24V6.62H1.29C.47 8.24 0 10.06 0 12s.47 3.76 1.29 5.38l3.99-3.14Z"
+                  />
+                  <path
+                    fill="#EA4335"
+                    d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.31 0 3.26 2.7 1.29 6.62l3.99 3.14c.95-2.85 3.6-4.96 6.72-4.96Z"
+                  />
+                </svg>
+                <span>{googleBusy ? 'Conectando con Google...' : 'Iniciar sesión con Google'}</span>
+              </button>
 
               <div className="text-center text-xs text-[#173B43]/80 pt-2 border-t border-[#D5BFA0]">
                 ¿No tenés una cuenta?{' '}
@@ -416,7 +519,7 @@ export const AuthProfileModal: React.FC<AuthProfileModalProps> = ({
                       value={regPhone}
                       onChange={(e) => setRegPhone(e.target.value)}
                       placeholder="+54 9 11..."
-                      className="w-full px-3 py-2 text-sm bg-white border border-[#D5BFA0] rounded-sm font-tabular focus:outline-none focus:border-[#173B43]"
+                      className="w-full px-3.5 py-2 text-sm bg-white border border-[#D5BFA0] rounded-sm font-tabular focus:outline-none focus:border-[#173B43]"
                     />
                   </div>
                   <div>
@@ -431,7 +534,7 @@ export const AuthProfileModal: React.FC<AuthProfileModalProps> = ({
                       value={regDni}
                       onChange={(e) => setRegDni(e.target.value)}
                       placeholder="35.000.000"
-                      className="w-full px-3 py-2 text-sm bg-white border border-[#D5BFA0] rounded-sm font-tabular focus:outline-none focus:border-[#173B43]"
+                      className="w-full px-3.5 py-2 text-sm bg-white border border-[#D5BFA0] rounded-sm font-tabular focus:outline-none focus:border-[#173B43]"
                     />
                   </div>
                 </div>
@@ -467,12 +570,69 @@ export const AuthProfileModal: React.FC<AuthProfileModalProps> = ({
                 </div>
                 <button
                   type="submit"
-                  disabled={busy}
+                  disabled={busy || googleBusy}
                   className="w-full py-3 px-4 text-xs uppercase tracking-widest font-semibold text-[#FCFBF7] bg-[#173B43] hover:bg-[#2c382d] rounded-sm transition-colors disabled:opacity-50"
                 >
                   {busy ? 'Registrando usuario...' : 'Registrarse'}
                 </button>
               </form>
+
+              <div className="relative flex items-center py-0.5">
+                <div className="flex-grow border-t border-[#D5BFA0]" />
+                <span className="shrink-0 mx-3 text-[11px] uppercase tracking-wider text-[#173B43]/65 font-semibold">
+                  o registrate con
+                </span>
+                <div className="flex-grow border-t border-[#D5BFA0]" />
+              </div>
+
+              {authFeedback && (
+                <div
+                  role="alert"
+                  className={`p-3 rounded-sm border text-xs space-y-2 ${
+                    authFeedback.type === 'error'
+                      ? 'bg-red-50 border-red-300 text-red-900'
+                      : 'bg-amber-50 border-amber-300 text-amber-900'
+                  }`}
+                >
+                  <p className="font-medium leading-relaxed">{authFeedback.message}</p>
+                  {authFeedback.actionLabel && authFeedback.actionMode && (
+                    <button
+                      type="button"
+                      onClick={() => switchMode(authFeedback.actionMode!)}
+                      className="inline-flex items-center px-2.5 py-1 text-[11px] font-semibold bg-[#173B43] text-[#FCFBF7] rounded-sm hover:bg-[#2c382d] transition-colors cursor-pointer"
+                    >
+                      {authFeedback.actionLabel}
+                    </button>
+                  )}
+                </div>
+              )}
+
+              <button
+                type="button"
+                onClick={() => handleGoogleAuth('register')}
+                disabled={busy || googleBusy}
+                className="w-full py-2.5 px-4 text-xs sm:text-sm font-semibold text-[#303638] bg-white hover:bg-[#F8F6F1] border border-[#D5BFA0] rounded-sm transition-colors flex items-center justify-center gap-2.5 shadow-2xs cursor-pointer disabled:opacity-50"
+              >
+                <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24" aria-hidden="true">
+                  <path
+                    fill="#4285F4"
+                    d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.17Z"
+                  />
+                  <path
+                    fill="#34A853"
+                    d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.11-6.72-4.96H1.29v3.14C3.26 21.3 7.31 24 12 24Z"
+                  />
+                  <path
+                    fill="#FBBC05"
+                    d="M5.28 14.24c-.24-.72-.38-1.49-.38-2.24s.14-1.52.38-2.24V6.62H1.29C.47 8.24 0 10.06 0 12s.47 3.76 1.29 5.38l3.99-3.14Z"
+                  />
+                  <path
+                    fill="#EA4335"
+                    d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.31 0 3.26 2.7 1.29 6.62l3.99 3.14c.95-2.85 3.6-4.96 6.72-4.96Z"
+                  />
+                </svg>
+                <span>{googleBusy ? 'Conectando con Google...' : 'Registrarse con Google'}</span>
+              </button>
 
               <div className="text-center text-xs text-[#173B43]/80 pt-1">
                 ¿Ya tenés una cuenta?{' '}
