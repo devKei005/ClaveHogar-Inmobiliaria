@@ -3445,7 +3445,6 @@ export default function App() {
               aria-label="Abrir menú de navegación"
             >
               <Menu className="w-5 h-5" />
-              <span className="hidden sm:inline lg:hidden text-xs font-semibold">Menú</span>
             </button>
 
             <button
@@ -3515,7 +3514,9 @@ export default function App() {
 
           {/* Right: Auth, Install & User Actions */}
           <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
-            <PWAInstallButton variant="header" />
+            <div className="hidden lg:flex items-center">
+              <PWAInstallButton variant="header" />
+            </div>
             {!currentUser ? (
               <>
                 <button
@@ -3720,7 +3721,7 @@ export default function App() {
           />
 
           <aside className="relative z-10 w-80 max-w-[85vw] bg-[#FCFBF7] border-r border-[#D5BFA0] h-full flex flex-col justify-between overflow-y-auto p-6">
-            <div className="space-y-8">
+            <div className="space-y-5">
               <div className="flex items-center justify-between border-b border-[#D5BFA0] pb-4">
                 <div>
                   <span className="text-xl font-serif-display font-semibold text-[#173B43] block">
@@ -3739,6 +3740,11 @@ export default function App() {
                   <X className="w-5 h-5" />
                 </button>
               </div>
+
+              <PWAInstallButton
+                variant="drawer"
+                onInstalled={() => setIsSideMenuOpen(false)}
+              />
 
               <div className="space-y-1.5">
                 <div className="text-[10px] uppercase tracking-[0.2em] text-[#173B43]/60 font-semibold px-2 mb-2">
@@ -3834,20 +3840,6 @@ export default function App() {
                       </button>
                     ))}
                   </div>
-
-                  {currentUser.role === 'cliente' &&
-                    !currentUser.isAlsoOwner &&
-                    !properties.some((p) => isUserOwnerOfProperty(p, currentUser, users)) && (
-                    <div className="pt-3">
-                      <button
-                        type="button"
-                        onClick={handleEnableOwnerRole}
-                        className="w-full py-2.5 px-3.5 text-xs font-semibold text-[#FCFBF7] bg-[#B86F52] hover:bg-[#a35e42] rounded-sm transition-colors text-left"
-                      >
-                        + Convertirme en Propietario (Vender / Alquilar mi propiedad)
-                      </button>
-                    </div>
-                  )}
                 </div>
               ) : (
                 <div className="space-y-3 pt-4 border-t border-[#D5BFA0]">
@@ -3878,33 +3870,27 @@ export default function App() {
               )}
             </div>
 
-            <div className="pt-4 border-t border-[#D5BFA0] space-y-2">
-              <PWAInstallButton
-                variant="drawer"
-                onInstalled={() => setIsSideMenuOpen(false)}
-              />
-              {currentUser && (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsSideMenuOpen(false);
-                      openAuthModal('profile');
-                    }}
-                    className="w-full text-left px-3.5 py-2 text-xs font-semibold text-[#173B43] hover:bg-[#F8F6F1] rounded-sm"
-                  >
-                    Mi Perfil Personal y Foto
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleLogout}
-                    className="w-full text-left px-3.5 py-2 text-xs font-semibold text-[#B86F52] hover:bg-[#F8F6F1] rounded-sm"
-                  >
-                    Cerrar sesión
-                  </button>
-                </>
-              )}
-            </div>
+            {currentUser && (
+              <div className="pt-4 border-t border-[#D5BFA0] space-y-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsSideMenuOpen(false);
+                    openAuthModal('profile');
+                  }}
+                  className="w-full text-left px-3.5 py-2 text-xs font-semibold text-[#173B43] hover:bg-[#F8F6F1] rounded-sm"
+                >
+                  Mi Perfil Personal y Foto
+                </button>
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  className="w-full text-left px-3.5 py-2 text-xs font-semibold text-[#B86F52] hover:bg-[#F8F6F1] rounded-sm"
+                >
+                  Cerrar sesión
+                </button>
+              </div>
+            )}
           </aside>
         </div>
       )}
