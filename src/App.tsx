@@ -20,6 +20,8 @@ import {
   Info,
   Clock,
   Home,
+  LayoutDashboard,
+  LogIn,
 } from 'lucide-react';
 import {
   onAuthStateChanged,
@@ -3548,7 +3550,7 @@ export default function App() {
       <main
         className={
           activeSection === 'buscador_ia'
-            ? 'flex-1 min-h-0 flex flex-col overflow-hidden'
+            ? 'flex-1 min-h-0 flex flex-col overflow-hidden pb-14 lg:pb-0'
             : 'flex-1 pb-16 lg:pb-0'
         }
       >
@@ -4242,80 +4244,78 @@ export default function App() {
         onQuickRoleLogin={handleQuickRoleLogin}
       />
 
-      {/* Mobile App Bottom Tab Navigation (solo celular y tablet <lg; oculta en buscador_ia para no tapar el chat) */}
-      {activeSection !== 'buscador_ia' && (
-        <nav
-          aria-label="Navegación móvil"
-          className="lg:hidden fixed bottom-0 left-0 right-0 z-30 bg-[#F8F6F1]/95 backdrop-blur-md border-t border-[#D5BFA0] shadow-[0_-4px_20px_rgba(23,59,67,0.08)]"
-        >
-          <div className="grid grid-cols-4 h-14 items-center max-w-xl mx-auto">
-            <button
-              type="button"
-              onClick={() => setActiveSection('catalogo')}
-              className={`h-full flex flex-col items-center justify-center gap-0.5 text-[10px] font-semibold transition-colors cursor-pointer ${
-                activeSection === 'catalogo' ? 'text-[#173B43]' : 'text-[#303638]/60'
-              }`}
-            >
-              <Home className={`w-4 h-4 ${activeSection === 'catalogo' ? 'text-[#C87955]' : ''}`} />
-              <span>Catálogo</span>
-            </button>
+      {/* Mobile App Bottom Tab Navigation (fija en celular y tablet <lg en todas las secciones) */}
+      <nav
+        aria-label="Navegación móvil"
+        className="lg:hidden fixed bottom-0 left-0 right-0 z-30 bg-[#F8F6F1]/95 backdrop-blur-md border-t border-[#D5BFA0] shadow-[0_-4px_20px_rgba(23,59,67,0.08)]"
+      >
+        <div className="grid grid-cols-4 h-14 items-center max-w-xl mx-auto">
+          <button
+            type="button"
+            onClick={() => setActiveSection('catalogo')}
+            className={`h-full flex flex-col items-center justify-center gap-0.5 text-[10px] font-semibold transition-colors cursor-pointer ${
+              activeSection === 'catalogo' ? 'text-[#173B43]' : 'text-[#303638]/60'
+            }`}
+          >
+            <Home className={`w-4 h-4 ${activeSection === 'catalogo' ? 'text-[#C87955]' : ''}`} />
+            <span>Catálogo</span>
+          </button>
 
-            <button
-              type="button"
-              onClick={() => setActiveSection('buscador_ia')}
-              className="h-full flex flex-col items-center justify-center gap-0.5 text-[10px] font-semibold transition-colors cursor-pointer text-[#303638]/60"
-            >
-              <Sparkles className="w-4 h-4 text-[#C87955]" />
-              <span>Asistente IA</span>
-            </button>
+          <button
+            type="button"
+            onClick={() => setActiveSection('buscador_ia')}
+            className={`h-full flex flex-col items-center justify-center gap-0.5 text-[10px] font-semibold transition-colors cursor-pointer ${
+              activeSection === 'buscador_ia' ? 'text-[#173B43]' : 'text-[#303638]/60'
+            }`}
+          >
+            <Sparkles className={`w-4 h-4 ${activeSection === 'buscador_ia' ? 'text-[#C87955]' : 'text-[#C87955]'}`} />
+            <span>Asistente IA</span>
+          </button>
 
-            <button
-              type="button"
-              onClick={() => setActiveSection('comparador')}
-              className={`relative h-full flex flex-col items-center justify-center gap-0.5 text-[10px] font-semibold transition-colors cursor-pointer ${
-                activeSection === 'comparador' ? 'text-[#173B43]' : 'text-[#303638]/60'
-              }`}
-            >
-              <div className="relative">
-                <ArrowLeftRight className={`w-4 h-4 ${activeSection === 'comparador' ? 'text-[#C87955]' : ''}`} />
-                {comparedIds.length > 0 && (
-                  <span className="absolute -top-1.5 -right-2.5 min-w-[15px] h-[15px] px-1 rounded-full bg-[#173B43] text-white text-[9px] font-bold flex items-center justify-center">
-                    {comparedIds.length}
-                  </span>
-                )}
-              </div>
-              <span>Comparar</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => {
-                if (currentUser) {
-                  setActiveSection('panel_rol');
-                } else {
-                  openAuthModal('login');
-                }
-              }}
-              className={`h-full flex flex-col items-center justify-center gap-0.5 text-[10px] font-semibold transition-colors cursor-pointer ${
-                activeSection === 'panel_rol' ? 'text-[#173B43]' : 'text-[#303638]/60'
-              }`}
-            >
-              {currentUser?.photoUrl ? (
-                <div className="w-5 h-5 rounded-full overflow-hidden shrink-0">
-                  <img
-                    src={currentUser.photoUrl}
-                    alt={currentUser.displayName}
-                    className="w-full h-full object-cover"
-                  />
-                </div>
-              ) : (
-                <User className={`w-4 h-4 ${activeSection === 'panel_rol' ? 'text-[#C87955]' : ''}`} />
+          <button
+            type="button"
+            onClick={() => setActiveSection('comparador')}
+            className={`relative h-full flex flex-col items-center justify-center gap-0.5 text-[10px] font-semibold transition-colors cursor-pointer ${
+              activeSection === 'comparador' ? 'text-[#173B43]' : 'text-[#303638]/60'
+            }`}
+          >
+            <div className="relative">
+              <ArrowLeftRight className={`w-4 h-4 ${activeSection === 'comparador' ? 'text-[#C87955]' : ''}`} />
+              {comparedIds.length > 0 && (
+                <span className="absolute -top-1.5 -right-2.5 min-w-[15px] h-[15px] px-1 rounded-full bg-[#173B43] text-white text-[9px] font-bold flex items-center justify-center">
+                  {comparedIds.length}
+                </span>
               )}
-              <span>{currentUser ? 'Mi Espacio' : 'Ingresar'}</span>
-            </button>
-          </div>
-        </nav>
-      )}
+            </div>
+            <span>Comparar</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              if (currentUser) {
+                setActiveSection('panel_rol');
+              } else {
+                openAuthModal('login');
+              }
+            }}
+            className={`h-full flex flex-col items-center justify-center gap-0.5 text-[10px] font-semibold transition-colors cursor-pointer ${
+              activeSection === 'panel_rol' ? 'text-[#173B43]' : 'text-[#303638]/60'
+            }`}
+          >
+            {currentUser ? (
+              <LayoutDashboard
+                className={`w-4 h-4 ${activeSection === 'panel_rol' ? 'text-[#C87955]' : ''}`}
+              />
+            ) : (
+              <LogIn
+                className={`w-4 h-4 ${activeSection === 'panel_rol' ? 'text-[#C87955]' : ''}`}
+              />
+            )}
+            <span>{currentUser ? 'Mi Espacio' : 'Ingresar'}</span>
+          </button>
+        </div>
+      </nav>
     </div>
   );
 }

@@ -1290,99 +1290,191 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
   };
 
   return (
-    <section className="max-w-7xl mx-auto px-3.5 sm:px-6 py-6 sm:py-10 space-y-6 sm:space-y-8">
-      {/* Role Header Banner ("Mi Espacio") matching Image 2 */}
-      <div className="bg-[#173B43] rounded-2xl p-4 sm:p-8 text-white flex flex-col lg:flex-row lg:items-center justify-between gap-5 sm:gap-6 shadow-sm relative overflow-hidden">
+    <section className="max-w-7xl mx-auto px-3.5 sm:px-6 py-4 sm:py-10 space-y-4 sm:space-y-8">
+      {/* Role Header Banner ("Mi Espacio") */}
+      <div className="bg-[#173B43] rounded-2xl p-3.5 sm:p-8 text-white shadow-sm relative overflow-hidden">
         {/* Subtle decorative background graphic */}
         <div className="absolute -right-16 -top-16 w-80 h-80 rounded-full border border-white/5 pointer-events-none" />
         <div className="absolute -right-24 -top-24 w-96 h-96 rounded-full border border-white/5 pointer-events-none" />
 
-        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-5 relative z-10 min-w-0">
-          <button
-            type="button"
-            onClick={onOpenProfileModal}
-            title="Hacé clic para cambiar tu foto o editar tu perfil"
-            className="group relative w-14 h-14 sm:w-18 sm:h-18 rounded-full overflow-hidden bg-[#173B43] text-white border-0 sm:border-2 sm:border-white/30 flex items-center justify-center shrink-0 cursor-pointer shadow-sm"
-          >
-            {currentUser.photoUrl ? (
-              <img
-                src={currentUser.photoUrl}
-                alt={currentUser.displayName}
-                className="w-full h-full object-cover"
-              />
-            ) : (
-              <User className="w-7 h-7 sm:w-8 sm:h-8 text-white" />
-            )}
-            <span className="absolute inset-0 bg-black/45 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-              <Camera className="w-5 h-5 text-white" />
-            </span>
-          </button>
-
-          <div className="space-y-1.5 min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#D6CBB8]">
-                Mi Espacio ·{' '}
-                {currentUser.role === 'cliente' && canActAsOwner
-                  ? 'Propietario y Cliente'
-                  : currentUser.role.toUpperCase()}
+        {/* Mobile compact layout (< sm): perfil izquierda, Mi Espacio + rol derecha, nombre y descripción de 2 renglones abajo */}
+        <div className="sm:hidden relative z-10 space-y-2.5">
+          <div className="flex items-center justify-between gap-3">
+            <button
+              type="button"
+              onClick={onOpenProfileModal}
+              title="Hacé clic para cambiar tu foto o editar tu perfil"
+              className="group relative w-11 h-11 rounded-full overflow-hidden bg-[#173B43] text-white border-0 flex items-center justify-center shrink-0 cursor-pointer shadow-sm"
+            >
+              {currentUser.photoUrl ? (
+                <img
+                  src={currentUser.photoUrl}
+                  alt={currentUser.displayName}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <User className="w-6 h-6 text-white" />
+              )}
+              <span className="absolute inset-0 bg-black/45 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                <Camera className="w-4 h-4 text-white" />
               </span>
+            </button>
+
+            <div className="flex flex-col items-end text-right min-w-0 flex-1">
+              <div className="flex items-center justify-end gap-1.5 flex-wrap">
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-[#D6CBB8]">
+                  Mi Espacio
+                </span>
+                <span className="text-[#D6CBB8]/60" aria-hidden="true">
+                  ·
+                </span>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-white">
+                  {currentUser.role === 'cliente' && canActAsOwner
+                    ? 'Propietario y Cliente'
+                    : currentUser.role}
+                </span>
+              </div>
               {onOpenProfileModal && (
                 <button
                   type="button"
                   onClick={onOpenProfileModal}
-                  className="inline-flex items-center gap-1 px-2.5 py-0.5 text-[10px] font-semibold bg-white/10 hover:bg-white/20 text-white rounded-full border border-white/20 transition-colors cursor-pointer"
+                  className="mt-1 inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold bg-white/10 hover:bg-white/20 text-white rounded-full border border-white/20 transition-colors cursor-pointer"
                 >
-                  <Edit3 className="w-3 h-3" />
+                  <Edit3 className="w-2.5 h-2.5" />
                   Editar perfil
                 </button>
               )}
             </div>
-            <h1 className="text-xl sm:text-3xl font-serif-display font-semibold text-white">
+          </div>
+
+          <div className="space-y-1 min-w-0">
+            <h1 className="text-lg font-serif-display font-semibold text-white leading-tight truncate">
               {currentUser.displayName}
             </h1>
-            <p className="text-xs sm:text-sm text-[#F4EFE6]/80 max-w-2xl leading-relaxed">
+            <p className="text-xs text-[#F4EFE6]/85 leading-snug line-clamp-2">
               {currentUser.role === 'cliente' &&
                 !canActAsOwner &&
-                'Gestioná tus inmuebles favoritos, tus visitas programadas, tus solicitudes de alquiler o compra y tus conversaciones.'}
+                'Gestioná favoritos, visitas programadas, solicitudes y consultas.'}
               {canActAsOwner &&
-                'Administrá tanto tus búsquedas y reservas como Cliente, como la publicación y gestión de tus inmuebles desde "Mis propiedades" (de forma independiente o con agente inmobiliario).'}
+                'Administrá tus búsquedas como cliente y tus inmuebles publicados.'}
               {currentUser.role === 'agente' &&
-                'Gestioná exclusivamente las propiedades a tu cargo, aceptá o rechazá solicitudes de asignación, coordiná visitas y respondé consultas.'}
+                'Gestioná tu cartera asignada, coordiná visitas y respondé consultas.'}
               {currentUser.role === 'administrador' &&
-                'Supervisión general de ClaveHogar: aprobá publicaciones pendientes, asigná o confirmá agentes inmobiliarios, administrá usuarios y roles, categorías y reclamos.'}
+                'Supervisá publicaciones, asigná agentes y administrá usuarios y reclamos.'}
             </p>
           </div>
-        </div>
 
-        <div className="relative z-10 w-full lg:w-auto lg:shrink-0">
           {currentUser.role === 'cliente' && !canActAsOwner && (
-            <div className="bg-white/10 border border-white/20 rounded-xl p-4 w-full lg:max-w-xs space-y-2.5">
-              <div className="text-xs font-semibold text-[#D6CBB8]">
-                ¿Querés vender o alquilar tu casa?
-              </div>
-              <p className="text-[11px] text-white/85 leading-relaxed">
-                Convertite en <strong>Propietario</strong> desde tu misma cuenta sin perder tus funciones de Cliente.
-              </p>
-              <button
-                type="button"
-                onClick={onEnableOwnerRole}
-                className="w-full py-2.5 px-3 text-xs font-semibold text-white bg-[#C87955] hover:bg-[#b56b49] rounded-xl transition-colors cursor-pointer shadow-xs"
-              >
-                Convertirme en Propietario
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={onEnableOwnerRole}
+              className="w-full py-2 px-3 text-xs font-semibold text-white bg-[#C87955] hover:bg-[#b56b49] rounded-xl transition-colors cursor-pointer shadow-xs text-center"
+            >
+              ¿Vendés o alquilás? Convertirme en Propietario
+            </button>
           )}
 
           {canActAsOwner && (
             <button
               type="button"
               onClick={onOpenNewProperty}
-              className="w-full sm:w-auto flex items-center justify-center gap-2 px-5 sm:px-6 py-3 sm:py-3.5 text-xs uppercase tracking-wider font-bold text-white bg-[#C87955] hover:bg-[#b56b49] rounded-xl transition-all shadow-sm cursor-pointer whitespace-nowrap"
+              className="w-full flex items-center justify-center gap-1.5 px-4 py-2 text-xs uppercase tracking-wider font-bold text-white bg-[#C87955] hover:bg-[#b56b49] rounded-xl transition-all shadow-xs cursor-pointer"
             >
-              <Plus className="w-4 h-4" />
+              <Plus className="w-3.5 h-3.5" />
               <span>Publicar en Mis propiedades</span>
             </button>
           )}
+        </div>
+
+        {/* Desktop & Tablet layout (>= sm) preserved intact */}
+        <div className="hidden sm:flex sm:flex-col lg:flex-row lg:items-center justify-between gap-6 relative z-10">
+          <div className="flex flex-row items-center gap-5 min-w-0">
+            <button
+              type="button"
+              onClick={onOpenProfileModal}
+              title="Hacé clic para cambiar tu foto o editar tu perfil"
+              className="group relative w-18 h-18 rounded-full overflow-hidden bg-[#173B43] text-white border-2 border-white/30 flex items-center justify-center shrink-0 cursor-pointer shadow-sm"
+            >
+              {currentUser.photoUrl ? (
+                <img
+                  src={currentUser.photoUrl}
+                  alt={currentUser.displayName}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <User className="w-8 h-8 text-white" />
+              )}
+              <span className="absolute inset-0 bg-black/45 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                <Camera className="w-5 h-5 text-white" />
+              </span>
+            </button>
+
+            <div className="space-y-1.5 min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#D6CBB8]">
+                  Mi Espacio ·{' '}
+                  {currentUser.role === 'cliente' && canActAsOwner
+                    ? 'Propietario y Cliente'
+                    : currentUser.role.toUpperCase()}
+                </span>
+                {onOpenProfileModal && (
+                  <button
+                    type="button"
+                    onClick={onOpenProfileModal}
+                    className="inline-flex items-center gap-1 px-2.5 py-0.5 text-[10px] font-semibold bg-white/10 hover:bg-white/20 text-white rounded-full border border-white/20 transition-colors cursor-pointer"
+                  >
+                    <Edit3 className="w-3 h-3" />
+                    Editar perfil
+                  </button>
+                )}
+              </div>
+              <h1 className="text-3xl font-serif-display font-semibold text-white">
+                {currentUser.displayName}
+              </h1>
+              <p className="text-sm text-[#F4EFE6]/80 max-w-2xl leading-relaxed">
+                {currentUser.role === 'cliente' &&
+                  !canActAsOwner &&
+                  'Gestioná tus inmuebles favoritos, tus visitas programadas, tus solicitudes de alquiler o compra y tus conversaciones.'}
+                {canActAsOwner &&
+                  'Administrá tanto tus búsquedas y reservas como Cliente, como la publicación y gestión de tus inmuebles desde "Mis propiedades" (de forma independiente o con agente inmobiliario).'}
+                {currentUser.role === 'agente' &&
+                  'Gestioná exclusivamente las propiedades a tu cargo, aceptá o rechazá solicitudes de asignación, coordiná visitas y respondé consultas.'}
+                {currentUser.role === 'administrador' &&
+                  'Supervisión general de ClaveHogar: aprobá publicaciones pendientes, asigná o confirmá agentes inmobiliarios, administrá usuarios y roles, categorías y reclamos.'}
+              </p>
+            </div>
+          </div>
+
+          <div className="relative z-10 w-full lg:w-auto lg:shrink-0">
+            {currentUser.role === 'cliente' && !canActAsOwner && (
+              <div className="bg-white/10 border border-white/20 rounded-xl p-4 w-full lg:max-w-xs space-y-2.5">
+                <div className="text-xs font-semibold text-[#D6CBB8]">
+                  ¿Querés vender o alquilar tu casa?
+                </div>
+                <p className="text-[11px] text-white/85 leading-relaxed">
+                  Convertite en <strong>Propietario</strong> desde tu misma cuenta sin perder tus funciones de Cliente.
+                </p>
+                <button
+                  type="button"
+                  onClick={onEnableOwnerRole}
+                  className="w-full py-2.5 px-3 text-xs font-semibold text-white bg-[#C87955] hover:bg-[#b56b49] rounded-xl transition-colors cursor-pointer shadow-xs"
+                >
+                  Convertirme en Propietario
+                </button>
+              </div>
+            )}
+
+            {canActAsOwner && (
+              <button
+                type="button"
+                onClick={onOpenNewProperty}
+                className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-3.5 text-xs uppercase tracking-wider font-bold text-white bg-[#C87955] hover:bg-[#b56b49] rounded-xl transition-all shadow-sm cursor-pointer whitespace-nowrap"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Publicar en Mis propiedades</span>
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
