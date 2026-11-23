@@ -3741,11 +3741,6 @@ export default function App() {
                 </button>
               </div>
 
-              <PWAInstallButton
-                variant="drawer"
-                onInstalled={() => setIsSideMenuOpen(false)}
-              />
-
               <div className="space-y-1.5">
                 <div className="text-[10px] uppercase tracking-[0.2em] text-[#173B43]/60 font-semibold px-2 mb-2">
                   Explorar Plataforma
@@ -3792,6 +3787,12 @@ export default function App() {
                 >
                   Comparador de Inmuebles ({comparedIds.length})
                 </button>
+                <div className="pt-2">
+                  <PWAInstallButton
+                    variant="drawer"
+                    onInstalled={() => setIsSideMenuOpen(false)}
+                  />
+                </div>
               </div>
 
               {currentUser ? (

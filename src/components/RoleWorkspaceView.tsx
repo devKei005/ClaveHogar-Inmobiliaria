@@ -1297,9 +1297,9 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
         <div className="absolute -right-16 -top-16 w-80 h-80 rounded-full border border-white/5 pointer-events-none" />
         <div className="absolute -right-24 -top-24 w-96 h-96 rounded-full border border-white/5 pointer-events-none" />
 
-        {/* Mobile compact layout (< sm): perfil izquierda, Mi Espacio + rol derecha, nombre y descripción de 2 renglones abajo */}
+        {/* Mobile compact layout (< sm): perfil izquierda, Mi Espacio + rol + Editar perfil al lado derecho del perfil */}
         <div className="sm:hidden relative z-10 space-y-2.5">
-          <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center justify-start gap-3">
             <button
               type="button"
               onClick={onOpenProfileModal}
@@ -1320,8 +1320,8 @@ export const RoleWorkspaceView: React.FC<RoleWorkspaceViewProps> = ({
               </span>
             </button>
 
-            <div className="flex flex-col items-end text-right min-w-0 flex-1">
-              <div className="flex items-center justify-end gap-1.5 flex-wrap">
+            <div className="flex flex-col items-start text-left min-w-0 flex-1">
+              <div className="flex items-center justify-start gap-1.5 flex-wrap">
                 <span className="text-[10px] font-semibold uppercase tracking-wider text-[#D6CBB8]">
                   Mi Espacio
                 </span>

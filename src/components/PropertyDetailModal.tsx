@@ -310,15 +310,15 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-[#1F241F]/65 p-0 sm:p-4 overflow-y-auto">
       <div className="relative w-full max-w-6xl bg-[#FCFBF7] border border-[#D5BFA0] rounded-none sm:rounded-md overflow-hidden my-0 sm:my-8 h-full sm:h-auto max-h-full sm:max-h-[92vh] flex flex-col">
         {/* Top bar */}
-        <div className="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-6 py-3 sm:py-4 bg-[#173B43] text-[#FCFBF7] shrink-0">
-          <div className="flex items-center gap-1.5 sm:gap-2 text-[10px] sm:text-xs tracking-wider uppercase text-[#D5BFA0] min-w-0 truncate">
+        <div className="flex flex-wrap sm:flex-nowrap items-center justify-between gap-2.5 px-3 sm:px-6 py-3 sm:py-4 bg-[#173B43] text-[#FCFBF7] shrink-0">
+          <div className="order-1 flex items-center gap-1.5 sm:gap-2 text-[10px] sm:text-xs tracking-wider uppercase text-[#D5BFA0] min-w-0 truncate">
             <span className="truncate">{property.propertyType}</span>
             <span aria-hidden="true">·</span>
             <span>{property.operationType === 'alquiler' ? 'Alquiler' : 'Venta'}</span>
             <span aria-hidden="true" className="hidden xs:inline">·</span>
             <span className="hidden xs:inline">{property.availability}</span>
           </div>
-          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2.5 shrink-0">
+          <div className="order-3 sm:order-2 w-full sm:w-auto sm:ml-auto flex flex-wrap items-center gap-1.5 sm:gap-2.5">
             {canEdit && onOpenEditProperty && !isConcretada && (
               <button
                 type="button"
@@ -373,15 +373,15 @@ export const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
               <Heart className={`w-3.5 h-3.5 ${isFavorite ? 'fill-current' : ''}`} />
               <span className="hidden md:inline">{isFavorite ? 'Guardado' : 'Guardar'}</span>
             </button>
-            <button
-              type="button"
-              onClick={onClose}
-              className="p-2 text-[#D5BFA0] hover:text-[#FCFBF7] rounded-sm hover:bg-white/10 transition-colors cursor-pointer"
-              aria-label="Cerrar detalle"
-            >
-              <X className="w-5 h-5" />
-            </button>
           </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="order-2 sm:order-3 ml-auto sm:ml-4 sm:pl-3 sm:border-l sm:border-white/15 p-2 text-[#D5BFA0] hover:text-[#FCFBF7] rounded-sm hover:bg-white/10 transition-colors cursor-pointer shrink-0"
+            aria-label="Cerrar detalle"
+          >
+            <X className="w-5 h-5" />
+          </button>
         </div>
 
         {/* Scrollable Content */}
