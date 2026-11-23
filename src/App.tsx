@@ -39,10 +39,12 @@ import {
   doc,
   setDoc,
   getDoc,
+  getDocFromServer,
   updateDoc,
   deleteDoc,
   onSnapshot,
   getDocs,
+  getDocsFromServer,
   query,
   where,
 } from 'firebase/firestore';
@@ -235,6 +237,10 @@ export default function App() {
     } catch {}
     return null;
   });
+  const currentUserRef = useRef<UserProfile | null>(currentUser);
+  useEffect(() => {
+    currentUserRef.current = currentUser;
+  }, [currentUser]);
   const isDemoSessionRef = useRef<boolean>(
     Boolean(typeof window !== 'undefined' && localStorage.getItem('clavehogar_active_session'))
   );
@@ -441,22 +447,24 @@ export default function App() {
     const unsubUsers = onSnapshot(
       collection(db, 'app_users'),
       (snap) => {
-        if (!mounted || snap.empty) return;
+        if (!mounted) return;
         const storedAvatars = getStoredAvatars();
         const userMap = new Map<string, UserProfile>();
 
-        // 1. Cargamos primero los usuarios reales guardados en Firestore
+        // 1. Cargamos primero los usuarios reales guardados en Firestore (solo si tienen email válido)
         snap.docs.forEach((d) => {
           const raw = d.data() as Partial<UserProfile>;
           const uid = raw.uid || d.id;
           const email = (raw.email || '').trim().toLowerCase();
+          if (!email) return;
+
           const cachedPhoto =
-            storedAvatars[uid] ?? (email ? storedAvatars[email] : '');
+            storedAvatars[uid] ?? storedAvatars[email];
 
           const profile: UserProfile = {
             uid,
-            displayName: raw.displayName || (email ? email.split('@')[0] : 'Usuario'),
-            email: raw.email ? raw.email.trim() : `${uid}@clavehogar.com`,
+            displayName: raw.displayName || email.split('@')[0] || 'Usuario',
+            email: raw.email!.trim(),
             phone: raw.phone || '+54 9 11 4000-0000',
             address: raw.address || 'Buenos Aires, Argentina',
             dni: raw.dni || '',
@@ -468,7 +476,7 @@ export default function App() {
             photoUrl: raw.photoUrl || cachedPhoto || '',
           };
 
-          if (email) userMap.set(`email:${email}`, profile);
+          userMap.set(`email:${email}`, profile);
           if (uid) userMap.set(`uid:${uid}`, profile);
         });
 
@@ -506,6 +514,42 @@ export default function App() {
 
         setUsers(uniqueList);
         saveCachedUsers(uniqueList);
+
+        // 4. Si el usuario logueado (no demo) fue eliminado o se le borró el email en Firestore, cerrar sesión
+        const activeUser = currentUserRef.current;
+        if (
+          activeUser &&
+          !isDemoSessionRef.current &&
+          authFlowInProgressRef.current === null &&
+          !snap.metadata.fromCache
+        ) {
+          const activeEmail = (activeUser.email || '').trim().toLowerCase();
+          const isOfficialDemo = Object.values(DEMO_ROLE_EMAILS).some(
+            (m) => m.toLowerCase() === activeEmail
+          );
+          if (!isOfficialDemo) {
+            const stillExistsInFirestore = snap.docs.some((d) => {
+              const raw = d.data() as Partial<UserProfile>;
+              const docEmail = (raw.email || '').trim().toLowerCase();
+              const docUid = raw.uid || d.id;
+              return (
+                Boolean(docEmail) &&
+                docEmail === activeEmail &&
+                (docUid === activeUser.uid || d.id === activeUser.uid || docEmail === activeEmail) &&
+                raw.active !== false
+              );
+            });
+            if (!stillExistsInFirestore) {
+              setCurrentUser(null);
+              try {
+                localStorage.removeItem('clavehogar_active_session');
+              } catch {
+                // ignore
+              }
+              signOut(auth).catch(() => {});
+            }
+          }
+        }
       },
       (err) => handleFirestoreError(err, OperationType.GET, 'app_users')
     );
@@ -672,16 +716,18 @@ export default function App() {
 
   const findRegisteredFirebaseUserProfile = async (
     firebaseUser: FirebaseUser
-  ): Promise<UserProfile | null> => {
+  ): Promise<{ profile: UserProfile; firestoreDocId: string } | null> => {
     const uid = sanitizeId(firebaseUser.uid);
     const rawEmail = (firebaseUser.email || '').trim();
     const emailLower = truncateText(rawEmail.toLowerCase(), SCHEMA_LIMITS.EMAIL_MAX);
+    if (!emailLower) return null;
 
-    // 1. Consultar si ya existe el perfil persistido por UID en Firestore
+    // 1. Consultar DIRECTAMENTE al servidor de Firestore por UID y validar que el email siga presente y coincida
     try {
-      const snap = await getDoc(doc(db, 'app_users', uid));
+      const snap = await getDocFromServer(doc(db, 'app_users', uid));
       if (snap.exists()) {
         const raw = snap.data() as Partial<UserProfile>;
+        const docEmailLower = (raw.email || '').trim().toLowerCase();
         if (
           emailLower === 'programacionkeichi@gmail.com' &&
           raw.role === 'administrador' &&
@@ -690,47 +736,65 @@ export default function App() {
           await deleteDoc(doc(db, 'app_users', uid)).catch(() => {});
           return null;
         }
-        return buildFirebaseUserProfileFromRaw(firebaseUser, uid, emailLower, raw);
+        // Si se borró el campo email en la base de datos o no coincide, NO se considera registrado
+        if (docEmailLower && docEmailLower === emailLower) {
+          return {
+            profile: buildFirebaseUserProfileFromRaw(firebaseUser, uid, emailLower, raw),
+            firestoreDocId: snap.id,
+          };
+        }
       }
     } catch (err) {
-      console.warn('Could not read existing user doc from Firestore:', err);
+      console.warn('Could not read existing user doc from Firestore server:', err);
     }
 
-    // 2. Buscar en Firestore por campo email (minúsculas o tal cual vino de Firebase)
-    if (emailLower) {
-      try {
-        let qSnap = await getDocs(
-          query(collection(db, 'app_users'), where('email', '==', emailLower))
+    // 2. Buscar DIRECTAMENTE en el servidor de Firestore por campo email
+    try {
+      let qSnap = await getDocsFromServer(
+        query(collection(db, 'app_users'), where('email', '==', emailLower))
+      );
+      if (qSnap.empty && rawEmail && rawEmail !== emailLower) {
+        qSnap = await getDocsFromServer(
+          query(collection(db, 'app_users'), where('email', '==', rawEmail))
         );
-        if (qSnap.empty && rawEmail && rawEmail !== emailLower) {
-          qSnap = await getDocs(
-            query(collection(db, 'app_users'), where('email', '==', rawEmail))
-          );
-        }
-        if (!qSnap.empty) {
-          const matchedDoc = qSnap.docs[0];
-          const raw = matchedDoc.data() as Partial<UserProfile>;
-          if (
-            emailLower === 'programacionkeichi@gmail.com' &&
-            raw.role === 'administrador' &&
-            raw.agencyName === 'ClaveHogar Administración'
-          ) {
-            await deleteDoc(doc(db, 'app_users', matchedDoc.id)).catch(() => {});
-            return null;
-          }
-          return buildFirebaseUserProfileFromRaw(firebaseUser, uid, emailLower, raw);
-        }
-      } catch (err) {
-        console.warn('Could not query user by email in Firestore:', err);
       }
+      if (!qSnap.empty) {
+        const matchedDoc = qSnap.docs[0];
+        const raw = matchedDoc.data() as Partial<UserProfile>;
+        const docEmailLower = (raw.email || '').trim().toLowerCase();
+        if (
+          emailLower === 'programacionkeichi@gmail.com' &&
+          raw.role === 'administrador' &&
+          raw.agencyName === 'ClaveHogar Administración'
+        ) {
+          await deleteDoc(doc(db, 'app_users', matchedDoc.id)).catch(() => {});
+          return null;
+        }
+        if (docEmailLower && docEmailLower === emailLower) {
+          return {
+            profile: buildFirebaseUserProfileFromRaw(firebaseUser, uid, emailLower, raw),
+            firestoreDocId: matchedDoc.id,
+          };
+        }
+      }
+    } catch (err) {
+      console.warn('Could not query user by email from Firestore server:', err);
     }
 
-    // 3. Buscar únicamente entre las cuentas oficiales iniciales (@clavehogar.com)
-    const demoExisting = INITIAL_USERS.find(
-      (u) => u.email.toLowerCase() === emailLower || u.uid === uid
+    // 3. Permitir respaldo solo para las 4 cuentas oficiales demo (@clavehogar.com)
+    const isOfficialDemo = Object.values(DEMO_ROLE_EMAILS).some(
+      (demoMail) => demoMail.toLowerCase() === emailLower
     );
-    if (demoExisting) {
-      return buildFirebaseUserProfileFromRaw(firebaseUser, uid, emailLower, demoExisting);
+    if (isOfficialDemo) {
+      const demoExisting = INITIAL_USERS.find(
+        (u) => u.email.toLowerCase() === emailLower
+      );
+      if (demoExisting) {
+        return {
+          profile: buildFirebaseUserProfileFromRaw(firebaseUser, uid, emailLower, demoExisting),
+          firestoreDocId: demoExisting.uid,
+        };
+      }
     }
 
     return null;
@@ -763,14 +827,20 @@ export default function App() {
     };
 
     try {
-      await setDoc(doc(db, 'app_users', uid), newProfile, { merge: true });
+      // Sobrescribe por completo el documento para garantizar estrictamente role: 'cliente' e isAlsoOwner: false
+      await setDoc(doc(db, 'app_users', uid), newProfile);
     } catch (err) {
       handleFirestoreError(err, OperationType.WRITE, `app_users/${uid}`);
     }
 
     setCurrentUser(newProfile);
     setUsers((prev) => {
-      const next = [newProfile, ...prev.filter((u) => u.uid !== uid)];
+      const next = [
+        newProfile,
+        ...prev.filter(
+          (u) => u.uid !== uid && u.email.toLowerCase() !== emailLower
+        ),
+      ];
       saveCachedUsers(next);
       return next;
     });
@@ -788,20 +858,25 @@ export default function App() {
         setCurrentUser(null);
         return;
       }
-      const profile = await findRegisteredFirebaseUserProfile(user);
-      if (!profile || !profile.active) {
+      const matched = await findRegisteredFirebaseUserProfile(user);
+      if (!matched || !matched.profile.active) {
         setCurrentUser(null);
+        try {
+          localStorage.removeItem('clavehogar_active_session');
+        } catch {
+          // ignore
+        }
         await signOut(auth).catch(() => {});
         return;
       }
-      setCurrentUser(profile);
+      setCurrentUser(matched.profile);
       setUsers((prev) => {
         const next = [
-          profile,
+          matched.profile,
           ...prev.filter(
             (u) =>
-              u.uid !== profile.uid &&
-              u.email.toLowerCase() !== profile.email.toLowerCase()
+              u.uid !== matched.profile.uid &&
+              u.email.toLowerCase() !== matched.profile.email.toLowerCase()
           ),
         ];
         saveCachedUsers(next);
@@ -818,13 +893,13 @@ export default function App() {
     if (fresh) setSelectedProperty(fresh);
   }, [properties, selectedProperty]);
 
-  // Sincronizar automáticamente la condición de propietario para clientes que ya tengan publicaciones creadas
+  // Sincronizar automáticamente la condición de propietario solo si coincide por UID exacto con una publicación suya
   useEffect(() => {
     if (!currentUser || currentUser.role !== 'cliente' || currentUser.isAlsoOwner) return;
-    const hasPublishedProperties = properties.some((p) =>
-      isUserOwnerOfProperty(p, currentUser, users)
+    const hasOwnedPropertiesByUid = properties.some(
+      (p) => Boolean(p.ownerId) && p.ownerId === currentUser.uid
     );
-    if (hasPublishedProperties) {
+    if (hasOwnedPropertiesByUid) {
       const updatedUser: UserProfile = { ...currentUser, isAlsoOwner: true };
       setCurrentUser(updatedUser);
       setUsers((prev) => {
@@ -834,7 +909,7 @@ export default function App() {
       });
       setDoc(doc(db, 'app_users', currentUser.uid), { isAlsoOwner: true }, { merge: true }).catch(() => {});
     }
-  }, [currentUser, properties, users]);
+  }, [currentUser, properties]);
 
   // Al navegar al Catálogo, nos aseguramos de que el input de búsqueda de texto esté limpio
   useEffect(() => {
@@ -954,21 +1029,22 @@ export default function App() {
       }
       const result = await signInWithPopup(auth, googleProvider);
       const additionalInfo = getAdditionalUserInfo(result);
-      const existingProfile = await findRegisteredFirebaseUserProfile(result.user);
+      const matched = await findRegisteredFirebaseUserProfile(result.user);
 
       if (intent === 'login') {
-        if (!existingProfile) {
+        if (!matched) {
           if (additionalInfo?.isNewUser) {
             await result.user.delete().catch(() => {});
           }
           await signOut(auth).catch(() => {});
           setCurrentUser(null);
           const msg =
-            'Esta cuenta de Google todavía no está registrada. Por favor, registrate primero desde "Crear cuenta".';
+            'Esta cuenta de Google todavía no está registrada en ClaveHogar. Por favor, registrate primero desde "Crear cuenta".';
           notify('error', 'Cuenta no registrada', msg);
           return { ok: false, reason: 'not_registered', message: msg };
         }
 
+        const existingProfile = matched.profile;
         if (!existingProfile.active) {
           await signOut(auth).catch(() => {});
           setCurrentUser(null);
@@ -990,9 +1066,6 @@ export default function App() {
           saveCachedUsers(next);
           return next;
         });
-        setDoc(doc(db, 'app_users', existingProfile.uid), existingProfile, { merge: true }).catch(
-          () => {}
-        );
         setActiveSubView(getDefaultSubViewForRole(existingProfile.role));
         notify(
           'success',
@@ -1003,7 +1076,7 @@ export default function App() {
       }
 
       // intent === 'register'
-      if (existingProfile) {
+      if (matched) {
         await signOut(auth).catch(() => {});
         setCurrentUser(null);
         const msg =
@@ -1098,33 +1171,15 @@ export default function App() {
 
       let profile: UserProfile | null = null;
       try {
-        const snap = await getDoc(doc(db, 'app_users', cred.user.uid));
+        const snap = await getDocFromServer(doc(db, 'app_users', cred.user.uid));
         if (snap.exists()) {
           const raw = snap.data() as Partial<UserProfile>;
-          profile = {
-            uid: cred.user.uid,
-            displayName: raw.displayName || cred.user.displayName || emailClean.split('@')[0],
-            email: raw.email || emailClean,
-            phone: raw.phone || '+54 9 11 4000-0000',
-            address: raw.address || 'Buenos Aires, Argentina',
-            dni: raw.dni || '',
-            role: (raw.role as UserRole) || 'cliente',
-            isAlsoOwner: Boolean(raw.isAlsoOwner),
-            active: raw.active !== false,
-            agencyName: raw.agencyName || '',
-            bio: raw.bio || '',
-            photoUrl: raw.photoUrl || cred.user.photoURL || '',
-          };
-        } else {
-          const qSnap = await getDocs(
-            query(collection(db, 'app_users'), where('email', '==', emailClean))
-          );
-          if (!qSnap.empty) {
-            const raw = qSnap.docs[0].data() as Partial<UserProfile>;
+          const docEmailLower = (raw.email || '').trim().toLowerCase();
+          if (docEmailLower && docEmailLower === emailClean) {
             profile = {
               uid: cred.user.uid,
               displayName: raw.displayName || cred.user.displayName || emailClean.split('@')[0],
-              email: raw.email || emailClean,
+              email: raw.email!,
               phone: raw.phone || '+54 9 11 4000-0000',
               address: raw.address || 'Buenos Aires, Argentina',
               dni: raw.dni || '',
@@ -1137,20 +1192,46 @@ export default function App() {
             };
           }
         }
+        if (!profile) {
+          const qSnap = await getDocsFromServer(
+            query(collection(db, 'app_users'), where('email', '==', emailClean))
+          );
+          if (!qSnap.empty) {
+            const raw = qSnap.docs[0].data() as Partial<UserProfile>;
+            const docEmailLower = (raw.email || '').trim().toLowerCase();
+            if (docEmailLower && docEmailLower === emailClean) {
+              profile = {
+                uid: cred.user.uid,
+                displayName: raw.displayName || cred.user.displayName || emailClean.split('@')[0],
+                email: raw.email!,
+                phone: raw.phone || '+54 9 11 4000-0000',
+                address: raw.address || 'Buenos Aires, Argentina',
+                dni: raw.dni || '',
+                role: (raw.role as UserRole) || 'cliente',
+                isAlsoOwner: Boolean(raw.isAlsoOwner),
+                active: raw.active !== false,
+                agencyName: raw.agencyName || '',
+                bio: raw.bio || '',
+                photoUrl: raw.photoUrl || cred.user.photoURL || '',
+              };
+            }
+          }
+        }
       } catch (e) {
         console.warn('Error reading fresh user doc on login:', e);
       }
 
-      if (!profile) {
-        profile =
-          users.find((u) => u.uid === cred.user.uid) ||
-          users.find((u) => u.email.toLowerCase() === emailClean) ||
-          officialDemoProfile ||
-          null;
+      if (!profile && officialDemoProfile) {
+        profile = officialDemoProfile;
       }
 
       if (!profile) {
-        notify('error', 'Perfil no encontrado', 'Tu cuenta existe pero falta el perfil en la base de datos.');
+        await signOut(auth).catch(() => {});
+        notify(
+          'error',
+          'Cuenta no registrada en la base de datos',
+          'Tu correo no figura registrado en ClaveHogar. Por favor, registrate primero desde "Crear cuenta".'
+        );
         return false;
       }
       if (!profile.active) {
@@ -1165,27 +1246,23 @@ export default function App() {
       return true;
     } catch (err: any) {
       const cleanPassword = password.trim();
-      const targetUser =
-        users.find((u) => u.email.toLowerCase() === emailClean) ||
-        INITIAL_USERS.find((u) => u.email.toLowerCase() === emailClean);
-
-      // Si es una cuenta oficial demo o usuario registrado en la base con clave 123456
-      if (targetUser && cleanPassword === '123456') {
-        if (!targetUser.active) {
+      // El acceso rápido con clave 123456 aplica exclusivamente a las 4 cuentas oficiales demo (@clavehogar.com)
+      if (officialDemoProfile && cleanPassword === '123456') {
+        if (!officialDemoProfile.active) {
           notify('error', 'Cuenta suspendida', 'Esta cuenta está desactivada por el administrador.');
           return false;
         }
         await signOut(auth).catch(() => {});
         isDemoSessionRef.current = true;
         try {
-          localStorage.setItem('clavehogar_active_session', JSON.stringify(targetUser));
+          localStorage.setItem('clavehogar_active_session', JSON.stringify(officialDemoProfile));
         } catch {}
-        setCurrentUser(targetUser);
-        setActiveSubView(getDefaultSubViewForRole(targetUser.role));
+        setCurrentUser(officialDemoProfile);
+        setActiveSubView(getDefaultSubViewForRole(officialDemoProfile.role));
         notify(
           'success',
-          `¡Bienvenido/a, ${targetUser.displayName}!`,
-          `Ingresaste con la cuenta ${targetUser.email} (${targetUser.role}).`
+          `¡Bienvenido/a, ${officialDemoProfile.displayName}!`,
+          `Ingresaste con la cuenta ${officialDemoProfile.email} (${officialDemoProfile.role}).`
         );
         return true;
       }
@@ -1438,9 +1515,30 @@ export default function App() {
       return;
     }
     const uidToDelete = currentUser.uid;
+    const emailToDelete = currentUser.email.toLowerCase();
     try {
       await deleteDoc(doc(db, 'app_users', uidToDelete));
-      setUsers((prev) => prev.filter((u) => u.uid !== uidToDelete));
+      // Eliminar también si existiera otro doc duplicado con el mismo correo
+      if (emailToDelete) {
+        const dupSnap = await getDocsFromServer(
+          query(collection(db, 'app_users'), where('email', '==', emailToDelete))
+        ).catch(() => null);
+        if (dupSnap && !dupSnap.empty) {
+          for (const d of dupSnap.docs) {
+            await deleteDoc(doc(db, 'app_users', d.id)).catch(() => {});
+          }
+        }
+      }
+      setUsers((prev) => {
+        const next = prev.filter(
+          (u) => u.uid !== uidToDelete && u.email.toLowerCase() !== emailToDelete
+        );
+        saveCachedUsers(next);
+        return next;
+      });
+      if (auth.currentUser && auth.currentUser.uid === uidToDelete) {
+        await auth.currentUser.delete().catch(() => {});
+      }
       await handleLogout();
       notify('info', 'Perfil eliminado', 'Tus datos personales fueron eliminados correctamente.');
     } catch (err) {
