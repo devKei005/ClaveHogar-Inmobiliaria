@@ -4332,7 +4332,7 @@ export default function App() {
                             </span>
                           </div>
 
-                          {canUserEditProperty(prop, currentUser, users) ? (
+                          {canUserEditProperty(prop, currentUser, users, operations) ? (
                             <div className="flex items-center gap-1 sm:gap-2">
                               <button
                                 type="button"

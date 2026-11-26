@@ -27,9 +27,13 @@ export default defineConfig(() => {
           description:
             'Plataforma inmobiliaria web y móvil con buscador inteligente con IA para buscar, comparar, publicar y gestionar propiedades en alquiler y venta.',
           lang: 'es',
+          dir: 'ltr',
           start_url: '/',
           scope: '/',
           display: 'standalone',
+          orientation: 'any',
+          prefer_related_applications: false,
+          categories: ['business', 'lifestyle'],
           theme_color: '#173B43',
           background_color: '#F8F6F1',
           icons: [
